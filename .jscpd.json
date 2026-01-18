@@ -1,0 +1,19 @@
+{
+  "pattern": "**/*",
+  "ignore": [
+    "**/docs/**",
+    "**/.turbo/**",
+    "**/.output/**",
+    "**/.nitro/**",
+    "**/mnt/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/generated/**",
+    "**/eslint.config.{js,ts}"
+  ],
+  "threshold": 0,
+  "minTokens": 50,
+  "minLines": 33,
+  "maxLines": 1000,
+  "maxSize": "100kb"
+}

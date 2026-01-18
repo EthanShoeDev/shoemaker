@@ -1,0 +1,196 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalPassThroughEnv": [
+    "NIX_*",
+    "ANDROID_*",
+    "GRADLE_OPTS"
+  ],
+  // ============================================================================
+  // TURBO TASK INHERITANCE PATTERN
+  // ============================================================================
+  //
+  // This root config defines BASE task definitions that all packages inherit.
+  // Packages can override/extend these in their own turbo.json files.
+  //
+  // Key concepts:
+  //   - "^taskName" in dependsOn = run taskName in all DEPENDENCY packages first
+  //   - "with": ["taskName"] = run taskName in parallel for the SAME package
+  //   - "//#taskName" = root-only task (runs once, not per-package)
+  //
+  // DO NOT add package-specific tasks (e.g., "mobile#foo") to this file.
+  // Instead, packages should override tasks in their own turbo.json.
+  //
+  // NOTE: Turbo uses SHALLOW extend - arrays are replaced, not merged.
+  // When overriding a task, copy the base definition and add your items:
+  //
+  //   // apps/mobile/turbo.jsonc
+  //   {
+  //     "extends": ["//"],
+  //     "tasks": {
+  //       // Copied from root + mobile-specific (lint:eslint:check, expo:doctor)
+  //       "lint": {
+  //         "dependsOn": ["fmt", "^build"],
+  //         "with": ["typecheck", "oxlint:fix", "lint:eslint:check", "expo:doctor", "//#lint:root"],
+  //       }
+  //     }
+  //   }
+  //
+  // This keeps the root config generic and scalable as packages are added.
+  // ============================================================================
+  "tasks": {
+    // === Base package tasks (inherited by all packages) ===
+    "fmt": {
+      "with": [
+        "//#fmt:root"
+      ]
+    },
+    "fmt:check": {
+      "with": [
+        "//#fmt:check:root"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "fmt",
+        "^build"
+      ],
+      "with": [
+        "typecheck",
+        "oxlint:fix",
+        "//#lint:root"
+      ],
+    },
+    "lint:check": {
+      "dependsOn": [
+        "^build"
+      ],
+      "with": [
+        "fmt:check",
+        "typecheck",
+        "oxlint:check",
+        "//#lint:check:root"
+      ],
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^build",
+        "//#typecheck"
+      ],
+    },
+    "build": {
+      "outputs": [
+        "dist/**"
+      ],
+      "dependsOn": [
+        "^build"
+      ],
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": [
+        "^build"
+      ],
+    },
+    "clean": {
+      "cache": false,
+      "dependsOn": [
+        "^clean"
+      ]
+    },
+    // === Database tasks ===
+    "db:push": {
+      "cache": false,
+      "env": [
+        "DATABASE_URL"
+      ],
+    },
+    "db:seed": {
+      "cache": false,
+      "env": [
+        "DATABASE_URL"
+      ],
+    },
+    // === Deployment tasks ===
+    "deploy": {
+      "cache": false
+    },
+    "deploy:staging": {
+      "cache": false
+    },
+    "deploy:prod": {
+      "cache": false
+    },
+    // === Package-level task dependencies ===
+    // These define dependencies for tasks that packages may have
+    "oxlint:fix": {
+      "dependsOn": [
+        "@shoe-box-tools/oxlint-plugins#build"
+      ]
+    },
+    "oxlint:check": {
+      "dependsOn": [
+        "@shoe-box-tools/oxlint-plugins#build"
+      ]
+    },
+    // === Root-only tasks (prefixed with //#) ===
+    "//#typecheck": {},
+    "//#fmt:root": {
+      "with": [
+        "fmt:root:nix",
+        "oxfmt:fix"
+      ],
+    },
+    "//#fmt:check:root": {
+      "with": [
+        "fmt:check:root:nix",
+        "oxfmt:check"
+      ],
+    },
+    "//#lint:root": {
+      "dependsOn": [
+        "fmt:root"
+      ],
+      "with": [
+        "jscpd:check",
+        // "knip:fix:danger",
+        "oxlint:fix",
+      ],
+    },
+    "//#lint:check:root": {
+      "with": [
+        "fmt:check:root",
+        "jscpd:check",
+        //"knip:check",
+        "oxlint:check",
+        "catalog:check",
+      ],
+    },
+    // === Root script tasks ===
+    "//#fmt:root:nix": {},
+    "//#fmt:check:root:nix": {},
+    "//#jscpd:check": {},
+    "//#knip:check": {},
+    "//#knip:fix:danger": {},
+    "//#oxfmt:fix": {},
+    "//#oxfmt:check": {},
+    "//#oxlint:fix": {
+      "dependsOn": [
+        "@shoe-box-tools/oxlint-plugins#build"
+      ]
+    },
+    "//#oxlint:check": {
+      "dependsOn": [
+        "@shoe-box-tools/oxlint-plugins#build"
+      ]
+    },
+    "//#catalog:check": {},
+    "//#catalog:fix": {},
+  },
+}

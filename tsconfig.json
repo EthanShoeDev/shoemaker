@@ -1,0 +1,17 @@
+{
+  "extends": "@shoe-box-tools/config/tsconfig.base.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "scripts/**/*.ts"
+  ],
+  "exclude": [
+    "apps",
+    "packages",
+    "node_modules",
+    "dist"
+  ]
+}

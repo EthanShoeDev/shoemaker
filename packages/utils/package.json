@@ -1,0 +1,35 @@
+{
+  "name": "@shoe-box-tools/utils",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    "./cli-utils": "./dist/cli-utils.mjs",
+    "./ts-utils": "./dist/ts-utils.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@shoe-box-tools/config": "workspace:*",
+    "@effect/cli": "catalog:",
+    "@effect/platform": "catalog:",
+    "@effect/platform-bun": "catalog:",
+    "@effect/sql": "catalog:",
+    "@effect/sql-drizzle-v1": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "@types/aws-lambda": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "effect": "catalog:",
+    "tsdown": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/platform": "catalog:",
+    "effect": "catalog:",
+    "typescript": "catalog:"
+  }
+}
