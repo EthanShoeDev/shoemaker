@@ -1,0 +1,42 @@
+{
+  "name": "@shoe-box-tools/spanoptic",
+  "version": "0.0.1",
+  "description": "TUI OTEL visualizer for Effect programs",
+  "type": "module",
+  "bin": {
+    "spanoptic": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./cli": "./dist/cli.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "build": "tsdown",
+    "demo": "bun src/demo.ts"
+  },
+  "dependencies": {
+    "@effect/cli": "^0.56.0",
+    "@effect/opentelemetry": "^0.45.0",
+    "@effect/platform": "^0.78.0",
+    "@effect/platform-node": "^0.74.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-logs": "^0.200.0",
+    "@opentelemetry/sdk-metrics": "^1.30.0",
+    "@opentelemetry/sdk-trace-base": "^1.30.0",
+    "@opentelemetry/sdk-trace-node": "^1.30.0",
+    "@opentelemetry/sdk-trace-web": "^1.30.0",
+    "@opentui/core": "^0.1.74",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@shoe-box-tools/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "tsdown": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}

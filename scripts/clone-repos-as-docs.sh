@@ -48,6 +48,7 @@ gh repo clone TanStack/form
 gh repo clone Effect-TS/effect
 gh repo clone Effect-TS/website
 gh repo clone kitlangton/effect-solutions
+gh repo clone kitlangton/visual-effect
 gh repo clone voidhashcom/effect-query
 gh repo clone mcrovero/effect-nextjs # This provides good examples on how to use ManagedRuntimes.
 gh repo clone PaulJPhilp/EffectPatterns
