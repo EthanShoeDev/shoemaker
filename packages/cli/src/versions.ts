@@ -1,5 +1,7 @@
 import { Record as Rec } from 'effect';
 
+import { cliVersion } from './engine/meta.ts';
+
 // Every dependency version a generated repo can receive. Generators ask for a
 // name through `GenContext.version`, which throws on a name missing here, so
 // nothing is ever emitted as `latest`. Families move together: bump a family
@@ -10,7 +12,20 @@ const oxlint = '1.90.0';
 const alchemy = '2.0.0-beta.84';
 const tanstackRouter = '^1.170.46';
 const expoSdk = '~58.0.21';
-const shoemaker = '^0.1.0';
+// Changesets releases the shoemaker packages as one fixed group, so the CLI's
+// own version is theirs. On 0.x a caret only admits patches, so a literal here
+// fell behind the first minor release.
+const shoemaker = `^${cliVersion}`;
+
+// The packages this repo publishes as one changesets `fixed` group.
+export const shoemakerFamily = [
+  'shoemaker',
+  'shoemaker-oxlint-config',
+  'shoemaker-oxlint-plugins',
+  'shoemaker-oxfmt-config',
+  'shoemaker-typescript-config',
+  'shoemaker-knip-config',
+] as const;
 
 // Every runtime package Effect-TS/effect-smol publishes in lockstep with
 // `effect` (all exist at 4.1.0). Dependencies such as alchemy pull these with

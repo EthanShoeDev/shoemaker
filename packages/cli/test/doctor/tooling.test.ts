@@ -13,12 +13,14 @@ import {
   monorepoLayout,
   nixDevShell,
   scriptNames,
+  shoemakerVersions,
   turboFixUncached,
   turboJsonc,
   turboTaskCommands,
   typescript7,
   vscode,
 } from '../../src/doctor/tooling.ts';
+import { cliVersion } from '../../src/engine/meta.ts';
 import { failures, json } from './helpers.ts';
 
 const rootWith = (extra: Record<string, unknown>) =>
@@ -32,6 +34,50 @@ const rootWith = (extra: Record<string, unknown>) =>
   });
 
 describe('tooling doctor checks', () => {
+  it.effect('shoemaker-versions: a range below this CLI fails', () =>
+    Effect.gen(function* () {
+      const found = yield* failures(shoemakerVersions, {
+        'package.json': rootWith({
+          workspaces: {
+            packages: ['apps/*'],
+            catalog: { 'shoemaker-oxlint-config': '^0.0.1' },
+          },
+        }),
+        'apps/web/package.json': json({
+          name: '@demo/web',
+          devDependencies: {
+            'shoemaker-oxlint-config': 'catalog:',
+            'shoemaker-knip-config': '0.0.1',
+          },
+        }),
+      });
+      assert.deepStrictEqual(
+        Arr.map(found, (f) => [f.message, f.path]),
+        [
+          [
+            `shoemaker-oxlint-config@^0.0.1 excludes shoemaker ${cliVersion}`,
+            'package.json (catalog)',
+          ],
+          [
+            `shoemaker-knip-config@0.0.1 excludes shoemaker ${cliVersion}`,
+            'apps/web/package.json',
+          ],
+        ],
+      );
+      assert.lengthOf(
+        yield* failures(shoemakerVersions, {
+          'package.json': rootWith({
+            workspaces: {
+              packages: [],
+              catalog: { 'shoemaker-oxlint-config': `^${cliVersion}` },
+            },
+          }),
+        }),
+        0,
+      );
+    }),
+  );
+
   it.effect('turbo-jsonc: turbo.json anywhere fails', () =>
     Effect.gen(function* () {
       const found = yield* failures(turboJsonc, {

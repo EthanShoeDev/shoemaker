@@ -11,6 +11,7 @@ import {
 
 import { analyzeCatalog } from '../checks/catalog.ts';
 import {
+  allManifests,
   catalogOf,
   decodeJsonc,
   hasDep,
@@ -22,6 +23,8 @@ import {
   scopeOf,
   allDeps,
 } from '../checks/workspace.ts';
+import { cliVersion } from '../engine/meta.ts';
+import { shoemakerFamily } from '../versions.ts';
 import { commandCopies } from './command-copies.ts';
 import { renameScript } from './script-names.ts';
 import { fail, listSome, manifestsOf, pass, scriptsOf } from './shared.ts';
@@ -588,6 +591,47 @@ export const catalog: DoctorCheck = {
   }),
 };
 
+// A repo pinned below the running CLI installs older lint and config
+// packages than the generators it was just synced with expect.
+export const shoemakerVersions: DoctorCheck = {
+  id: 'shoemaker-versions',
+  description: `shoemaker-* ranges admit this CLI's version (${cliVersion})`,
+  run: Effect.fnUntraced(function* (repo) {
+    const workspace = yield* readWorkspace(repo);
+    if (workspace === undefined) return [];
+    const family = new Set<string>(shoemakerFamily);
+    const ranges = [
+      ...Arr.map(
+        Rec.toEntries(catalogOf(workspace.root.pkg)),
+        ([name, range]) => ({ name, range, path: 'package.json (catalog)' }),
+      ),
+      ...Arr.flatMap(allManifests(workspace), (manifest) =>
+        Arr.map(Rec.toEntries(allDeps(manifest.pkg)), ([name, range]) => ({
+          name,
+          range,
+          path: manifest.path,
+        })),
+      ),
+    ];
+    const stale = Arr.filter(
+      ranges,
+      ({ name, range }) =>
+        family.has(name) &&
+        !/^(?:catalog|workspace|link|file):/u.test(range) &&
+        !Bun.semver.satisfies(cliVersion, range),
+    );
+    if (stale.length === 0) {
+      return [pass(`shoemaker-* ranges admit ${cliVersion}`)];
+    }
+    return Arr.map(stale, ({ name, range, path }) =>
+      fail(`${name}@${range} excludes shoemaker ${cliVersion}`, {
+        path,
+        fix: `bun run shoemaker:sync (or set the range to ^${cliVersion}), then bun install`,
+      }),
+    );
+  }),
+};
+
 const COPIED = [
   'catalog-check',
   'effect-versions-check',
@@ -746,6 +790,7 @@ export const toolingChecks = [
   jscpd,
   knip,
   catalog,
+  shoemakerVersions,
   copiedScripts,
   gitHooks,
   vscode,
