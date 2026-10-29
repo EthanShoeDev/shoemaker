@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-typescript-config",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Shared strict tsconfig base for Effect + bun monorepos",
   "license": "MIT",
   "repository": {
