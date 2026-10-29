@@ -1,6 +1,6 @@
 {
   "name": "shoemaker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scaffold and keep in sync Effect + bun monorepos with Ethan's tooling preferences",
   "license": "MIT",
   "bin": {
