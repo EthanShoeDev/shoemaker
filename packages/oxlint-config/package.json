@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-oxlint-config",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "defineShoemakerConfig(): the shared oxlint.config.ts for Effect + bun monorepos",
   "license": "MIT",
   "repository": {
