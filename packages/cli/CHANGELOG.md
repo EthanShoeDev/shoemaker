@@ -1,5 +1,35 @@
 # shoemaker
 
+## 0.2.2
+
+### Patch Changes
+
+- [`52a67c8`](https://github.com/EthanShoeDev/shoemaker/commit/52a67c86f3a08ed1929e75dbedc0078a272fc459) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Generated repos now get `^<this CLI's version>` for shoemaker and the
+  `shoemaker-*` config packages. It used to be a hard-coded `^0.1.0`, which on
+  0.x never matches 0.2.x, so synced repos installed 0.1.x tooling, and a repo
+  that raised the catalog by hand got a root `package.json` conflict on every
+  sync. A test now fails if the range stops admitting the released versions,
+  and a new `doctor` check, `shoemaker-versions`, reports any shoemaker-* range
+  that excludes the running CLI.
+  
+  Existing repos (for a coding agent):
+  
+  1. Run `bun run shoemaker:sync`. It writes `^<version>` for every
+     shoemaker-* entry in the root catalog. A repo that held the catalog at
+     `^0.2.x` by hand no longer sees the root `package.json` conflict.
+  2. `bun install`, then run the repo's checks.
+
+- [`f995013`](https://github.com/EthanShoeDev/shoemaker/commit/f995013a8b5da179c52abcd8e7e3e1831e132cd0) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - `sync` treats dependency versions in package.json files as a floor. A repo
+  that raises a version past what shoemaker writes keeps it, and that bump no
+  longer makes the file look hand-edited, so it is not a conflict. A newer
+  version from shoemaker still replaces an older one. Changing a version into
+  another kind of spec (`catalog:`, `file:`, a range) is still a hand edit.
+  
+  Existing repos need nothing: locks written by older versions are still
+  recognized.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

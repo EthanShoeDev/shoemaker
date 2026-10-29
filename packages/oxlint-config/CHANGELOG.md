@@ -1,5 +1,12 @@
 # shoemaker-oxlint-config
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies []:
+  - shoemaker-oxlint-plugins@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes
