@@ -14,10 +14,10 @@ import {
   nixDevShell,
   scriptNames,
   turboJsonc,
+  turboTaskCommands,
   typescript7,
   vscode,
 } from '../../src/doctor/tooling.ts';
-import { MigrationId } from '../../src/migrations/ids.ts';
 import { failures, json } from './helpers.ts';
 
 const rootWith = (extra: Record<string, unknown>) =>
@@ -37,12 +37,71 @@ describe('tooling doctor checks', () => {
         'apps/api/turbo.json': '{}',
       });
       assert.deepStrictEqual(
-        Arr.map(found, (f) => f.migration),
-        [MigrationId.turboJsonToJsonc],
+        Arr.map(found, (f) => f.fix),
+        ['rename it to turbo.jsonc'],
       );
       assert.lengthOf(yield* failures(turboJsonc, { 'turbo.jsonc': '{}' }), 0);
       assert.lengthOf(yield* failures(turboJsonc, { 'nx.json': '{}' }), 0);
     }),
+  );
+
+  it.effect(
+    'turbo-task-commands: copies of a command, scripts in every package',
+    () =>
+      Effect.gen(function* () {
+        const pkg = (name: string, scripts: Record<string, string>) =>
+          json({ name, scripts });
+        const copies = yield* failures(turboTaskCommands, {
+          'package.json': rootWith({ scripts: { typecheck: 'tsc --noEmit' } }),
+          'turbo.jsonc':
+            '{\n  // shared\n  "tasks": { "typecheck": { "command": ["bun", "run", "tsc", "--noEmit"] } },\n}\n',
+          'apps/web/package.json': pkg('@demo/web', {
+            typecheck: 'tsc  --noEmit',
+          }),
+          'apps/api/package.json': pkg('@demo/api', {
+            typecheck: 'tsc --noEmit -p tsconfig.app.json',
+          }),
+        });
+        assert.deepStrictEqual(
+          Arr.map(copies, (f) => f.fix),
+          ['delete the copies so the shared turbo.jsonc command applies'],
+        );
+        const [copy] = copies;
+        assert.include(copy?.message, 'apps/web/package.json#typecheck');
+        assert.notInclude(copy?.message, 'apps/api');
+
+        const packages = {
+          'apps/web/package.json': pkg('@demo/web', {
+            'oxlint:check': 'oxlint .',
+            prepack: 'bun pack.ts',
+            build: 'vite build',
+          }),
+          'apps/api/package.json': pkg('@demo/api', {
+            'oxlint:check': 'oxlint .',
+            prepack: 'bun pack.ts',
+            build: 'tsdown',
+          }),
+        };
+        const everywhere = yield* failures(turboTaskCommands, {
+          'package.json': rootWith({}),
+          'turbo.jsonc': '{ "tasks": {} }',
+          ...packages,
+        });
+        assert.lengthOf(everywhere, 1);
+        const [shared] = everywhere;
+        assert.include(shared?.message, 'oxlint:check');
+        assert.notInclude(shared?.message, 'prepack');
+        assert.notInclude(shared?.message, 'build');
+        // nx runs package scripts, so the copies are how it works there.
+        assert.lengthOf(
+          yield* failures(turboTaskCommands, {
+            'package.json': rootWith({}),
+            'nx.json': '{}',
+            ...packages,
+          }),
+          0,
+        );
+      }),
   );
 
   it.effect('script-names: lint:* and fmt:* drift', () =>
@@ -61,7 +120,10 @@ describe('tooling doctor checks', () => {
         found[0]?.message ?? '',
         'lint:oxlint -> oxlint:fix, fmt:check -> oxfmt:check',
       );
-      assert.strictEqual(found[0]?.migration, MigrationId.lintScriptNames);
+      assert.strictEqual(
+        found[0]?.fix,
+        'rename them to <tool>:check / <tool>:fix',
+      );
     }),
   );
 
@@ -121,8 +183,12 @@ describe('tooling doctor checks', () => {
         }),
       });
       assert.deepStrictEqual(
-        Arr.map(found, (f) => f.migration),
-        [MigrationId.tsgoToTsc, MigrationId.tsgoToTsc, MigrationId.tsgoToTsc],
+        Arr.map(found, (f) => f.fix),
+        [
+          'run tsc (TypeScript 7) instead of tsgo',
+          'replace it with typescript ^7',
+          'bump typescript to ^7',
+        ],
       );
       assert.include(found[2]?.message ?? '', '~5.9.3');
       assert.lengthOf(
@@ -164,13 +230,10 @@ describe('tooling doctor checks', () => {
           '{ description = "Elden Ring Compass development environment"; }',
       });
       assert.deepStrictEqual(
-        Arr.map(
-          found,
-          (f) =>
-            f.migration ??
-            (f.fix === undefined ? undefined : Str.slice(0, 12)(f.fix)),
+        Arr.map(found, (f) =>
+          f.fix === undefined ? undefined : Str.slice(0, 12)(f.fix),
         ),
-        ['run `nix fla', MigrationId.addEnvrc, 'update the f'],
+        ['run `nix fla', 'add `use fla', 'update the f'],
       );
       assert.lengthOf(
         yield* failures(nixDevShell, {
@@ -225,10 +288,7 @@ describe('tooling doctor checks', () => {
         'scripts/catalog-check.ts': '',
         'scripts/lint/effect-versions-check.ts': '',
       });
-      assert.strictEqual(
-        found[0]?.migration,
-        MigrationId.catalogCheckToShoebox,
-      );
+      assert.include(found[0]?.fix ?? '', 'shoe-box check catalog');
       assert.include(found[1]?.message ?? '', 'shoe-box check effect-versions');
     }),
   );

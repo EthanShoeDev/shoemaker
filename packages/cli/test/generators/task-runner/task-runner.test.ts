@@ -9,7 +9,9 @@ import {
 import { type ParseError, parse } from 'jsonc-parser';
 
 import type { ShoeboxConfig } from '../../../src/config/schema.ts';
+import type { GeneratedFile } from '../../../src/engine/types.ts';
 import { parseRef } from '../../../src/generators/task-runner/refs.ts';
+import { packageCommands } from '../../../src/generators/task-runner/tasks.ts';
 import { parseJson, preset, record, render } from '../root/fixtures.ts';
 
 const strings = (value: unknown) =>
@@ -26,6 +28,15 @@ const withRunner = (
   config: ShoeboxConfig,
   taskRunner: ShoeboxConfig['taskRunner'],
 ): ShoeboxConfig => ({ ...config, taskRunner });
+
+const workspaceScripts = (files: ReadonlyArray<GeneratedFile>) =>
+  pipe(
+    files,
+    Arr.filter((f) =>
+      /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(f.path),
+    ),
+    Arr.map((f) => [f.path, record(parseJson(f).scripts)] as const),
+  );
 
 const configs = [
   ['minimal', preset('minimal')],
@@ -110,6 +121,27 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
     );
   });
 
+  it('defines shared leaf commands once, run through bun', () => {
+    const turbo = parseJsonc(file('turbo.jsonc').content);
+    assert.deepStrictEqual(record(turbo.futureFlags), {
+      experimentalTaskCommand: true,
+    });
+    for (const [name, argv] of Rec.toEntries(packageCommands)) {
+      assert.deepStrictEqual(
+        strings(record(tasks[name]).command),
+        ['bun', 'run', ...argv],
+        name,
+      );
+    }
+    // A package script would override the command; only real overrides
+    // (Expo's `clean`) remain.
+    for (const [path, scripts] of workspaceScripts(files)) {
+      for (const [name, argv] of Rec.toEntries(packageCommands)) {
+        assert.notStrictEqual(scripts[name], Arr.join(argv, ' '), path);
+      }
+    }
+  });
+
   it('extends the root config from package overrides', () => {
     for (const override of overrides.values()) {
       assert.deepStrictEqual(override.extends, ['//']);
@@ -186,6 +218,14 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
       } else {
         assert.strictEqual(entry.executor, 'nx:noop', name);
       }
+    }
+  });
+
+  it('keeps shared leaf commands as package scripts', () => {
+    assert.notInclude(file('nx.json').content, '"command"');
+    for (const [path, scripts] of workspaceScripts(files)) {
+      assert.strictEqual(scripts.typecheck, 'tsc --noEmit', path);
+      assert.isDefined(scripts.test, path);
     }
   });
 

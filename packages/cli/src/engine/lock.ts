@@ -27,7 +27,6 @@ export type LockEntry = typeof LockEntry.Type;
 
 export const Lock = Schema.Struct({
   cliVersion: Schema.String,
-  migrations: Schema.Array(Schema.String),
   files: Schema.Record(Schema.String, LockEntry),
 });
 export type Lock = typeof Lock.Type;
@@ -36,12 +35,6 @@ export class LockParseError extends Schema.TaggedError<
   LockParseError,
   { readonly brand: unique symbol }
 >()('LockParseError', { message: Schema.String }) {}
-
-export const emptyLock = (cliVersion: string): Lock => ({
-  cliVersion,
-  migrations: [],
-  files: {},
-});
 
 const decodeLock = Schema.decodeUnknownEffect(Lock);
 
@@ -70,7 +63,6 @@ export const renderLock = (lock: Lock) =>
   `${JSON.stringify(
     {
       cliVersion: lock.cliVersion,
-      migrations: [...new Set(lock.migrations)],
       files: Rec.fromEntries(
         Arr.map(
           Arr.sort(Rec.toEntries(lock.files), byPath),

@@ -3,7 +3,7 @@ import { Array as Arr, Effect, Option, Record as Rec } from 'effect';
 
 import { catalogCheck } from '../../src/checks/catalog.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
-import { pkgIn } from '../migrations/helpers.ts';
+import { pkgIn } from './helpers.ts';
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 

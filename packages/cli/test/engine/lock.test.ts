@@ -12,7 +12,6 @@ import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
 describe('lock', () => {
   const lock: Lock = {
     cliVersion: '0.1.0',
-    migrations: ['2026-10-28-a'],
     files: {
       'b.json': { sha256: 'bb', strategy: 'json-merge', owned: ['/name'] },
       'a.ts': { sha256: 'aa', strategy: 'owned' },
@@ -34,7 +33,7 @@ describe('lock', () => {
   it.effect('accepts JSONC comments and trailing commas', () =>
     Effect.gen(function* () {
       const parsed = yield* parseLock(
-        '// header\n{ "cliVersion": "1", "migrations": [], "files": {}, }',
+        '// header\n{ "cliVersion": "1", "files": {}, }',
       );
       assert.strictEqual(parsed.cliVersion, '1');
     }),

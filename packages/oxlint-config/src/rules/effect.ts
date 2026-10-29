@@ -40,10 +40,11 @@ export const custom = (scope: string): OxlintRules => ({
   'import-boundaries/no-cross-package-relative-imports': 'error',
   // A dynamic import() must carry a `dynamic-import -- reason` comment.
   'dynamic-import/no-unexplained-dynamic-import': 'error',
-  // process.env / import.meta.env go through the generated env package.
+  // process.env / import.meta.env go through Effect Config, or the repo's own
+  // `@<scope>/env` package when it has one.
   'env-access/no-raw-env-access': [
     'error',
-    { envPackage: `@${scope}/env`, allowedPackages: [`@${scope}/env`] },
+    { allowedPackages: [`@${scope}/env`] },
   ],
 });
 

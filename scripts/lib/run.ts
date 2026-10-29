@@ -76,7 +76,7 @@ export const run = Effect.fnUntraced(function* (
   return result.output;
 });
 
-// Runs a command with its output on the terminal.
+// Runs a command attached to the terminal, so it can also prompt.
 export const runInherit = Effect.fnUntraced(function* (
   command: string,
   args: ReadonlyArray<string>,
@@ -89,6 +89,7 @@ export const runInherit = Effect.fnUntraced(function* (
         cwd: options.cwd,
         env: options.env,
         extendEnv: true,
+        stdin: 'inherit',
         stdout: 'inherit',
         stderr: 'inherit',
       }),

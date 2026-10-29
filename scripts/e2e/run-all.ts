@@ -15,15 +15,14 @@ import {
   Path,
   Record as Rec,
   Schema,
-  String as Str,
 } from 'effect';
 import { Argument, Command, Flag } from 'effect/cli';
 
 import { renderConfigFile } from '../../packages/cli/src/config/render.ts';
-import { readJsonObject, stringRecord, writeJson } from '../lib/json.ts';
+import { writeJson } from '../lib/json.ts';
 import { repoRoot } from '../lib/packages.ts';
 import { run, runScript } from '../lib/run.ts';
-import { packLocal } from './pack-local.ts';
+import { packLocal, pinTarballs } from './pack-local.ts';
 import { presets } from './presets.ts';
 
 class PresetsFailed extends Schema.TaggedError<
@@ -105,17 +104,7 @@ const runAll = Command.make(
         'shoe-box sync',
         run('bun', [cli, 'sync', '--allow-dirty'], { cwd: dir, env }),
       );
-      // Tarballs depend on each other at versions not on npm yet.
-      const manifestPath = path.join(dir, 'package.json');
-      const manifest = yield* readJsonObject(manifestPath);
-      manifest.overrides = Rec.fromEntries(
-        Arr.sort(
-          Rec.toEntries({ ...stringRecord(manifest.overrides), ...overrides }),
-          ([a]: readonly [string, string], [b]: readonly [string, string]) =>
-            Str.localeCompare(b)(a),
-        ),
-      );
-      yield* writeJson(manifestPath, manifest);
+      yield* pinTarballs(path.join(dir, 'package.json'), overrides);
       yield* step(
         name,
         'bun install',

@@ -7,7 +7,6 @@ import { adoptCommand } from './adopt.ts';
 import { checkCommand } from './check.ts';
 import { doctorCommand } from './doctor.ts';
 import { initCommand } from './init.ts';
-import { migrateCommand } from './migrate.ts';
 import { CommandFailed, style } from './shared.ts';
 import { syncCommand } from './sync.ts';
 
@@ -21,7 +20,6 @@ export const shoebox = Command.make('shoe-box').pipe(
     addCommand,
     doctorCommand,
     adoptCommand,
-    migrateCommand,
     checkCommand,
   ]),
 );

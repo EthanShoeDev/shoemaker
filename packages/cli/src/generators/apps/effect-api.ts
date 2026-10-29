@@ -13,12 +13,13 @@ import {
   catalogOf,
   devTask,
   effectTestDevDependencies,
-  envExportName,
   forApps,
+  pascalCase,
   vitestConfig,
 } from './common.ts';
 
 const dependencies = ['@effect/platform-bun', 'effect'];
+const workerDependencies = ['@alchemy.run/cloudflare', 'alchemy'];
 const devDependencies = [...effectTestDevDependencies, 'tsdown'];
 
 const portKey = 'PORT';
@@ -71,9 +72,8 @@ export const ApiLive = HttpApiBuilder.layer(Api).pipe(
 );
 `;
 
-const binSource = (ctx: GenContext) => `#!/usr/bin/env bun
+const binSource = `#!/usr/bin/env bun
 import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
-import { ${envExportName(portKey)} } from '${ctx.pkg('env')}';
 import { Config, Layer } from 'effect';
 import { HttpRouter } from 'effect/http';
 
@@ -81,25 +81,41 @@ import { ApiLive } from './handlers.ts';
 
 const ServerLive = HttpRouter.serve(ApiLive).pipe(
   Layer.provide(
-    BunHttpServer.layerConfig(Config.map(${envExportName(portKey)}, (value) => ({ port: value }))),
+    BunHttpServer.layerConfig(
+      Config.Port('${portKey}').pipe(
+        Config.withDefault(3000),
+        Config.map((port) => ({ port })),
+      ),
+    ),
   ),
 );
 
 Layer.launch(ServerLive).pipe(BunRuntime.runMain);
 `;
 
-// Cloudflare runs the same API as a fetch handler: no server, no port.
-const workerSource = `import { Layer } from 'effect';
+// Cloudflare runs the same API as a Worker: no server, no port. The root
+// alchemy.run.ts yields the class; `main: import.meta.url` makes this file the
+// Worker's entry wherever alchemy runs from.
+const workerSource = (app: App) => {
+  const name = pascalCase(app.name);
+  return `import * as Cloudflare from '@alchemy.run/cloudflare';
+import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServer } from 'effect/http';
 
 import { ApiLive } from './handlers.ts';
 
-const { handler } = HttpRouter.toWebHandler(
-  ApiLive.pipe(Layer.provide(HttpServer.layerServices)),
-);
-
-export default { fetch: handler };
+export default class ${name} extends Cloudflare.Worker<${name}>()(
+  '${name}',
+  { main: import.meta.url },
+  Effect.succeed({
+    fetch: ApiLive.pipe(
+      Layer.provide(HttpServer.layerServices),
+      HttpRouter.toHttpEffect,
+    ),
+  }),
+) {}
 `;
+};
 
 const testSource = `import { assert, layer } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
@@ -160,19 +176,19 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
           dev: 'bun --watch src/bin.ts',
           build: 'tsdown',
           start: 'bun dist/bin.mjs',
-          test: 'vitest run',
         },
-        dependencies,
+        dependencies: worker
+          ? [...dependencies, ...workerDependencies]
+          : dependencies,
         devDependencies,
-        workspaceDependencies: ['env'],
       }),
       packageTsconfig(dir),
       vitestConfig(dir, app.name),
       owned(`${dir}/tsdown.config.ts`, tsdownConfig),
       seed(`${dir}/src/api.ts`, apiSource(app)),
       seed(`${dir}/src/handlers.ts`, handlersSource),
-      seed(`${dir}/src/bin.ts`, binSource(ctx)),
-      ...(worker ? [seed(`${dir}/src/worker.ts`, workerSource)] : []),
+      seed(`${dir}/src/bin.ts`, binSource),
+      ...(worker ? [seed(`${dir}/src/worker.ts`, workerSource(app))] : []),
       seed(`${dir}/test/api.test.ts`, testSource),
       seed(
         `${dir}/README.md`,
@@ -201,7 +217,11 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
         tags: [app.name],
       },
     ],
-    catalog: catalogOf(dependencies, devDependencies),
+    catalog: catalogOf(
+      dependencies,
+      devDependencies,
+      worker ? workerDependencies : [],
+    ),
   };
 };
 

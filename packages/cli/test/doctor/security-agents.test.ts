@@ -134,22 +134,17 @@ describe('security doctor checks', () => {
 });
 
 describe('agents doctor check', () => {
-  it.effect('AGENTS.md + CLAUDE.md -> @AGENTS.md + .claude/settings.json', () =>
+  it.effect('AGENTS.md + CLAUDE.md -> @AGENTS.md', () =>
     Effect.gen(function* () {
       const good = yield* runCheck(agentsMd, {
         'AGENTS.md': '# x',
         'CLAUDE.md': '@AGENTS.md\n',
-        '.claude/settings.json': '{}',
       });
       assert.isTrue(Arr.every(good, (f) => f.ok));
       const bad = yield* failures(agentsMd, { 'CLAUDE.md': '# Guidance\n' });
       assert.deepStrictEqual(
         Arr.map(bad, (f) => f.message),
-        [
-          'no AGENTS.md',
-          'CLAUDE.md is not `@AGENTS.md`',
-          'no .claude/settings.json',
-        ],
+        ['no AGENTS.md', 'CLAUDE.md is not `@AGENTS.md`'],
       );
       assert.include(bad[0]?.fix ?? '', 'move CLAUDE.md to AGENTS.md');
     }),

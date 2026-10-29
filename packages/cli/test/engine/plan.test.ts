@@ -29,7 +29,6 @@ const lockOf = (
   entries: ReadonlyArray<readonly [GeneratedFile, string]>,
 ): Lock => ({
   cliVersion: '0.0.0',
-  migrations: [],
   files: Rec.fromEntries(
     Arr.map(
       entries,

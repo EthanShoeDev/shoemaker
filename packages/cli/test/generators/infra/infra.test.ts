@@ -1,7 +1,11 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, pipe, String as Str } from 'effect';
+import { Array as Arr, String as Str } from 'effect';
 
-import type { App, InfraProvider } from '../../../src/config/schema.ts';
+import type {
+  App,
+  DeployTarget,
+  StateStore,
+} from '../../../src/config/schema.ts';
 import { generate } from '../../../src/engine/generate.ts';
 import { alchemyInfra } from '../../../src/generators/infra/alchemy.ts';
 import { infraGenerators } from '../../../src/generators/infra/index.ts';
@@ -22,80 +26,56 @@ const apps: ReadonlyArray<App> = [
   { name: 'mobile', kind: 'expo' },
 ];
 
-const withProviders = (providers: ReadonlyArray<InfraProvider>) =>
-  sampleConfig({ apps, infra: { kind: 'alchemy', providers } });
+const withInfra = (deploy: DeployTarget, state: StateStore) =>
+  sampleConfig({ apps, infra: { kind: 'alchemy', deploy, state } });
 
-const providerSets: ReadonlyArray<ReadonlyArray<InfraProvider>> = [
-  ['cloudflare'],
-  ['aws'],
-  ['cloudflare', 'aws'],
+const run = (deploy: DeployTarget, state: StateStore) =>
+  contribute(alchemyInfra, withInfra(deploy, state)).file('alchemy.run.ts')
+    .content;
+
+const combos: ReadonlyArray<readonly [DeployTarget, StateStore]> = [
+  ['cloudflare', 'local'],
+  ['cloudflare', 'cloudflare'],
+  ['aws', 'aws'],
+  ['none', 'local'],
 ];
 
-describe.each(Arr.map(providerSets, (set) => [set]))(
-  'alchemy infra (%j)',
-  (providers) => {
+describe.each(combos)(
+  'alchemy infra (deploy %s, state %s)',
+  (deploy, state) => {
     const { contribution, files, byPath, file } = contribute(
       alchemyInfra,
-      withProviders(providers),
+      withInfra(deploy, state),
     );
 
-    it('emits the infra package and the root entrypoint', () => {
+    it('emits one root Stack and no infra package', () => {
       assertStrategies(byPath, [
-        ['packages/infra/package.json', 'json-merge'],
-        ['packages/infra/tsconfig.json', 'owned'],
-        ['packages/infra/vitest.config.ts', 'owned'],
-        ['packages/infra/alchemy.run.ts', 'seed'],
-        ['packages/infra/src/stack.ts', 'seed'],
-        ['packages/infra/src/providers.ts', 'seed'],
-        ['packages/infra/src/stage.ts', 'seed'],
-        ['alchemy.run.ts', 'owned'],
+        ['alchemy.run.ts', 'seed'],
         ['package.json', 'json-merge'],
       ]);
-      assert.strictEqual(
-        file('alchemy.run.ts').content,
-        "export { default } from './packages/infra/alchemy.run.ts';\n",
+      assert.isFalse(
+        Arr.some(files, (f) => Str.startsWith('packages/infra/')(f.path)),
       );
     });
 
     it('wraps the root infra scripts with the secrets manager', () => {
       const scripts = record(parseJson(file('package.json')).scripts);
       assert.deepStrictEqual(scripts, {
+        'infra:dev': 'varlock run -- alchemy dev',
         'infra:plan': 'varlock run -- alchemy plan',
         'infra:deploy': 'varlock run -- alchemy deploy',
         'infra:destroy': 'varlock run -- alchemy destroy',
       });
     });
 
-    it('merges a layer per chosen provider', () => {
-      const source = file('packages/infra/src/providers.ts').content;
-      for (const provider of providers) {
-        const name = provider === 'aws' ? 'AWS' : 'Cloudflare';
-        assert.include(source, `${name}.providers()`);
-      }
-    });
-
     it('lists every dependency in the catalog', () => {
       assertCatalogComplete(contribution);
     });
 
-    it('declares the provider credentials and gitignores local state', () => {
-      const keys = Arr.map(contribution.env ?? [], (v) => v.key);
-      assert.include(keys, 'ALCHEMY_STAGE');
-      if (providers.includes('cloudflare')) {
-        assert.includeMembers(keys, [
-          'CLOUDFLARE_API_TOKEN',
-          'CLOUDFLARE_ACCOUNT_ID',
-        ]);
-      }
-      if (providers.includes('aws')) {
-        assert.includeMembers(keys, ['AWS_PROFILE', 'AWS_REGION']);
-      }
-      assert.isTrue(
-        pipe(
-          contribution.env ?? [],
-          Arr.filter((v) => Str.startsWith('CLOUDFLARE_')(v.key)),
-          Arr.every((v) => v.sensitive),
-        ),
+    it('leaves credentials to alchemy profiles and gitignores local state', () => {
+      assert.deepStrictEqual(
+        Arr.map(contribution.env ?? [], (v) => v.key),
+        ['ALCHEMY_STAGE', 'ALCHEMY_PROFILE'],
       );
       assert.include(contribution.gitignore ?? [], '.alchemy/');
     });
@@ -111,50 +91,76 @@ describe('infra scripts under secretspec', () => {
       sampleConfig({
         apps,
         secrets: 'secretspec',
-        infra: { kind: 'alchemy', providers: ['cloudflare'] },
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
       }),
     );
     const scripts = record(parseJson(file('package.json')).scripts);
+    const via = (verb: string) =>
+      `secretspec run --profile development -- bun run alchemy ${verb}`;
     assert.deepStrictEqual(scripts, {
       alchemy: 'alchemy',
-      'infra:plan':
-        'secretspec run --profile development -- bun run alchemy plan',
-      'infra:deploy':
-        'secretspec run --profile development -- bun run alchemy deploy',
-      'infra:destroy':
-        'secretspec run --profile development -- bun run alchemy destroy',
+      'infra:dev': via('dev'),
+      'infra:plan': via('plan'),
+      'infra:deploy': via('deploy'),
+      'infra:destroy': via('destroy'),
     });
   });
 });
 
 describe('deploy targets', () => {
-  const stack = (providers: ReadonlyArray<InfraProvider>) =>
-    contribute(alchemyInfra, withProviders(providers)).file(
-      'packages/infra/src/stack.ts',
-    ).content;
-
-  it('deploys sites and the API worker to Cloudflare', () => {
-    const source = stack(['cloudflare']);
+  it('deploys sites and the API Worker to Cloudflare', () => {
+    const source = run('cloudflare', 'local');
     assert.include(source, "Cloudflare.Website.Vite('Web'");
     assert.include(source, "Cloudflare.Website.Foldkit('Site'");
-    assert.include(source, "main: 'apps/api/src/worker.ts'");
+    assert.include(
+      source,
+      "rootDir: path.resolve(import.meta.dirname, 'apps/web')",
+    );
+    assert.include(source, "import Api from './apps/api/src/worker.ts';");
+    assert.include(source, 'const api = yield* Api;');
+    assert.include(source, 'providers: Cloudflare.providers()');
     assert.notInclude(source, 'Mobile');
   });
 
-  it('deploys sites to AWS when Cloudflare is not chosen', () => {
-    const source = stack(['aws']);
+  it("installs the Stack's imports at the root, where alchemy runs", () => {
+    const { file } = contribute(alchemyInfra, withInfra('cloudflare', 'local'));
+    const devDependencies = record(
+      parseJson(file('package.json')).devDependencies,
+    );
+    assert.strictEqual(devDependencies['@alchemy.run/cloudflare'], 'catalog:');
+    assert.isUndefined(devDependencies['@sample/api']);
+  });
+
+  it('keys the root typecheck and lint on the Worker sources', () => {
+    const { contribution } = contribute(
+      alchemyInfra,
+      withInfra('cloudflare', 'local'),
+    );
+    const tasks = contribution.tasks ?? [];
+    assert.deepStrictEqual(
+      Arr.map(tasks, (task) => [task.name, task.root, task.inputs]),
+      Arr.map(['typecheck', 'oxlint:check', 'oxlint:fix'], (name) => [
+        name,
+        true,
+        ['apps/api/package.json', 'apps/api/src/**'],
+      ]),
+    );
+  });
+
+  it('deploys sites to AWS, which has no Worker for the API', () => {
+    const source = run('aws', 'aws');
     assert.include(source, "AWS.Website.TanStackStart('Web'");
     assert.include(source, "AWS.Website.Foldkit('Site'");
     assert.notInclude(source, 'Api');
+    const { contribution } = contribute(alchemyInfra, withInfra('aws', 'aws'));
+    assert.deepStrictEqual(contribution.tasks, []);
   });
 
-  it('keeps state with the primary provider', () => {
-    const run = (providers: ReadonlyArray<InfraProvider>) =>
-      contribute(alchemyInfra, withProviders(providers)).file(
-        'packages/infra/alchemy.run.ts',
-      ).content;
-    assert.include(run(['cloudflare', 'aws']), 'state: Cloudflare.state()');
-    assert.include(run(['aws']), 'state: AWS.state()');
+  it('starts an empty Stack with no providers when nothing deploys', () => {
+    const source = run('none', 'local');
+    assert.include(source, 'providers: Layer.empty');
+    assert.include(source, 'Effect.succeed({})');
+    assert.notInclude(source, '@alchemy.run/');
   });
 
   it('contributes nothing without alchemy', () => {
@@ -163,16 +169,31 @@ describe('deploy targets', () => {
   });
 });
 
+describe('state stores', () => {
+  it('keeps state where the config says, independent of the deploy target', () => {
+    assert.include(run('cloudflare', 'local'), 'state: Alchemy.localState()');
+    assert.include(
+      run('cloudflare', 'cloudflare'),
+      'state: Cloudflare.state()',
+    );
+    const mixed = run('cloudflare', 'aws');
+    assert.include(mixed, 'state: AWS.state()');
+    assert.include(mixed, "import * as AWS from '@alchemy.run/aws';");
+    assert.include(mixed, 'providers: Cloudflare.providers()');
+    assert.include(run('none', 'aws'), 'providers: Layer.empty');
+  });
+});
+
 describe('registration', () => {
   it('is part of the generator pipeline', () => {
     assert.include(infraGenerators, alchemyInfra);
-    const { files } = generate(withProviders(['cloudflare']));
+    const { files } = generate(withInfra('cloudflare', 'local'));
     const paths = Arr.map(files, (file) => file.path);
     assert.includeMembers(paths, [
       'alchemy.run.ts',
-      'packages/infra/alchemy.run.ts',
       'apps/web/vite.config.ts',
       'apps/api/src/worker.ts',
     ]);
+    assert.notInclude(paths, 'packages/infra/package.json');
   });
 });

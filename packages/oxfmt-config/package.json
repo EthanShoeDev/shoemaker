@@ -30,15 +30,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "clean": "rm -rf dist .turbo *.tsbuildinfo",
-    "typecheck": "tsc --noEmit",
-    "oxlint:check": "oxlint -c ../../oxlint.config.ts .",
-    "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
-    "test": "vitest run",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
-    "postpack": "bun ../../scripts/publish-manifest.ts restore",
-    "release:publish": "bun ../../scripts/publish-package.ts"
+    "postpack": "bun ../../scripts/publish-manifest.ts restore"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",

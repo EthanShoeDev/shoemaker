@@ -5,8 +5,8 @@ import type { EnvVar } from './model.ts';
 
 export const STAGES = ['development', 'staging', 'production'] as const;
 
-// The environment flag every manager keys off: varlock's `@currentEnv`, the
-// secretspec profile defaults, and `@scope/env`'s `appEnv`.
+// The environment flag every manager keys off: varlock's `@currentEnv` and the
+// secretspec profile defaults.
 export const appEnvVar: EnvVar = {
   key: 'APP_ENV',
   description:
@@ -31,11 +31,4 @@ export const allEnvVars = (aggregate: Aggregate): ReadonlyArray<EnvVar> => {
       Str.localeCompare(b.key)(a.key),
     ),
   ];
-};
-
-export const enumMembers = (type: string | undefined) => {
-  const members = /^enum\((.*)\)$/u.exec(type ?? '')?.[1];
-  return members === undefined
-    ? undefined
-    : Arr.map(Str.split(members, ','), (member) => Str.trim(member));
 };

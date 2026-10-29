@@ -1,7 +1,7 @@
 import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
 
 import type { GeneratedFile, Renderer } from '../../engine/types.ts';
-import { hasEnvPackage, workspaces } from '../root/workspaces.ts';
+import { workspaces } from '../root/workspaces.ts';
 import { hasApp, owned } from '../shared.ts';
 import { commented, type Jsonc, jsonc } from './jsonc.ts';
 import type { TaskDef } from './model.ts';
@@ -16,14 +16,26 @@ const HEADER = `Task-inheritance pattern:
   "^task"        -> run \`task\` in all DEPENDENCY packages first
   "with": [...]  -> run these tasks in parallel for the SAME package
   "//#task"      -> a root-only task (defined in root package.json)
-Package scripts are leaf commands. Aggregates (\`lint\`, \`lint:check\`) have
-no script: they only fan out, so turbo is never called from a script.
+Leaf commands every package shares are task \`command\`s (argv, no shell),
+defined here once instead of copied into each package.json. A package script
+of the same name overrides one; \`"command": null\` in a package's turbo.jsonc
+opts the package out. Other leaf commands are package scripts. Aggregates
+(\`lint\`, \`lint:check\`) have neither: they only fan out, so turbo is never
+called from a script.
 Turbo uses shallow extend: a package overriding a task must copy the whole
 definition, it is not merged with the root one.
 The root depends on no internal package: turbo hashes the source of every
 internal package the root depends on into the global hash, so one such
 dependency misses cache for every task in the repo.
 @see https://turborepo.dev/docs/crafting-your-repository/caching#root-workspace-dependencies`;
+
+// Turbo spawns a `command` directly, without node_modules/.bin on PATH;
+// `bun run` resolves the binary the way a package script would.
+export const turboCommand = (argv: ReadonlyArray<string>) => [
+  'bun',
+  'run',
+  ...argv,
+];
 
 // Cached leaf tasks only print logs on a miss; `transit` has no script.
 const quietLogs = (task: TaskDef) =>
@@ -34,6 +46,8 @@ const quietLogs = (task: TaskDef) =>
 
 const turboTask = (task: TaskDef): Jsonc => {
   const body: Record<string, Jsonc | undefined> = {
+    command:
+      task.command === undefined ? undefined : turboCommand(task.command),
     dependsOn: task.dependsOn,
     with: task.with,
     inputs: task.inputs,
@@ -62,7 +76,8 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
     ...Arr.filter(shared, (task) => task.root !== true),
     ...Arr.filter(shared, (task) => task.root === true),
   ];
-  const envPackage = hasEnvPackage(ctx.config, aggregate);
+  // Apps and declared env vars read the environment, so it keys the cache.
+  const readsEnv = ctx.config.apps.length > 0 || aggregate.env.length > 0;
   const plainEnv = pipe(
     aggregate.env,
     Arr.filter((v) => !v.sensitive),
@@ -79,8 +94,14 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
     jsonc({
       $schema: schemaFrom('.'),
       ui: 'tui',
+      futureFlags: Arr.some(tasks, (task) => task.command !== undefined)
+        ? commented(
+            'Task `command` is experimental; it lets every package share one\ndefinition of a leaf command instead of a copied script.',
+            { experimentalTaskCommand: true },
+          )
+        : undefined,
       globalPassThroughEnv: ['NIX_*', 'TMPDIR', ...secretEnv],
-      globalEnv: envPackage ? ['APP_ENV', ...plainEnv] : undefined,
+      globalEnv: readsEnv ? ['APP_ENV', ...plainEnv] : undefined,
       globalDependencies: [
         ...(hasApp(ctx.config, 'expo') ? ['bunfig.toml'] : []),
         'patches/**',
@@ -90,7 +111,7 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
   );
 
   const dirs = new Map(
-    Arr.map(workspaces(ctx, aggregate), (w) => [w.name, w.dir] as const),
+    Arr.map(workspaces(ctx), (w) => [w.name, w.dir] as const),
   );
   const byPackage = Map.groupBy(
     Arr.filter(tasks, (task) => task.package !== undefined),

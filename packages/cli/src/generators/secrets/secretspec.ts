@@ -30,7 +30,7 @@ export const secretspecToml = (name: string, vars: ReadonlyArray<EnvVar>) => {
     'project',
     `# Declarative secret manifest for ${name}: what every process needs, not where
 # it is stored. \`secretspec run --profile <stage> -- <command>\` materializes it;
-# app code reads the values through the generated env package (Effect Config).
+# app code reads the values through Effect Config, never process.env.
 # Docs: https://secretspec.dev/concepts/declarative/
 [project]
 name = ${str(name)}

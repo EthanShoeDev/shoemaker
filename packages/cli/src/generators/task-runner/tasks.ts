@@ -15,6 +15,16 @@ const manifests = [
   'packages/*/package.json',
 ];
 
+// Leaf commands every workspace package runs. Under turbo they are defined
+// once, here, instead of copied into every package.json.
+export const packageCommands = {
+  clean: ['rm', '-rf', 'dist', '.turbo'],
+  typecheck: ['tsc', '--noEmit'],
+  test: ['vitest', 'run'],
+  'oxlint:check': ['oxlint', '-c', '../../oxlint.config.ts', '.'],
+  'oxlint:fix': ['oxlint', '-c', '../../oxlint.config.ts', '--fix', '.'],
+};
+
 const packageTasks: ReadonlyArray<TaskDef> = [
   {
     name: 'transit',
@@ -35,19 +45,23 @@ const packageTasks: ReadonlyArray<TaskDef> = [
   },
   {
     name: 'typecheck',
+    command: packageCommands.typecheck,
     dependsOn: ['^transit'],
     inputs: ['$TURBO_DEFAULT$', '!**/*.md'],
   },
   {
     name: 'test',
+    command: packageCommands.test,
     dependsOn: ['^transit'],
   },
   {
     name: 'clean',
+    command: packageCommands.clean,
     cache: false,
   },
   {
     name: 'oxlint:check',
+    command: packageCommands['oxlint:check'],
     dependsOn: ['^transit'],
     inputs: oxlintInputs,
     comment:
@@ -55,6 +69,7 @@ const packageTasks: ReadonlyArray<TaskDef> = [
   },
   {
     name: 'oxlint:fix',
+    command: packageCommands['oxlint:fix'],
     dependsOn: ['^transit'],
     inputs: oxlintInputs,
   },

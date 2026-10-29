@@ -103,7 +103,7 @@ export const versions = {
   '@varlock/cloudflare-integration': '^1.6.2',
   '@varlock/effect-plugin': '^0.1.0',
 
-  // Infra (alchemy v2 is Effect-native; pin exact while in beta)
+  // Infra (alchemy is Effect-native; pin exact while in beta)
   alchemy,
   '@alchemy.run/cloudflare': alchemy,
   '@alchemy.run/aws': alchemy,

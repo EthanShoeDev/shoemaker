@@ -174,7 +174,6 @@ describe('owned key / region set changes between versions', () => {
         // What a lock written before owned sets were recorded holds.
         const legacy: Lock = {
           cliVersion: '0.0.0',
-          migrations: [],
           files: {
             'package.json': {
               strategy: 'json-merge',

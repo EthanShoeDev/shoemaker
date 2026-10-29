@@ -10,6 +10,8 @@ export const presets: Readonly<Record<string, ShoeboxConfig>> = {
     ...defaultConfig('sample-minimal'),
     packages: [{ name: 'core', kind: 'library' }],
     secrets: 'none',
+    // A Stack with no cloud: resources added by hand, state in .alchemy/.
+    infra: { kind: 'alchemy', deploy: 'none', state: 'local' },
     ci: 'none',
   },
   web: {
@@ -20,7 +22,7 @@ export const presets: Readonly<Record<string, ShoeboxConfig>> = {
     ],
     packages: [{ name: 'core', kind: 'library' }],
     secrets: 'varlock',
-    infra: { kind: 'alchemy', providers: ['cloudflare'] },
+    infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'cloudflare' },
   },
   full: {
     ...defaultConfig('sample-full'),
@@ -34,7 +36,7 @@ export const presets: Readonly<Record<string, ShoeboxConfig>> = {
     packages: [{ name: 'core', kind: 'library' }],
     taskRunner: 'nx',
     secrets: 'secretspec',
-    infra: { kind: 'alchemy', providers: ['cloudflare', 'aws'] },
+    infra: { kind: 'alchemy', deploy: 'aws', state: 'aws' },
     features: { changesets: true, agents: true, vscode: true },
   },
 };

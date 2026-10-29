@@ -1,6 +1,9 @@
 {
   "$schema": "./node_modules/turbo/schema.json",
   "ui": "tui",
+  // Task `command` is experimental; it lets every package share one
+  // definition of a leaf command instead of a copied script.
+  "futureFlags": { "experimentalTaskCommand": true },
   // TMPDIR: tests that write fixtures to os.tmpdir() must see the same temp
   // dir as outside turbo (nix shells and sandboxes set it).
   "globalPassThroughEnv": ["NIX_*", "TMPDIR"],
@@ -8,8 +11,13 @@
   //   "^task"        -> run `task` in all DEPENDENCY packages first
   //   "with": [...]  -> run these tasks in parallel for the SAME package
   //   "//#task"      -> a root-only task (defined in root package.json)
-  // Package scripts are leaf commands. Aggregates (`lint`, `lint:check`) have
-  // no script: they only fan out, so turbo is never called from a script.
+  // Leaf commands every package shares are task `command`s (argv, no shell),
+  // defined here once instead of copied into each package.json. Turbo spawns
+  // them without node_modules/.bin on PATH, so binaries go through `bun run`.
+  // A package script of the same name overrides one (cli's `test`);
+  // `"command": null` in a package's turbo.jsonc opts the package out. Other
+  // leaf commands are package scripts. Aggregates (`lint`, `lint:check`) have
+  // neither: they only fan out, so turbo is never called from a script.
   // Turbo uses shallow extend: a package overriding a task must copy the whole
   // definition, it is not merged with the root one.
   "tasks": {
@@ -19,23 +27,28 @@
       "dependsOn": ["^transit"]
     },
     "build": {
+      "command": ["bun", "run", "tsdown"],
       "dependsOn": ["^build"],
       "outputs": ["dist/**"],
       "outputLogs": "new-only"
     },
     "typecheck": {
+      "command": ["bun", "run", "tsc", "--noEmit"],
       "dependsOn": ["^transit"],
       "outputLogs": "new-only"
     },
     "test": {
+      "command": ["bun", "run", "vitest", "run"],
       "dependsOn": ["^transit"],
       "outputLogs": "new-only"
     },
     "clean": {
+      "command": ["rm", "-rf", "dist", ".turbo"],
       "cache": false
     },
     // Publishes a package after its dependencies (scripts/publish-package.ts).
     "release:publish": {
+      "command": ["bun", "../../scripts/publish-package.ts"],
       "dependsOn": ["build", "^release:publish"],
       "cache": false,
       "passThroughEnv": [
@@ -45,6 +58,7 @@
       ]
     },
     "oxlint:check": {
+      "command": ["bun", "run", "oxlint", "-c", "../../oxlint.config.ts", "."],
       "inputs": [
         "$TURBO_DEFAULT$",
         "!**/*.md",
@@ -53,6 +67,15 @@
       "outputLogs": "new-only"
     },
     "oxlint:fix": {
+      "command": [
+        "bun",
+        "run",
+        "oxlint",
+        "-c",
+        "../../oxlint.config.ts",
+        "--fix",
+        "."
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "!**/*.md",

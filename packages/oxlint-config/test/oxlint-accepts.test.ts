@@ -112,7 +112,7 @@ layer(services)('defineShoeboxConfig under oxlint', (it) => {
           },
         );
         expect(output).toContain('env-access(no-raw-env-access)');
-        expect(output).toContain('`@probe/env`');
+        expect(output).toContain('Read it through Effect `Config`');
         // web is off, so the backdrop-filter plugin is neither loaded nor enabled.
         expect(output).not.toContain('backdrop-filter');
         expect(status).toBe(1);

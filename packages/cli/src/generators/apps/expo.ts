@@ -139,7 +139,6 @@ export const expoApp = (ctx: GenContext, app: App): Contribution => {
           dev: 'expo start',
           ios: 'expo start --ios',
           android: 'expo start --android',
-          test: 'vitest run',
           clean: 'rm -rf .expo .turbo',
         },
         dependencies,

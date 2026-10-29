@@ -7,9 +7,8 @@ import { Console, Effect, FileSystem, Path, Record as Rec } from 'effect';
 import { Argument, Command, Flag } from 'effect/cli';
 
 import { generate } from '../../packages/cli/src/engine/generate.ts';
-import { readJsonObject, stringRecord, writeJson } from '../lib/json.ts';
 import { run, runInherit, runScript } from '../lib/run.ts';
-import { packLocal } from './pack-local.ts';
+import { packLocal, pinTarballs } from './pack-local.ts';
 import { presets } from './presets.ts';
 
 const generateSample = Command.make(
@@ -48,15 +47,7 @@ const generateSample = Command.make(
         }),
       { discard: true },
     );
-    // The packed tarballs depend on each other at versions not on npm yet, so
-    // pin every shoe-box package to its tarball for the whole install tree.
-    const rootManifest = path.join(out, 'package.json');
-    const manifest = yield* readJsonObject(rootManifest);
-    manifest.overrides = {
-      ...stringRecord(manifest.overrides),
-      ...versionOverrides,
-    };
-    yield* writeJson(rootManifest, manifest);
+    yield* pinTarballs(path.join(out, 'package.json'), versionOverrides);
     yield* Console.log(`wrote ${files.length} files to ${out}`);
 
     if (install) {

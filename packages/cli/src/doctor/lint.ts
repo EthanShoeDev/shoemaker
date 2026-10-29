@@ -10,7 +10,6 @@ import {
 
 import { decodeJsonc, invokes, stripComments } from '../checks/workspace.ts';
 import type { Repo } from '../engine/repo.ts';
-import { MigrationId } from '../migrations/ids.ts';
 import {
   OXFMT_RC,
   OXLINT_RC,
@@ -79,7 +78,7 @@ export const oxlintConfigFormat: DoctorCheck = {
       return Arr.map(rcs, (path) =>
         fail(`${path} should be ${OXLINT_TS}`, {
           path,
-          migration: MigrationId.oxlintrcToTs,
+          fix: `move it to ${OXLINT_TS} on ${SHARED_OXLINT}`,
         }),
       );
     }
@@ -109,7 +108,7 @@ export const oxlintSharedConfig: DoctorCheck = {
           missing.length > 0
             ? `no ${OXLINT_TS}; categories not at error: ${Arr.join(missing, ', ')}`
             : `no ${OXLINT_TS}`,
-          { migration: MigrationId.oxlintrcToTs },
+          { fix: `add ${OXLINT_TS} on ${SHARED_OXLINT}` },
         ),
       ];
     }
@@ -141,7 +140,6 @@ export const oxlintSharedConfig: DoctorCheck = {
           `hand-rolled ${OXLINT_TS}: options missing ${Arr.join(options, ', ')}`,
           {
             path: OXLINT_TS,
-            migration: MigrationId.oxlintFlagsToOptions,
             fix: `set options: { typeAware: true, typeCheck: true, reportUnusedDisableDirectives: 'error' }, or use ${SHARED_OXLINT}`,
           },
         ),
@@ -194,7 +192,7 @@ export const oxlintNoWarn: DoctorCheck = {
         findings.push(
           fail(`${path}: warn severity on ${listSome(warned)}`, {
             path,
-            migration: MigrationId.oxlintrcToTs,
+            fix: 'set each rule to error or off',
           }),
         );
       }
@@ -243,10 +241,6 @@ export const oxlintUnusedDirectives: DoctorCheck = {
           ? 'unused disable directives are only reported via a CLI flag, not oxlint options'
           : 'unused disable directives are not reported as errors',
         {
-          migration:
-            source === undefined
-              ? MigrationId.oxlintrcToTs
-              : MigrationId.oxlintFlagsToOptions,
           fix: "options: { reportUnusedDisableDirectives: 'error' }",
         },
       ),
@@ -268,7 +262,6 @@ export const oxlintCliFlags: DoctorCheck = {
     );
     if (flagged.length === 0)
       return [pass('no type-aware CLI flags in oxlint scripts')];
-    const hasRc = (yield* globAll(repo, OXLINT_RC)).length > 0;
     return [
       fail(
         `${flagged.length} oxlint script(s) pass type-aware flags on the CLI: ${listSome(
@@ -276,9 +269,7 @@ export const oxlintCliFlags: DoctorCheck = {
           4,
         )}`,
         {
-          migration: hasRc
-            ? MigrationId.oxlintrcToTs
-            : MigrationId.oxlintFlagsToOptions,
+          fix: `move the flags into ${OXLINT_TS} options and drop them from the scripts`,
         },
       ),
     ];
@@ -298,7 +289,7 @@ export const oxfmtConfigFormat: DoctorCheck = {
             ? {
                 fix: `fold into the root ${OXFMT_TS} ignorePatterns/overrides and delete it`,
               }
-            : { migration: MigrationId.oxfmtrcToTs }),
+            : { fix: `move it to ${OXFMT_TS} on shoe-box-oxfmt-config` }),
         }),
       );
     }
@@ -348,7 +339,7 @@ export const oxfmtSortImports: DoctorCheck = {
           : [
               fail(`${path} does not enable sortImports`, {
                 path,
-                migration: MigrationId.oxfmtrcToTs,
+                fix: `use ${OXFMT_TS} on shoe-box-oxfmt-config, which enables it`,
               }),
             ];
       }
@@ -390,9 +381,6 @@ export const retiredPlugins: DoctorCheck = {
           fail(`${path} enables retired rules: ${listSome(rules)}`, {
             path,
             fix: 'delete them: anti-slop require-safety-comment-for-type-assertion and the @effect/tsgo presets cover them',
-            ...(Str.endsWith('.json')(path) || Str.endsWith('.jsonc')(path)
-              ? { migration: MigrationId.oxlintrcToTs }
-              : {}),
           }),
         );
       }

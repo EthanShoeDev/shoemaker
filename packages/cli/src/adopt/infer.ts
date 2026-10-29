@@ -1,7 +1,7 @@
 import {
   Array as Arr,
   Effect,
-  pipe,
+  Option,
   Record as Rec,
   String as Str,
 } from 'effect';
@@ -18,7 +18,8 @@ import {
 import {
   defaultConfig,
   type App,
-  type InfraProvider,
+  type DeployTarget,
+  type StateStore,
   type Package,
   type ShoeboxConfig,
 } from '../config/schema.ts';
@@ -104,12 +105,20 @@ const uniqueBy = <A extends { readonly name: string }>(
   ...new Map(Arr.map(items, (item) => [item.name, item] as const)).values(),
 ];
 
-const PROVIDERS: ReadonlyArray<readonly [InfraProvider, RegExp]> = [
+const PROVIDERS: ReadonlyArray<readonly ['cloudflare' | 'aws', RegExp]> = [
   [
     'cloudflare',
     /from ['"](?:alchemy(?:-effect)?\/[Cc]loudflare|@alchemy\.run\/cloudflare)[\w/'"-]*/u,
   ],
-  ['aws', /from ['"]alchemy(?:-effect)?\/(?:AWS|aws)[\w/'"-]*/u],
+  [
+    'aws',
+    /from ['"](?:alchemy(?:-effect)?\/(?:AWS|aws)|@alchemy\.run\/aws)[\w/'"-]*/u,
+  ],
+];
+
+const STATE_STORES: ReadonlyArray<readonly [StateStore, RegExp]> = [
+  ['cloudflare', /\bCloudflare\.state\(/u],
+  ['aws', /\bAWS\.state\(/u],
 ];
 
 const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
@@ -118,7 +127,7 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
     'apps/*/alchemy.run.ts',
     'packages/*/alchemy.run.ts',
   ]);
-  if (entrypoints.length === 0) return { kind: 'none' as const, providers: [] };
+  if (entrypoints.length === 0) return { kind: 'none' as const };
   const files = [
     ...entrypoints,
     ...(yield* globAll(repo, [
@@ -127,19 +136,18 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
       'apps/*/infra/**/*.ts',
     ])),
   ].slice(0, MAX_SOURCE_FILES);
-  const found = new Set<InfraProvider>();
-  for (const file of files) {
-    const source = (yield* repo.read(file)) ?? '';
-    for (const [provider, pattern] of PROVIDERS)
-      if (pattern.test(source)) found.add(provider);
-  }
+  const sources = yield* Effect.forEach(files, (file) =>
+    Effect.map(repo.read(file), (source) => source ?? ''),
+  );
+  const first = <A>(table: ReadonlyArray<readonly [A, RegExp]>) =>
+    Arr.findFirst(table, ([, pattern]) =>
+      Arr.some(sources, (source) => pattern.test(source)),
+    ).pipe(Option.map(([value]) => value));
   return {
     kind: 'alchemy' as const,
-    providers: pipe(
-      PROVIDERS,
-      Arr.map(([provider]) => provider),
-      Arr.filter((provider) => found.has(provider)),
-    ),
+    // Cloudflare hosts every app kind shoebox scaffolds, so it wins a tie.
+    deploy: Option.getOrElse(first(PROVIDERS), (): DeployTarget => 'none'),
+    state: Option.getOrElse(first(STATE_STORES), (): StateStore => 'local'),
   };
 });
 

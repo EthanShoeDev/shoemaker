@@ -168,39 +168,6 @@ export const lockEntry = (file: GeneratedFile, written: string): LockEntry => {
   };
 };
 
-// After shoebox itself edits a tracked file (a migration), the result becomes
-// its baseline, but only when the file still matched the old baseline: a hand
-// edit stays a conflict. `generated` stands in for a lock without a recorded
-// set; without either, the baseline is left alone.
-export const rebaseline = (
-  entry: LockEntry,
-  path: string,
-  before: string,
-  after: string,
-  generated: string | undefined,
-) => {
-  const needsSet =
-    entry.strategy === 'managed' || entry.strategy === 'json-merge';
-  const owned =
-    entry.owned ??
-    (needsSet && generated !== undefined
-      ? ownedSet({ path, strategy: entry.strategy, content: generated })
-      : undefined);
-  if (needsSet && owned === undefined) return undefined;
-  const scope: Scope =
-    entry.owned === undefined && generated !== undefined
-      ? { generated }
-      : { owned: owned ?? [] };
-  if (fingerprint(entry.strategy, path, before, scope) !== entry.sha256) {
-    return undefined;
-  }
-  return {
-    strategy: entry.strategy,
-    sha256: fingerprint(entry.strategy, path, after, { owned: owned ?? [] }),
-    ...(owned === undefined ? {} : { owned }),
-  } satisfies LockEntry;
-};
-
 interface Desired {
   readonly after: string;
   // Set when the file cannot be merged: always a conflict.
@@ -412,7 +379,6 @@ export const nextLock = (
   }
   return {
     cliVersion,
-    migrations: previous?.migrations ?? [],
     files,
   };
 };

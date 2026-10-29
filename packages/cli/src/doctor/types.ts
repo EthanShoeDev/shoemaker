@@ -7,10 +7,8 @@ export interface Finding {
   readonly ok: boolean;
   // One line: what is wrong (or what passed).
   readonly message: string;
-  // How to fix it by hand, when not covered by a migration.
+  // How to fix it by hand.
   readonly fix?: string;
-  // Id of the migration that fixes it (`shoe-box migrate <id>`).
-  readonly migration?: string;
   readonly path?: string;
 }
 

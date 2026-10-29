@@ -228,7 +228,6 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
           dev: 'vite dev',
           build: 'vite build',
           start: 'vite preview',
-          test: 'vitest run',
           clean: 'rm -rf dist .tanstack .turbo',
         },
         dependencies,

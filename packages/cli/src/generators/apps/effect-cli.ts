@@ -93,7 +93,6 @@ export const effectCli = (ctx: GenContext, app: App): Contribution => {
         scripts: {
           dev: 'bun src/bin.ts',
           build: 'tsdown',
-          test: 'vitest run',
         },
         dependencies,
         devDependencies,

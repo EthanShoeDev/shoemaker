@@ -168,7 +168,7 @@ export const nxRenderer: Renderer = (ctx, aggregate) => {
     Arr.filter(tasks, (task) => task.package !== undefined),
     (task) => task.package ?? '',
   );
-  const known = workspaces(ctx, aggregate);
+  const known = workspaces(ctx);
   for (const pkg of byPackage.keys()) {
     if (!Arr.some(known, (w) => w.name === pkg)) {
       throw new Error(`Task override for unknown workspace package ${pkg}`);

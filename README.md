@@ -31,18 +31,37 @@ shoe-box add app expo mobile    # add to shoebox.config.ts, then sync
 
 shoe-box doctor ../some-repo    # audit any repo against current preferences
 shoe-box adopt ../some-repo     # infer shoebox.config.ts for an existing repo
-shoe-box migrate --list         # one-shot structural migrations (.oxlintrc.json -> TS, ...)
 shoe-box check catalog --fix    # repo checkers used by package scripts
 ```
 
 What the wizard asks: apps (tanstack-start, foldkit, expo, effect-api,
 effect-cli), libraries, task runner (turbo/nx), secrets (varlock/secretspec),
-infra (alchemy on cloudflare/aws), CI, and extras (changesets, agents files,
-vscode).
+infra (alchemy: where apps deploy and where state lives), CI, and extras
+(changesets, agents files, vscode).
+
+With alchemy, the repo gets one Stack in a root `alchemy.run.ts` (alchemy's
+single-stack monorepo layout): it deploys the scaffolded apps to Cloudflare or
+AWS (or nothing, for resources added by hand), with paths anchored to the file
+so `alchemy dev` and `alchemy deploy` work from anywhere. `bun run infra:dev`
+runs every deployed app locally (Workers in workerd, sites on their own dev
+servers; AWS needs Docker). State defaults to the gitignored `.alchemy/`;
+the Cloudflare and AWS stores are created on first use, even by a plan.
+Credentials come from alchemy profiles (`alchemy profile edit`,
+`ALCHEMY_PROFILE`), not env vars. The file is typechecked and linted with the
+other root files.
+
+Env is read through Effect `Config` (never `process.env`); shoebox declares the
+variables in the secrets manager's schema but generates no env package, since
+how apps split server, client and secret config is project-specific.
 
 What it never asks, because every repo gets it: bun, Effect 4, oxlint with
 every rule at error, oxfmt, jscpd, knip, a Nix flake dev shell with direnv,
 the bun catalog, and AGENTS.md.
+
+Under turbo, the leaf commands every package runs (`typecheck`, `test`,
+`oxlint:check`, `oxlint:fix`, `clean`) are defined once as task `command`s in
+`turbo.jsonc` (turbo's experimental `experimentalTaskCommand` flag), not copied
+into each `package.json`. A package script of the same name overrides one.
 
 ### How sync stays safe
 
@@ -66,6 +85,7 @@ bun install
 bun run test
 bunx turbo run lint:check '//#lint:check:root'
 bun scripts/e2e/generate-sample.ts web /tmp/sample-web   # prove generated repos build
+bun run wizard:local           # run the init wizard into tmp/wizard against local packages
 ```
 
 ## Release

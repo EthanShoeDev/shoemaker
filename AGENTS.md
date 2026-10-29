@@ -4,9 +4,10 @@ Shared tooling (`shoe-box-*` config packages) plus the `shoe-box` CLI that
 scaffolds new repos and keeps existing ones on Ethan's current preferences.
 
 README.md is the only prose doc; keep it current when behavior changes. The
-preferences live in code, so a preference change usually touches three places:
-the shared package (or generator) that encodes it, the doctor check that detects
-drift from it, and a migration when old repos need a structural change.
+preferences live in code, so a preference change usually touches two places:
+the shared package (or generator) that encodes it, and the doctor check that
+detects drift from it. Nothing is published yet, so there are no migrations:
+change the generator and its output directly.
 
 ## Rules
 

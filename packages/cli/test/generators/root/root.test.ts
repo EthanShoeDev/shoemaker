@@ -39,7 +39,6 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
       ['README.md', 'seed'],
       ['AGENTS.md', 'managed'],
       ['CLAUDE.md', 'owned'],
-      ['.claude/settings.json', 'seed'],
       ['.vscode/settings.json', 'owned'],
       ['.vscode/extensions.json', 'owned'],
     ];
@@ -138,7 +137,7 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
       Str.Order,
     );
     const known = Arr.sort(
-      Arr.map(workspaces(makeContext(config), aggregate), (w) => w.dir),
+      Arr.map(workspaces(makeContext(config)), (w) => w.dir),
       Str.Order,
     );
     assert.deepStrictEqual(known, generatedDirs);

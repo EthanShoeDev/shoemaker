@@ -10,7 +10,6 @@ import type { Finding } from './types.ts';
 
 interface Extra {
   readonly fix?: string;
-  readonly migration?: string;
   readonly path?: string;
 }
 

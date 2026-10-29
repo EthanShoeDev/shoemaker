@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  // JSON tsconfigs only: nothing to typecheck, lint, test or build.
+  "tasks": {
+    "typecheck": { "command": null },
+    "oxlint:check": { "command": null },
+    "oxlint:fix": { "command": null },
+    "test": { "command": null },
+    "build": { "command": null }
+  }
+}

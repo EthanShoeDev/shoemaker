@@ -16,6 +16,7 @@ import {
 import { Argument, Command } from 'effect/cli';
 
 import { renderJson } from '../../packages/cli/src/engine/json.ts';
+import { readJsonObject, stringRecord, writeJson } from '../lib/json.ts';
 import { publishablePackages, repoRoot } from '../lib/packages.ts';
 import { run, runScript } from '../lib/run.ts';
 
@@ -50,6 +51,23 @@ export const packLocal = Effect.fnUntraced(function* (outDir: string) {
     { concurrency: 'unbounded' },
   );
   return Rec.fromEntries(entries);
+});
+
+// The tarballs depend on each other at versions not on npm yet, so pin every
+// shoe-box package to its tarball for the whole install tree.
+export const pinTarballs = Effect.fnUntraced(function* (
+  manifestPath: string,
+  overrides: Record<string, string>,
+) {
+  const manifest = yield* readJsonObject(manifestPath);
+  manifest.overrides = Rec.fromEntries(
+    Arr.sort(
+      Rec.toEntries({ ...stringRecord(manifest.overrides), ...overrides }),
+      ([a]: readonly [string, string], [b]: readonly [string, string]) =>
+        Str.localeCompare(b)(a),
+    ),
+  );
+  yield* writeJson(manifestPath, manifest);
 });
 
 const packLocalCommand = Command.make(

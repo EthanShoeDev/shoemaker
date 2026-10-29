@@ -16,7 +16,7 @@ import { makeRepo } from '../../src/engine/repo-live.ts';
 import { Generate } from '../../src/engine/sync.ts';
 import type { GeneratedFile } from '../../src/engine/types.ts';
 import { json } from '../../src/generators/shared.ts';
-import { pkgIn } from '../migrations/helpers.ts';
+import { pkgIn } from '../checks/helpers.ts';
 import { git, readText, run, scratch, withBun, writeText } from './helpers.ts';
 
 // Command-level regression tests: shoebox must never overwrite the user's
@@ -66,7 +66,7 @@ export default defineConfig({
   packages: [],
   taskRunner: 'turbo',
   secrets: 'none',
-  infra: { kind: 'none', providers: [] },
+  infra: { kind: 'none' },
   ci: 'none',
   features: { changesets: false, agents: true, vscode: false },
   nixPackages: [],
@@ -202,110 +202,6 @@ describe('add', () => {
           );
         }),
       ),
-  );
-});
-
-describe('migrate', () => {
-  it.effect(
-    'rebaselines tracked files it edits, so the next sync is clean',
-    () =>
-      withBun(
-        Effect.gen(function* () {
-          const dir = yield* scratch();
-          const v1 = scriptGenerate('lint:oxlint', 'oxlint .');
-          yield* run(
-            ['init', '--yes', '--no-install', '--no-git', dir],
-            [],
-          ).pipe(Effect.provideService(Generate, v1));
-          yield* run(
-            ['migrate', '2026-10-28-lint-script-names', '--cwd', dir],
-            [],
-          );
-          assert.include(
-            yield* readText(dir, 'package.json'),
-            '"oxlint:check": "oxlint ."',
-          );
-
-          // The next CLI version owns the renamed script with a new command.
-          const v2 = scriptGenerate(
-            'oxlint:check',
-            'oxlint -c oxlint.config.ts .',
-          );
-          const out: Array<string> = [];
-          yield* run(['sync', '--cwd', dir], out).pipe(
-            Effect.provideService(Generate, v2),
-          );
-          assert.notMatch(Arr.join(out, '\n'), /conflict/u);
-          assert.include(
-            yield* readText(dir, 'package.json'),
-            '"oxlint:check": "oxlint -c oxlint.config.ts ."',
-          );
-        }),
-      ),
-  );
-
-  it.effect('keeps a hand-edited file a conflict after migrating it', () =>
-    withBun(
-      Effect.gen(function* () {
-        const dir = yield* scratch();
-        yield* run(['init', '--yes', '--no-install', '--no-git', dir], []).pipe(
-          Effect.provideService(
-            Generate,
-            scriptGenerate('lint:oxlint', 'oxlint .'),
-          ),
-        );
-        const pkg = yield* readText(dir, 'package.json');
-        yield* writeText(
-          dir,
-          'package.json',
-          Str.replace('"name": "my-repo"', '"name": "mine"')(pkg),
-        );
-        yield* run(
-          ['migrate', '2026-10-28-lint-script-names', '--cwd', dir],
-          [],
-        );
-        const out: Array<string> = [];
-        const error = yield* Effect.flip(
-          run(['sync', '--cwd', dir], out).pipe(
-            Effect.provideService(
-              Generate,
-              scriptGenerate('oxlint:check', 'oxlint -c oxlint.config.ts .'),
-            ),
-          ),
-        );
-        assert.strictEqual(error._tag, 'CommandFailed');
-        assert.match(Arr.join(out, '\n'), /conflict\s+package\.json/u);
-      }),
-    ),
-  );
-
-  it.effect('--dry-run diffs each migration against the previous one', () =>
-    withBun(
-      Effect.gen(function* () {
-        const dir = yield* scratch();
-        yield* writeText(
-          dir,
-          'package.json',
-          json({
-            name: 'r',
-            scripts: { 'lint:oxlint': 'oxlint -c .oxlintrc.json .' },
-          }),
-        );
-        yield* writeText(dir, '.oxlintrc.json', '{ "rules": {} }\n');
-        const out: Array<string> = [];
-        yield* run(['migrate', '--dry-run', '--cwd', dir], out);
-        const text = Arr.join(out, '\n');
-        // lint-script-names runs after oxlintrc-to-ts repointed the script.
-        assert.include(
-          text,
-          '-    "lint:oxlint": "oxlint -c oxlint.config.ts ."',
-        );
-        assert.include(
-          text,
-          '+    "oxlint:check": "oxlint -c oxlint.config.ts ."',
-        );
-      }),
-    ),
   );
 });
 

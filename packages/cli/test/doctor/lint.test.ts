@@ -11,7 +11,6 @@ import {
   oxlintUnusedDirectives,
   retiredPlugins,
 } from '../../src/doctor/lint.ts';
-import { MigrationId } from '../../src/migrations/ids.ts';
 import { failures, json } from './helpers.ts';
 
 const shared =
@@ -23,7 +22,7 @@ const allCategories =
 
 describe('oxlint doctor checks', () => {
   it.effect(
-    'oxlint-config-ts: .oxlintrc.json anywhere fails with the migration',
+    'oxlint-config-ts: .oxlintrc.json anywhere fails with the fix',
     () =>
       Effect.gen(function* () {
         const found = yield* failures(oxlintConfigFormat, {
@@ -31,10 +30,16 @@ describe('oxlint doctor checks', () => {
           'apps/a/.oxlintrc.json': '{}',
         });
         assert.deepStrictEqual(
-          Arr.map(found, (f) => [f.path, f.migration]),
+          Arr.map(found, (f) => [f.path, f.fix]),
           [
-            ['.oxlintrc.json', MigrationId.oxlintrcToTs],
-            ['apps/a/.oxlintrc.json', MigrationId.oxlintrcToTs],
+            [
+              '.oxlintrc.json',
+              'move it to oxlint.config.ts on shoe-box-oxlint-config',
+            ],
+            [
+              'apps/a/.oxlintrc.json',
+              'move it to oxlint.config.ts on shoe-box-oxlint-config',
+            ],
           ],
         );
         assert.lengthOf(
@@ -64,10 +69,7 @@ describe('oxlint doctor checks', () => {
           'perf, restriction, suspicious, pedantic, style',
         );
         assert.include(partial[1]?.message ?? '', 'typeCheck');
-        assert.strictEqual(
-          partial[1]?.migration,
-          MigrationId.oxlintFlagsToOptions,
-        );
+        assert.include(partial[1]?.fix ?? '', 'typeCheck: true');
         const complete = yield* failures(oxlintSharedConfig, {
           'oxlint.config.ts': handRolled(
             allCategories,
@@ -147,7 +149,7 @@ describe('oxlint doctor checks', () => {
       const found = yield* failures(oxlintCliFlags, files);
       assert.lengthOf(found, 1);
       assert.include(found[0]?.message ?? '', 'package.json#oxlint:check');
-      assert.strictEqual(found[0]?.migration, MigrationId.oxlintFlagsToOptions);
+      assert.include(found[0]?.fix ?? '', 'oxlint.config.ts options');
     }),
   );
 
@@ -157,7 +159,7 @@ describe('oxlint doctor checks', () => {
         '.oxfmtrc.jsonc': '{}',
         'apps/web/.oxfmtrc.json': '{}',
       });
-      assert.strictEqual(rc[0]?.migration, MigrationId.oxfmtrcToTs);
+      assert.include(rc[0]?.fix ?? '', 'oxfmt.config.ts');
       assert.isDefined(rc[1]?.fix);
       assert.lengthOf(
         yield* failures(oxfmtSortImports, {

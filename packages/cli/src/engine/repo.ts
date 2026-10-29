@@ -1,9 +1,9 @@
 import type { Effect } from 'effect';
 import type { PlatformError } from 'effect/PlatformError';
 
-// Read-only view of a repo on disk, shared by doctor checks, adopt inference,
-// migrations and repo checks. `makeRepo` (engine/repo-live.ts) implements it
-// over FileSystem; tests use `makeMemoryRepo` (engine/repo-memory.ts).
+// Read-only view of a repo on disk, shared by doctor checks, adopt inference
+// and repo checks. `makeRepo` (engine/repo-live.ts) implements it over
+// FileSystem; tests use `makeMemoryRepo` (engine/repo-memory.ts).
 export interface Repo {
   // Absolute root path.
   readonly root: string;
@@ -18,7 +18,7 @@ export interface Repo {
   ) => Effect.Effect<ReadonlyArray<string>, PlatformError>;
 }
 
-// A write planned by a migration or a `--fix` repo check. `content: undefined`
+// A write planned by a `--fix` repo check. `content: undefined`
 // deletes the file.
 export interface FileChange {
   readonly path: string;

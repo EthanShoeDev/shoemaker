@@ -27,8 +27,15 @@ export const SecretsManager = Schema.Literals([
 ]);
 export type SecretsManager = typeof SecretsManager.Type;
 
-export const InfraProvider = Schema.Literals(['cloudflare', 'aws']);
-export type InfraProvider = typeof InfraProvider.Type;
+// Where the root alchemy.run.ts deploys the apps shoebox scaffolds. `none`
+// still generates the Stack, for resources added by hand.
+export const DeployTarget = Schema.Literals(['cloudflare', 'aws', 'none']);
+export type DeployTarget = typeof DeployTarget.Type;
+
+// Where alchemy keeps deploy state. `local` is the gitignored `.alchemy/`
+// folder; the remote stores are created on first use, even by a plan.
+export const StateStore = Schema.Literals(['local', 'cloudflare', 'aws']);
+export type StateStore = typeof StateStore.Type;
 
 export const Ci = Schema.Literals(['github', 'none']);
 export type Ci = typeof Ci.Type;
@@ -47,10 +54,14 @@ export const Package = Schema.Struct({
 });
 export type Package = typeof Package.Type;
 
-export const Infra = Schema.Struct({
-  kind: Schema.Literals(['alchemy', 'none']),
-  providers: Schema.Array(InfraProvider),
-});
+export const Infra = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('none') }),
+  Schema.Struct({
+    kind: Schema.Literal('alchemy'),
+    deploy: DeployTarget,
+    state: StateStore,
+  }),
+]);
 export type Infra = typeof Infra.Type;
 
 export const Features = Schema.Struct({
@@ -88,7 +99,7 @@ export const defaultConfig = (name: string): ShoeboxConfig => ({
   packages: [],
   taskRunner: 'turbo',
   secrets: 'varlock',
-  infra: { kind: 'none', providers: [] },
+  infra: { kind: 'none' },
   ci: 'github',
   features: { changesets: false, agents: true, vscode: true },
   nixPackages: [],

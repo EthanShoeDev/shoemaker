@@ -5,8 +5,7 @@ import type { DoctorCheck, Finding } from './types.ts';
 
 export const agentsMd: DoctorCheck = {
   id: 'agents-md',
-  description:
-    'AGENTS.md is canonical, CLAUDE.md is `@AGENTS.md`, .claude/settings.json is tracked',
+  description: 'AGENTS.md is canonical, CLAUDE.md is `@AGENTS.md`',
   run: Effect.fnUntraced(function* (repo) {
     const findings: Array<Finding> = [];
     const agents = yield* repo.read('AGENTS.md');
@@ -32,13 +31,6 @@ export const agentsMd: DoctorCheck = {
             fix: 'merge its content into AGENTS.md and replace it with the single line `@AGENTS.md`',
           },
         ),
-      );
-    }
-    if (!(yield* repo.exists('.claude/settings.json'))) {
-      findings.push(
-        fail('no .claude/settings.json', {
-          fix: 'track team permissions in .claude/settings.json',
-        }),
       );
     }
     return findings.length > 0

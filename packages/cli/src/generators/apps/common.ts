@@ -141,16 +141,5 @@ export const buildTask = (
   outputs,
 });
 
-// `PORT` -> `port`, `DATABASE_URL` -> `databaseUrl`: the export name the
-// generated `@scope/env` package gives each EnvVar's Config.
-export const envExportName = (key: string) =>
-  pipe(
-    key,
-    Str.toLowerCase,
-    Str.split(/_(?=[a-z0-9])/u),
-    Arr.map((part, index) => (index === 0 ? part : Str.capitalize(part))),
-    Arr.join(''),
-  );
-
 export const pascalCase = (name: string) =>
   pipe(name, Str.split('-'), Arr.map(Str.capitalize), Arr.join(''));

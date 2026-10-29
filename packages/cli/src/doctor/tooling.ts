@@ -20,8 +20,8 @@ import {
   scopeOf,
   allDeps,
 } from '../checks/workspace.ts';
-import { MigrationId } from '../migrations/ids.ts';
-import { renameScript } from '../migrations/script-names.ts';
+import { commandCopies } from './command-copies.ts';
+import { renameScript } from './script-names.ts';
 import { fail, listSome, manifestsOf, pass, scriptsOf } from './shared.ts';
 import type { DoctorCheck, Finding } from './types.ts';
 
@@ -38,7 +38,7 @@ export const turboJsonc: DoctorCheck = {
       return Arr.map(json, (path) =>
         fail(`${path} should be turbo.jsonc`, {
           path,
-          migration: MigrationId.turboJsonToJsonc,
+          fix: 'rename it to turbo.jsonc',
         }),
       );
     }
@@ -50,6 +50,63 @@ export const turboJsonc: DoctorCheck = {
         fix: 'shoe-box adopt, then shoe-box sync renders turbo.jsonc',
       }),
     ];
+  }),
+};
+
+// npm runs these itself (`bun pm pack`, `bun install`), so they stay scripts.
+const LIFECYCLE = new Set([
+  'preinstall',
+  'install',
+  'postinstall',
+  'prepare',
+  'prepublishOnly',
+  'prepack',
+  'postpack',
+]);
+
+export const turboTaskCommands: DoctorCheck = {
+  id: 'turbo-task-commands',
+  description:
+    'A leaf command every package runs is one turbo.jsonc task `command`, not a script copied into each package.json',
+  run: Effect.fnUntraced(function* (repo) {
+    const copies = yield* commandCopies(repo);
+    if (copies.length > 0) {
+      return [
+        fail(
+          `${copies.length} package script(s) copy a turbo.jsonc task command and override it: ${listSome(
+            Arr.map(copies, (c) => `${c.manifest.path}#${c.name}`),
+          )}`,
+          {
+            fix: 'delete the copies so the shared turbo.jsonc command applies',
+          },
+        ),
+      ];
+    }
+    const workspace = yield* readWorkspace(repo);
+    const turbo =
+      (yield* repo.exists('turbo.jsonc')) || (yield* repo.exists('turbo.json'));
+    const packages = workspace?.packages ?? [];
+    if (!turbo || packages.length < 2)
+      return [pass('no package scripts copy a turbo task command')];
+    const [first, ...rest] = packages;
+    const shared = Arr.filter(
+      Rec.toEntries(first?.pkg.scripts ?? {}),
+      ([name, command]) =>
+        !LIFECYCLE.has(name) &&
+        Arr.every(rest, (m) => m.pkg.scripts?.[name] === command),
+    );
+    return shared.length === 0
+      ? [pass('no script is copied into every package')]
+      : [
+          fail(
+            `copied into all ${packages.length} packages: ${listSome(
+              Arr.map(shared, ([name]) => name),
+            )}`,
+            {
+              fix: 'define each once as a task `command` in turbo.jsonc (futureFlags.experimentalTaskCommand) and delete the copies; shoe-box sync does this in a shoebox repo',
+            },
+          ),
+        ];
   }),
 };
 
@@ -71,7 +128,7 @@ export const scriptNames: DoctorCheck = {
       : [
           fail(
             `${drifted.length} script(s) to rename: ${listSome(drifted, 6)}`,
-            { migration: MigrationId.lintScriptNames },
+            { fix: 'rename them to <tool>:check / <tool>:fix' },
           ),
         ];
   }),
@@ -165,7 +222,7 @@ export const typescript7: DoctorCheck = {
       findings.push(
         fail(
           `tsgo in ${listSome(Arr.map(tsgoScripts, (s) => `${s.manifest.path}#${s.name}`))}`,
-          { migration: MigrationId.tsgoToTsc },
+          { fix: 'run tsc (TypeScript 7) instead of tsgo' },
         ),
       );
     }
@@ -176,7 +233,7 @@ export const typescript7: DoctorCheck = {
       findings.push(
         fail(
           `@typescript/native-preview in ${listSome(Arr.map(preview, (m) => m.path))}`,
-          { migration: MigrationId.tsgoToTsc },
+          { fix: 'replace it with typescript ^7' },
         ),
       );
     }
@@ -193,13 +250,13 @@ export const typescript7: DoctorCheck = {
     if (old.length > 0) {
       findings.push(
         fail(`typescript ${listSome([...new Set(old)])} (want ^7)`, {
-          migration: MigrationId.tsgoToTsc,
+          fix: 'bump typescript to ^7',
         }),
       );
     } else if (versions.length === 0) {
       findings.push(
         fail('typescript is not a dependency', {
-          migration: MigrationId.tsgoToTsc,
+          fix: 'add typescript ^7 as a root devDependency',
         }),
       );
     }
@@ -311,7 +368,7 @@ export const nixDevShell: DoctorCheck = {
       findings.push(
         fail(
           envrc === undefined ? 'no .envrc' : '.envrc does not `use flake`',
-          { migration: MigrationId.addEnvrc },
+          { fix: 'add `use flake` to .envrc' },
         ),
       );
     }
@@ -497,11 +554,7 @@ export const copiedScripts: DoctorCheck = {
         findings.push(
           fail(`${path} is a copy of \`shoe-box check ${check}\``, {
             path,
-            ...(script === 'catalog-check'
-              ? { migration: MigrationId.catalogCheckToShoebox }
-              : {
-                  fix: `point its script at \`shoe-box check ${check}\` and delete the copy (keep it if it has repo-specific rules)`,
-                }),
+            fix: `point its script at \`shoe-box check ${check}\` and delete the copy (keep it if it has repo-specific rules)`,
           }),
         );
       }
@@ -624,6 +677,7 @@ export const vscode: DoctorCheck = {
 export const toolingChecks = [
   monorepoLayout,
   turboJsonc,
+  turboTaskCommands,
   scriptNames,
   bunTest,
   effectTsgo,

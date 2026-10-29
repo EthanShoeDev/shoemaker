@@ -1,0 +1,8 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  // No tests yet.
+  "tasks": {
+    "test": { "command": null }
+  }
+}

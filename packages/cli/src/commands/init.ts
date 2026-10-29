@@ -22,9 +22,10 @@ import {
   type App,
   type AppKind,
   type Features,
+  type DeployTarget,
   type Infra,
-  type InfraProvider,
   type Package,
+  type StateStore,
   decodeConfig,
   defaultConfig,
 } from '../config/schema.ts';
@@ -61,14 +62,21 @@ const DEFAULT_APP_NAME: Readonly<Record<AppKind, string>> = {
   'effect-cli': 'cli',
 };
 
-const PROVIDERS: ReadonlyArray<InfraProvider> = ['cloudflare', 'aws'];
+const DEPLOY_TARGETS: ReadonlyArray<DeployTarget> = [
+  'cloudflare',
+  'aws',
+  'none',
+];
+const STATE_STORES: ReadonlyArray<StateStore> = ['local', 'cloudflare', 'aws'];
 const EXTRAS = ['changesets', 'agents', 'vscode'] as const;
 const KEBAB = /^[a-z][a-z0-9-]*$/u;
 
 const isAppKind = (value: string): value is AppKind =>
   Arr.some(APP_KINDS, (kind) => kind === value);
-const isProvider = (value: string): value is InfraProvider =>
-  Arr.some(PROVIDERS, (provider) => provider === value);
+const isDeployTarget = (value: string): value is DeployTarget =>
+  Arr.some(DEPLOY_TARGETS, (target) => target === value);
+const isStateStore = (value: string): value is StateStore =>
+  Arr.some(STATE_STORES, (store) => store === value);
 
 const invalid = (option: string, value: string, expected: string) =>
   CliError.InvalidValue.make({ option, value, expected, kind: 'flag' });
@@ -140,23 +148,22 @@ const parseLibraries = (value: string) => {
   );
 };
 
-// `--infra none`, `--infra alchemy` (cloudflare) or `--infra alchemy:cloudflare,aws`
+const INFRA_SYNTAX = `none | alchemy[:<deploy>[:<state>]], deploy one of ${Arr.join(DEPLOY_TARGETS, ', ')}, state one of ${Arr.join(STATE_STORES, ', ')}`;
+
+// `--infra none`, `--infra alchemy` (cloudflare, local state) or
+// `--infra alchemy:aws:aws`.
 const parseInfra = (value: string) => {
-  const [kind, list] = Str.split(value, ':');
-  if (kind === 'none' && list === undefined) {
-    return Effect.succeed<Infra>({ kind: 'none', providers: [] });
-  }
-  const providers = list === undefined ? ['cloudflare'] : splitList(list);
+  const [kind, deploy = 'cloudflare', state = 'local', ...rest] = Str.split(
+    value,
+    ':',
+  );
+  if (value === 'none') return Effect.succeed<Infra>({ kind: 'none' });
   return kind === 'alchemy' &&
-    providers.length > 0 &&
-    Arr.every(providers, isProvider)
-    ? Effect.succeed<Infra>({
-        kind: 'alchemy',
-        providers: Arr.filter(providers, isProvider),
-      })
-    : Effect.fail(
-        invalid('infra', value, 'none | alchemy | alchemy:<cloudflare,aws>'),
-      );
+    rest.length === 0 &&
+    isDeployTarget(deploy) &&
+    isStateStore(state)
+    ? Effect.succeed<Infra>({ kind: 'alchemy', deploy, state })
+    : Effect.fail(invalid('infra', value, INFRA_SYNTAX));
 };
 
 const toFeatures = (extras: ReadonlyArray<string>): Features => ({
@@ -206,22 +213,51 @@ const infraPrompt = Prompt.Select({
   message: 'Infra',
   choices: [
     { title: 'none', value: 'none' as const },
-    { title: 'alchemy', value: 'alchemy' as const, description: 'alchemy v2' },
+    { title: 'alchemy', value: 'alchemy' as const },
   ],
 }).pipe(
   Prompt.flatMap((kind) =>
     kind === 'none'
-      ? Prompt.succeed<Infra>({ kind: 'none', providers: [] })
-      : Prompt.MultiSelect({
-          message: 'Alchemy providers',
-          min: 1,
-          choices: Arr.map(PROVIDERS, (provider) => ({
-            title: provider,
-            value: provider,
-            selected: provider === 'cloudflare',
+      ? Prompt.succeed<Infra>({ kind: 'none' })
+      : Prompt.all([
+          Prompt.Select({
+            message: 'Deploy apps to',
+            choices: [
+              { title: 'Cloudflare', value: 'cloudflare' as const },
+              { title: 'AWS', value: 'aws' as const },
+              {
+                title: 'nowhere yet',
+                value: 'none' as const,
+                description: 'add resources to alchemy.run.ts by hand',
+              },
+            ],
+          }),
+          Prompt.Select({
+            message: 'Alchemy state store',
+            choices: [
+              {
+                title: 'local',
+                value: 'local' as const,
+                description: '.alchemy/, gitignored; nothing created remotely',
+              },
+              {
+                title: 'Cloudflare',
+                value: 'cloudflare' as const,
+                description: 'shared; a state Worker is created on first use',
+              },
+              {
+                title: 'AWS',
+                value: 'aws' as const,
+                description: 'shared; an S3 bucket is created on first use',
+              },
+            ],
+          }),
+        ]).pipe(
+          Prompt.map(([deploy, state]): Infra => ({
+            kind: 'alchemy',
+            deploy,
+            state,
           })),
-        }).pipe(
-          Prompt.map((providers): Infra => ({ kind: 'alchemy', providers })),
         ),
   ),
 );
@@ -329,7 +365,7 @@ const config = {
   ),
   infra: Flag.String('infra').pipe(
     Flag.withDescription(
-      'none | alchemy | alchemy:<cloudflare,aws> (default: none)',
+      'none | alchemy[:<cloudflare|aws|none>[:<local|cloudflare|aws>]] (default: none; alchemy alone is cloudflare with local state)',
     ),
     Flag.mapEffect(parseInfra),
     fallback('infra', infraPrompt),

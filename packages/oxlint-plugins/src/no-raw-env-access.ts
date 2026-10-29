@@ -1,13 +1,14 @@
 /**
  * Disallows direct access to `import.meta.env` or `process.env`.
  *
- * App code reads environment variables only through the generated env package
- * (`@<scope>/env`, Effect `Config` underneath), which provides type safety and
- * validation and keeps secrets out of client bundles. Files inside the env
- * package itself are exempt: reading the raw environment is its job.
+ * App code reads environment variables through Effect `Config`, which
+ * validates them and keeps configuration swappable in tests, or through a
+ * repo's own env package where it has one. Files inside such a package are
+ * exempt: reading the raw environment is its job.
  *
  * Options (all optional):
- * - `envPackage`: the package named in the message (default `@<scope>/env`).
+ * - `envPackage`: an env package to name in the message instead of Effect
+ *   `Config`.
  * - `allowedPackages`: package.json names whose files may read the raw
  *   environment (default: any package named `@<anything>/env`).
  */
@@ -22,7 +23,7 @@ import { findPackageRoot, readPackageName } from './internal/package-root.ts';
 const defaultEnvPackagePattern = /^@[^/]+\/env$/u;
 
 type EnvAccessOptions = {
-  envPackage: string;
+  envPackage: string | null;
   allowedPackages: ReadonlyArray<string> | null;
 };
 
@@ -34,7 +35,7 @@ const readOptions = (context: Context): EnvAccessOptions => {
       : {};
   const { envPackage, allowedPackages } = options;
   return {
-    envPackage: typeof envPackage === 'string' ? envPackage : '@<scope>/env',
+    envPackage: typeof envPackage === 'string' ? envPackage : null,
     allowedPackages: Array.isArray(allowedPackages)
       ? allowedPackages.filter((name) => typeof name === 'string')
       : null,
@@ -73,7 +74,7 @@ const rule = defineRule({
     type: 'problem',
     docs: {
       description:
-        'Disallow direct access to import.meta.env or process.env; read env through the generated env package.',
+        'Disallow direct access to import.meta.env or process.env; read env through Effect Config.',
     },
     schema: [
       {
@@ -87,17 +88,22 @@ const rule = defineRule({
     ],
     messages: {
       noImportMetaEnv:
-        'Direct access to `import.meta.env` is not allowed. Read it through `{{envPackage}}` instead: ' +
+        'Direct access to `import.meta.env` is not allowed. Read it through {{via}} instead: ' +
         'it validates every variable and keeps secrets out of client bundles.',
       noProcessEnv:
-        'Direct access to `process.env` is not allowed. Read it through `{{envPackage}}` instead: ' +
+        'Direct access to `process.env` is not allowed. Read it through {{via}} instead: ' +
         'it validates every variable and keeps configuration in one place.',
     },
   },
   create(context) {
     const options = readOptions(context);
     if (isInAllowedPackage(context, options)) return {};
-    const data = { envPackage: options.envPackage };
+    const data = {
+      via:
+        options.envPackage === null
+          ? 'Effect `Config`'
+          : `\`${options.envPackage}\``,
+    };
 
     return {
       // `process.env.X` and `import.meta.env.X` contain the bare form, so

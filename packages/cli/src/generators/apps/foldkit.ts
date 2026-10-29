@@ -214,7 +214,6 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
           dev: 'vite',
           build: 'vite build',
           start: 'vite preview',
-          test: 'vitest run',
         },
         dependencies,
         devDependencies,

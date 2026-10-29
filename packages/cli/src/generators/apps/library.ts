@@ -53,7 +53,6 @@ export const library = (ctx: GenContext, pkg: Package): Contribution => {
         dir,
         name: pkg.name,
         exports: { '.': './src/index.ts' },
-        scripts: { test: 'vitest run' },
         dependencies,
         devDependencies,
       }),

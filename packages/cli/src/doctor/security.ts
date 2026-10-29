@@ -121,8 +121,8 @@ export const mcpSecrets: DoctorCheck = {
 
 const ENV_USE = /\bprocess\.env\b|\bimport\.meta\.env\b|\bBun\.env\b/u;
 const RAW_ENV = /\bprocess\.env\b|\bBun\.env\b/gu;
-// The env package is the one place allowed to read the environment; tool
-// configs run outside the app and read it legitimately.
+// A repo's own env package is the one place allowed to read the environment;
+// tool configs run outside the app and read it legitimately.
 // Tests, scripts and lint plugins are not app code either.
 const ENV_ALLOWED =
   /(?:^|\/)(?:env|scripts|test|tests|e2e|__tests__|oxlint-plugins|oxlint-config)\/|\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)[\w.-]+\.config\.[cm]?[jt]s$|(?:^|\/)alchemy\.run\.ts$/u;
@@ -170,7 +170,7 @@ export const secretsManager: DoctorCheck = {
     return any || dotenv.length > 0
       ? [
           fail('reads env but has no secrets manager', {
-            fix: 'adopt varlock (.env.schema + generated @scope/env package) or secretspec.toml',
+            fix: 'adopt varlock (.env.schema) or secretspec (secretspec.toml)',
           }),
         ]
       : [pass('no env usage')];
@@ -200,7 +200,7 @@ export const rawEnvAccess: DoctorCheck = {
       fail(
         `${total} raw process.env/Bun.env reads in ${raw.length} file(s)${truncated ? ` (first ${MAX_FILES} files scanned)` : ''}: ${listSome(top, SHOWN)}`,
         {
-          fix: 'read env through the generated @scope/env package (Effect Config); no-raw-env-access enforces it',
+          fix: 'read env through Effect Config; no-raw-env-access enforces it',
         },
       ),
     ];

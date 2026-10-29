@@ -34,6 +34,14 @@ tester.run(
         errors: [processEnv],
       },
       {
+        name: 'Effect Config named in the message by default',
+        filename: app,
+        code: 'process.env;',
+        errors: [
+          { messageId: 'noProcessEnv', data: { via: 'Effect `Config`' } },
+        ],
+      },
+      {
         name: 'computed process env',
         filename: app,
         code: "const env = process['env'];",
@@ -50,9 +58,7 @@ tester.run(
         filename: app,
         code: 'process.env;',
         options: [{ envPackage: '@fx/env' }],
-        errors: [
-          { messageId: 'noProcessEnv', data: { envPackage: '@fx/env' } },
-        ],
+        errors: [{ messageId: 'noProcessEnv', data: { via: '`@fx/env`' } }],
       },
       {
         name: 'explicit allowlist drops the default',

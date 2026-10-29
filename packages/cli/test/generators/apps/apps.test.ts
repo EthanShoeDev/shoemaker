@@ -179,7 +179,7 @@ describe('library package', () => {
 });
 
 describe('kind specifics', () => {
-  it('effect-api reads PORT through the env package', () => {
+  it('effect-api reads PORT through Effect Config', () => {
     const config = sampleConfig({
       apps: [{ name: 'api', kind: 'effect-api' }],
     });
@@ -189,15 +189,9 @@ describe('kind specifics', () => {
       ({ contribution }) => contribution.env ?? [],
     );
     assert.deepInclude(env[0], { key: 'PORT', default: '3000', type: 'port' });
-    assert.include(
-      file('apps/api/src/bin.ts').content,
-      "import { port } from '@sample/env';",
-    );
+    assert.include(file('apps/api/src/bin.ts').content, "Config.Port('PORT')");
     const manifest = parseJson(file('apps/api/package.json'));
-    assert.strictEqual(
-      record(manifest.dependencies)['@sample/env'],
-      'workspace:*',
-    );
+    assert.isUndefined(record(manifest.dependencies)['@sample/env']);
   });
 
   it('effect-api only ships a Worker entry when Cloudflare deploys it', () => {
@@ -206,7 +200,7 @@ describe('kind specifics', () => {
     const cloudflare = allApps(
       sampleConfig({
         apps,
-        infra: { kind: 'alchemy', providers: ['cloudflare'] },
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
       }),
     );
     const worker = (files: typeof plain.files) =>
@@ -281,7 +275,7 @@ describe('kind specifics', () => {
       vite(
         sampleConfig({
           apps,
-          infra: { kind: 'alchemy', providers: ['cloudflare'] },
+          infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
         }),
       ),
       'varlock',
@@ -293,7 +287,7 @@ describe('kind specifics', () => {
       const config = sampleConfig({
         apps: Arr.map(cases, ({ app }) => app),
         packages: [{ name: 'core', kind: 'library' }],
-        infra: { kind: 'alchemy', providers: ['cloudflare', 'aws'] },
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
       });
       return assertSourcesParse(allApps(config).files);
     }),

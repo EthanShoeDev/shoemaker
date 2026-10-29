@@ -65,7 +65,8 @@ const repo = {
   }),
   'turbo.jsonc': '{}',
   '.env.schema': '',
-  'alchemy.run.ts': "import * as Cloudflare from 'alchemy/Cloudflare';\n",
+  'alchemy.run.ts':
+    "import * as Cloudflare from 'alchemy/Cloudflare';\nexport default Stack('x', { state: Cloudflare.state() });\n",
   'packages/infra/src/aws.ts': "import * as AWS from 'alchemy/AWS';\n",
   '.github/workflows/ci.yml': '',
   '.changeset/config.json': '{}',
@@ -102,7 +103,8 @@ describe('inferConfig', () => {
       assert.strictEqual(config.secrets, 'varlock');
       assert.deepStrictEqual(config.infra, {
         kind: 'alchemy',
-        providers: ['cloudflare', 'aws'],
+        deploy: 'cloudflare',
+        state: 'cloudflare',
       });
       assert.strictEqual(config.ci, 'github');
       assert.deepStrictEqual(config.features, {
@@ -129,7 +131,7 @@ describe('inferConfig', () => {
       assert.strictEqual(config.scope, 'mp');
       assert.strictEqual(config.taskRunner, 'nx');
       assert.strictEqual(config.secrets, 'secretspec');
-      assert.deepStrictEqual(config.infra, { kind: 'none', providers: [] });
+      assert.deepStrictEqual(config.infra, { kind: 'none' });
       assert.strictEqual(config.ci, 'none');
       assert.isTrue(config.features.vscode);
     }),

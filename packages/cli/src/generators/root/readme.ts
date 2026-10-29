@@ -10,7 +10,7 @@ const run = (config: ShoeboxConfig, args: string) =>
     : `bunx turbo run ${args}`;
 
 const secretsLine = (config: ShoeboxConfig) => {
-  const env = `read through \`@${config.scope}/env\` (Effect \`Config\`)`;
+  const env = 'read through Effect `Config`';
   switch (config.secrets) {
     case 'varlock': {
       return `- Env: varlock (\`.env.schema\`), ${env}`;

@@ -10,15 +10,6 @@ const withSecrets = (
   secrets: ShoeboxConfig['secrets'],
 ): ShoeboxConfig => ({ ...config, secrets });
 
-const camel = (key: string) =>
-  pipe(
-    key,
-    Str.toLowerCase,
-    Str.split(/_(?=[a-z0-9])/u),
-    Arr.map((part, index) => (index === 0 ? part : Str.capitalize(part))),
-    Arr.join(''),
-  );
-
 // A `[section]` table's body, up to the next table header.
 const tomlTable = (toml: string, table: string) => {
   const start = pipe(
@@ -116,36 +107,12 @@ describe('secretspec', () => {
 });
 
 describe('env package', () => {
-  it('exports one Config per var, redacting secrets', () => {
-    const { aggregate, file } = render(preset('web'));
-    const index = file('packages/env/src/index.ts').content;
-    for (const v of allEnvVars(aggregate)) {
-      assert.include(index, `export const ${camel(v.key)} = `, v.key);
-      if (v.sensitive) {
-        assert.match(
-          index,
-          new RegExp(`Config\\.Redacted\\(\\s*'${v.key}',?\\s*\\)`, 'u'),
-        );
-      }
+  // How apps read env (server vs client, secrets vs plain vars) is
+  // project-specific, so shoebox generates no package for it.
+  it('is never generated', () => {
+    for (const name of ['minimal', 'web', 'full'] as const) {
+      const { byPath } = render(preset(name));
+      assert.isFalse(byPath.has('packages/env/package.json'), name);
     }
-    assert.include(index, 'Config.withDefault');
-    const manifest = parseJson(file('packages/env/package.json'));
-    assert.deepStrictEqual(manifest.exports, {
-      '.': './src/index.ts',
-      './package.json': './package.json',
-    });
-  });
-
-  it('is generated with secrets off as long as something reads env', () => {
-    const { byPath } = render(withSecrets(preset('web'), 'none'));
-    assert.isTrue(byPath.has('packages/env/src/index.ts'));
-    assert.isFalse(byPath.has('.env.schema'));
-    assert.isFalse(byPath.has('secretspec.toml'));
-  });
-
-  it('is skipped when nothing reads env', () => {
-    const { aggregate, byPath } = render(preset('minimal'));
-    assert.deepStrictEqual(aggregate.env, []);
-    assert.isFalse(byPath.has('packages/env/package.json'));
   });
 });

@@ -60,6 +60,7 @@
     "nix:fmt:check": "bun packages/cli/src/bin.ts check nix-fmt",
     "nix:fmt:fix": "bun packages/cli/src/bin.ts check nix-fmt --fix",
     "shoe-box": "bun packages/cli/src/bin.ts",
+    "wizard:local": "bun scripts/try-wizard.ts",
     "changeset": "changeset",
     "changeset:status": "changeset status",
     "changeset:version": "changeset version && bun install --lockfile-only",

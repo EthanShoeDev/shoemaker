@@ -13,7 +13,7 @@ import * as Jsonc from 'jsonc-parser';
 
 import type { Repo } from '../engine/repo.ts';
 
-// Shared readers for doctor checks, repo checks, migrations and adopt: they all
+// Shared readers for doctor checks, repo checks and adopt: they all
 // walk the same package.json files and edit them without reformatting.
 
 export const parseJsonc = (text: string): unknown => {
@@ -255,21 +255,6 @@ export const editJson = (
   return Jsonc.applyEdits(text, edits);
 };
 
-// Renames an object key in place (jsonc-parser cannot), keeping its value and
-// position. A no-op when the key is missing.
-export const renameJsonKey = (
-  text: string,
-  path: Jsonc.JSONPath,
-  to: string,
-) => {
-  const tree = Jsonc.parseTree(text);
-  const node =
-    tree === undefined ? undefined : Jsonc.findNodeAtLocation(tree, path);
-  const keyNode = node?.parent?.children?.[0];
-  if (keyNode === undefined) return text;
-  return `${Str.slice(0, keyNode.offset)(text)}${JSON.stringify(to)}${Str.slice(keyNode.offset + keyNode.length)(text)}`;
-};
-
 // Accumulates edits to many files so several fixes can touch one file.
 // `undefined` content means deleted. Files first seen through `set` have an
 // unknown original, so they are always reported.
@@ -324,9 +309,6 @@ export const stripComments = (source: string) =>
     Str.replaceAll(/\/\*[\s\S]*?\*\//gu, ''),
     Str.replaceAll(/(^|[^:'"`\\])\/\/.*$/gmu, '$1'),
   );
-
-export const replaceCommand = (script: string, from: string, to: string) =>
-  Str.replaceAll(new RegExp(commandWord(from).source, 'gu'), `$1${to}`)(script);
 
 // The workspace scope (most common `@x/` among packages), never `repo`.
 export const scopeFor = (workspace: Workspace) => {

@@ -2,6 +2,7 @@ import { Array as Arr, Record as Rec, String as Str } from 'effect';
 
 import type { ShoeboxConfig } from '../config/schema.ts';
 import type { GenContext, GeneratedFile } from '../engine/types.ts';
+import { packageCommands } from './task-runner/tasks.ts';
 
 // Helpers shared by every generator area. Keep these small and boring: each
 // generator should read like the file it produces.
@@ -47,20 +48,22 @@ export const catalogDeps = (names: ReadonlyArray<string>) =>
     Arr.map(Arr.sort(names, Str.Order), (name) => [name, 'catalog:'] as const),
   );
 
-// Scripts every workspace package carries. Aggregates (`lint`, `lint:check`)
-// are task-runner tasks with no script.
+// A workspace package's scripts. Turbo runs the shared leaf commands from
+// turbo.jsonc, so packages only carry their own; nx runs package scripts, so
+// there every package gets a copy. Aggregates (`lint`, `lint:check`) are
+// task-runner tasks with no script.
 export const packageScripts = (
+  config: ShoeboxConfig,
   extra: Readonly<Record<string, string>> = {},
 ) => ({
-  clean: 'rm -rf dist .turbo',
-  typecheck: 'tsc --noEmit',
-  'oxlint:check': 'oxlint -c ../../oxlint.config.ts .',
-  'oxlint:fix': 'oxlint -c ../../oxlint.config.ts --fix .',
+  ...(config.taskRunner === 'nx'
+    ? Rec.map(packageCommands, (argv) => Arr.join(argv, ' '))
+    : {}),
   ...extra,
 });
 
 export interface WorkspacePackage {
-  // Directory relative to the repo root (`apps/web`, `packages/env`).
+  // Directory relative to the repo root (`apps/web`, `packages/core`).
   readonly dir: string;
   // Unscoped name; the scope comes from the config.
   readonly name: string;
@@ -84,35 +87,43 @@ export interface WorkspacePackage {
 export const workspacePackageJson = (
   ctx: GenContext,
   pkg: WorkspacePackage,
-): GeneratedFile => ({
-  path: `${pkg.dir}/package.json`,
-  strategy: 'json-merge',
-  content: json({
-    name: ctx.pkg(pkg.name),
-    version: '0.0.0',
-    private: true,
-    ...(pkg.module === false ? {} : { type: 'module' }),
-    ...(pkg.description === undefined ? {} : { description: pkg.description }),
-    ...(pkg.exports === undefined
-      ? {}
-      : { exports: { ...pkg.exports, './package.json': './package.json' } }),
-    scripts: packageScripts(pkg.scripts),
-    dependencies: {
-      ...Rec.fromEntries(
-        Arr.map(
-          Arr.sort(pkg.workspaceDependencies ?? [], Str.Order),
-          (name) => [ctx.pkg(name), 'workspace:*'] as const,
+): GeneratedFile => {
+  const scripts: Readonly<Record<string, string>> = packageScripts(
+    ctx.config,
+    pkg.scripts,
+  );
+  return {
+    path: `${pkg.dir}/package.json`,
+    strategy: 'json-merge',
+    content: json({
+      name: ctx.pkg(pkg.name),
+      version: '0.0.0',
+      private: true,
+      ...(pkg.module === false ? {} : { type: 'module' }),
+      ...(pkg.description === undefined
+        ? {}
+        : { description: pkg.description }),
+      ...(pkg.exports === undefined
+        ? {}
+        : { exports: { ...pkg.exports, './package.json': './package.json' } }),
+      ...(Rec.isEmptyRecord(scripts) ? {} : { scripts }),
+      dependencies: {
+        ...Rec.fromEntries(
+          Arr.map(
+            Arr.sort(pkg.workspaceDependencies ?? [], Str.Order),
+            (name) => [ctx.pkg(name), 'workspace:*'] as const,
+          ),
         ),
-      ),
-      ...catalogDeps(pkg.dependencies ?? []),
-    },
-    devDependencies: catalogDeps([
-      ...(pkg.sharedTsconfig === false ? [] : ['shoe-box-typescript-config']),
-      ...(pkg.devDependencies ?? []),
-    ]),
-    ...pkg.extra,
-  }),
-});
+        ...catalogDeps(pkg.dependencies ?? []),
+      },
+      devDependencies: catalogDeps([
+        ...(pkg.sharedTsconfig === false ? [] : ['shoe-box-typescript-config']),
+        ...(pkg.devDependencies ?? []),
+      ]),
+      ...pkg.extra,
+    }),
+  };
+};
 
 // Per-package tsconfig extending the shared base.
 export const packageTsconfig = (

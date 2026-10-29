@@ -16,9 +16,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "release:publish": "bun ../../scripts/publish-package.ts"
-  },
   "dependencies": {
     "@effect/language-service": "catalog:"
   }

@@ -88,10 +88,16 @@ const configLines = (config: ShoeboxConfig): ReadonlyArray<Line> => [
   ),
   prop('taskRunner', config.taskRunner),
   prop('secrets', config.secrets),
-  object('infra', [
-    prop('kind', config.infra.kind),
-    strings('providers', config.infra.providers),
-  ]),
+  object(
+    'infra',
+    config.infra.kind === 'alchemy'
+      ? [
+          prop('kind', config.infra.kind),
+          prop('deploy', config.infra.deploy),
+          prop('state', config.infra.state),
+        ]
+      : [prop('kind', config.infra.kind)],
+  ),
   prop('ci', config.ci),
   object('features', [
     bool('changesets', config.features.changesets),

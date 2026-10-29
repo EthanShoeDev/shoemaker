@@ -18,7 +18,7 @@ const full: ShoeboxConfig = {
   packages: [{ name: 'domain', kind: 'library' }],
   taskRunner: 'nx',
   secrets: 'secretspec',
-  infra: { kind: 'alchemy', providers: ['cloudflare', 'aws'] },
+  infra: { kind: 'alchemy', deploy: 'aws', state: 'local' },
   features: { changesets: true, agents: true, vscode: false },
   nixPackages: [
     'postgresql_17',

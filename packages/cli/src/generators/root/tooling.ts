@@ -8,9 +8,11 @@ import {
 
 import type { ShoeboxConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
-import { quote } from '../secrets/env-package.ts';
 import { hasApp, json, managed, owned, region } from '../shared.ts';
 import { type Workspace, workspaces } from './workspaces.ts';
+
+const quote = (value: string) =>
+  `'${pipe(value, Str.replaceAll('\\', '\\\\'), Str.replaceAll("'", "\\'"))}'`;
 
 // Indents every line of a block (region markers included) by `spaces`.
 const indent = (text: string, spaces: number) =>
@@ -127,11 +129,7 @@ const knipEntries = (workspace: Workspace): ReadonlyArray<string> => {
     case 'effect-cli': {
       return ['src/bin.ts', 'src/main.ts'];
     }
-    case 'infra': {
-      return ['alchemy.run.ts'];
-    }
-    case 'library':
-    case 'env': {
+    case 'library': {
       return [];
     }
   }
@@ -183,7 +181,7 @@ export const knipConfig: Renderer = (ctx, aggregate) => {
       tsArray('ignoreDependencies', unseen, 0),
       'workspaces: {',
       "  '.': { entry: ['*.ts'] },",
-      ...Arr.flatMap(workspaces(ctx, aggregate), knipWorkspace),
+      ...Arr.flatMap(workspaces(ctx), knipWorkspace),
       '},',
     ],
     '\n',
@@ -269,7 +267,7 @@ export const rootTsconfig: Generator = () => ({
     "declarationMap": false
   },
   // Every package has its own tsconfig; this one covers the root-level
-  // config files only.
+  // files only (tool configs, and alchemy.run.ts with infra).
   "include": ["*.ts"]
 }
 `,
@@ -278,8 +276,8 @@ export const rootTsconfig: Generator = () => ({
 });
 
 // Every workspace shoebox generates carries a test dir, so each is a project.
-export const vitestConfig: Renderer = (ctx, aggregate) => {
-  const projects = Arr.map(workspaces(ctx, aggregate), (w) => w.dir);
+export const vitestConfig: Renderer = (ctx) => {
+  const projects = Arr.map(workspaces(ctx), (w) => w.dir);
   return [
     owned(
       'vitest.config.ts',

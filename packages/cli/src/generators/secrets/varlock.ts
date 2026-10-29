@@ -32,7 +32,7 @@ export const envSchema = (name: string, vars: ReadonlyArray<EnvVar>) => {
     'header',
     `# Environment schema (env-spec) for ${name}. Declares every variable the
 # repo reads; values live in .env.local (gitignored) or a varlock plugin, never
-# here. App code reads them through the generated env package (Effect Config).
+# here. App code reads them through Effect Config, never process.env.
 # Docs: https://varlock.dev/env-spec/overview/
 #
 # @defaultSensitive=false @defaultRequired=infer @currentEnv=$APP_ENV

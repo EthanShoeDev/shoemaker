@@ -1,5 +1,4 @@
 import type { Generator, Renderer } from '../../engine/types.ts';
-import { envPackageRenderer } from './env-package.ts';
 import { secretspecRenderer } from './secretspec.ts';
 import { varlockRenderer } from './varlock.ts';
 
@@ -25,7 +24,6 @@ const secretsTooling: Generator = (ctx) => {
 export const secretsGenerators: ReadonlyArray<Generator> = [secretsTooling];
 
 export const secretsRenderers: ReadonlyArray<Renderer> = [
-  envPackageRenderer,
   varlockRenderer,
   secretspecRenderer,
 ];
