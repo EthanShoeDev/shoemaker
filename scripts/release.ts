@@ -15,16 +15,27 @@ import { Array as Arr, Predicate, String as Str } from 'effect';
 import { readJsonObject } from './lib/json.ts';
 
 const dryRun = process.argv.includes('--dry-run');
+// The workflow passes secrets.NPM_TOKEN as BUN_AUTH_TOKEN; until that secret
+// exists, skip instead of failing every push to main.
+const missingToken =
+  !dryRun &&
+  process.env.CI === 'true' &&
+  (process.env.BUN_AUTH_TOKEN ?? '') === '';
+if (missingToken) {
+  console.log('NPM_TOKEN secret is not configured; skipping publish.');
+}
 const root = join(import.meta.dirname, '..');
 // Dependency order: a package is published after the packages it depends on.
-const order = [
-  'typescript-config',
-  'oxlint-plugins',
-  'oxlint-config',
-  'oxfmt-config',
-  'knip-config',
-  'cli',
-];
+const order = missingToken
+  ? []
+  : [
+      'typescript-config',
+      'oxlint-plugins',
+      'oxlint-config',
+      'oxfmt-config',
+      'knip-config',
+      'cli',
+    ];
 
 const published: Array<string> = [];
 for (const dir of order) {
