@@ -3,6 +3,11 @@
   "version": "0.1.1",
   "description": "Shared strict tsconfig base for Effect + bun monorepos",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EthanShoeDev/shoemaker.git",
+    "directory": "packages/typescript-config"
+  },
   "files": [
     "tsconfig.base.json",
     "tsconfig.react.json"
