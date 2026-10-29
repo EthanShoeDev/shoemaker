@@ -1,5 +1,5 @@
 {
-  "extends": "shoe-box-typescript-config/tsconfig.base.json",
+  "extends": "shoemaker-typescript-config/tsconfig.base.json",
   "compilerOptions": {
     // The config is evaluated by oxlint's Node host, never under Bun.
     "types": ["node"]

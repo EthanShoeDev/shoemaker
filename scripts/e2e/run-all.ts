@@ -1,6 +1,6 @@
 // End-to-end proof that generated repos work, through the real CLI path:
-// write shoebox.config.ts -> `shoe-box sync` -> bun install -> every check the
-// generated repo defines -> `shoe-box sync --check` must report no drift.
+// write shoemaker.config.ts -> `shoemaker sync` -> bun install -> every check the
+// generated repo defines -> `shoemaker sync --check` must report no drift.
 //
 //   bun scripts/e2e/run-all.ts [preset...] [--out <dir>]
 //
@@ -64,7 +64,7 @@ const runAll = Command.make(
     const overrides = yield* packLocal(path.join(outRoot, 'packs'));
     const overridesFile = path.join(outRoot, 'version-overrides.json');
     yield* writeJson(overridesFile, overrides);
-    const env = { SHOEBOX_VERSION_OVERRIDES: overridesFile };
+    const env = { SHOEMAKER_VERSION_OVERRIDES: overridesFile };
 
     const failures: Array<string> = [];
     const step = <A, E, R>(
@@ -95,13 +95,13 @@ const runAll = Command.make(
         `\n== ${name} (${config.taskRunner}, secrets: ${config.secrets}) ==`,
       );
       yield* fs.writeFileString(
-        path.join(dir, 'shoebox.config.ts'),
+        path.join(dir, 'shoemaker.config.ts'),
         renderConfigFile(config),
       );
 
       yield* step(
         name,
-        'shoe-box sync',
+        'shoemaker sync',
         run('bun', [cli, 'sync', '--allow-dirty'], { cwd: dir, env }),
       );
       yield* pinTarballs(path.join(dir, 'package.json'), overrides);

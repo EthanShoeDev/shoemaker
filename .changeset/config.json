@@ -3,22 +3,22 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "EthanShoeDev/shoe-box"
+      "repo": "EthanShoeDev/shoemaker"
     }
   ],
   "commit": false,
   "fixed": [
     [
-      "shoe-box",
-      "shoe-box-oxlint-config",
-      "shoe-box-oxlint-plugins",
-      "shoe-box-oxfmt-config",
-      "shoe-box-typescript-config",
-      "shoe-box-knip-config"
+      "shoemaker",
+      "shoemaker-oxlint-config",
+      "shoemaker-oxlint-plugins",
+      "shoemaker-oxfmt-config",
+      "shoemaker-typescript-config",
+      "shoemaker-knip-config"
     ]
   ],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["shoe-box-utils"]
+  "ignore": ["shoemaker-utils"]
 }

@@ -32,7 +32,7 @@ export const envSchema = (name: string, vars: ReadonlyArray<EnvVar>) => {
     'header',
     `# Environment schema (env-spec) for ${name}. Declares every variable the
 # repo reads; values live in .env.local (gitignored) or a varlock plugin, never
-# here. App code reads them through Effect Config, never process.env.
+# here. App code reads them through \`ENV\` from varlock/env, never process.env.
 # Docs: https://varlock.dev/env-spec/overview/
 #
 # @defaultSensitive=false @defaultRequired=infer @currentEnv=$APP_ENV
@@ -44,7 +44,7 @@ export const envSchema = (name: string, vars: ReadonlyArray<EnvVar>) => {
     `\n${Arr.join(Arr.map(vars, item), '\n\n')}\n\n`,
     '#',
   );
-  return `${header}\n\n${items}\n\n# Project-only variables go below; shoebox never touches them.\n`;
+  return `${header}\n\n${items}\n\n# Project-only variables go below; shoemaker never touches them.\n`;
 };
 
 export const varlockRenderer: Renderer = (ctx, aggregate) =>

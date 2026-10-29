@@ -1,11 +1,11 @@
 {
-  "name": "shoe-box-oxlint-plugins",
+  "name": "shoemaker-oxlint-plugins",
   "version": "0.1.0",
-  "description": "Generic oxlint JS plugin rules plus vendored anti-slop, used by shoe-box-oxlint-config",
+  "description": "Generic oxlint JS plugin rules plus vendored anti-slop, used by shoemaker-oxlint-config",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
+    "url": "git+https://github.com/EthanShoeDev/shoemaker.git",
     "directory": "packages/oxlint-plugins"
   },
   "files": [
@@ -74,7 +74,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "oxlint": "catalog:",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

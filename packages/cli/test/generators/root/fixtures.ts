@@ -2,19 +2,19 @@ import { Array as Arr, Predicate } from 'effect';
 
 // oxlint-disable-next-line import-boundaries/no-cross-package-relative-imports -- the e2e presets are repo-level fixtures shared with scripts/e2e, not a package
 import { presets } from '../../../../../scripts/e2e/presets.ts';
-import type { ShoeboxConfig } from '../../../src/config/schema.ts';
+import type { ShoemakerConfig } from '../../../src/config/schema.ts';
 import { generate } from '../../../src/engine/generate.ts';
 import type { GeneratedFile } from '../../../src/engine/types.ts';
 
 export const presetNames = ['minimal', 'web', 'full'] as const;
 
-export const preset = (name: (typeof presetNames)[number]): ShoeboxConfig => {
+export const preset = (name: (typeof presetNames)[number]): ShoemakerConfig => {
   const config = presets[name];
   if (config === undefined) throw new Error(`no preset ${name}`);
   return config;
 };
 
-export const render = (config: ShoeboxConfig) => {
+export const render = (config: ShoemakerConfig) => {
   const { files, aggregate } = generate(config);
   const byPath = new Map(Arr.map(files, (file) => [file.path, file] as const));
   const file = (path: string): GeneratedFile => {

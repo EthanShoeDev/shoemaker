@@ -26,7 +26,7 @@ export const nixFmtCheck: RepoCheck = {
     if (code === 0) return { ok: true, report: output, fixes: [] };
     return {
       ok: false,
-      report: fix ? output : `${output}\nFix: shoe-box check nix-fmt --fix`,
+      report: fix ? output : `${output}\nFix: shoemaker check nix-fmt --fix`,
       fixes: [],
     };
   }),

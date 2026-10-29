@@ -32,7 +32,7 @@ export const gitignore: Renderer = (_ctx, aggregate) => {
   return [
     managed(
       '.gitignore',
-      `${region('shoebox', Arr.join(lines, '\n'), '#')}\n\n# Project-specific ignores go below.\n`,
+      `${region('shoemaker', Arr.join(lines, '\n'), '#')}\n\n# Project-specific ignores go below.\n`,
     ),
   ];
 };

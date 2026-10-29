@@ -2,7 +2,7 @@ import { BunServices } from '@effect/platform-bun';
 import { Array as Arr, Console, Effect, FileSystem, Path } from 'effect';
 import { TestConsole } from 'effect/testing';
 
-import { runShoebox } from '../../src/commands/index.ts';
+import { runShoemaker } from '../../src/commands/index.ts';
 import { runCapture } from '../../src/engine/process.ts';
 
 // Runs the CLI, appending everything it printed to `output`.
@@ -16,7 +16,7 @@ export const run = (args: ReadonlyArray<string>, output: Array<string>) =>
       ];
       output.push(...Arr.map(lines, String));
     });
-    return yield* runShoebox(args).pipe(
+    return yield* runShoemaker(args).pipe(
       Effect.provideService(Console.Console, console),
       Effect.ensuring(collect),
     );

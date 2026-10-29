@@ -12,7 +12,7 @@ export interface Finding {
   readonly path?: string;
 }
 
-// A doctor check audits any repo (shoebox-managed or not) against the current
+// A doctor check audits any repo (shoemaker-managed or not) against the current
 // preferences.
 export interface DoctorCheck {
   readonly id: string;

@@ -6,14 +6,14 @@ import type { FileChange, Repo } from '../engine/repo.ts';
 
 export interface CheckResult {
   readonly ok: boolean;
-  // Human-readable report printed by `shoe-box check <name>`.
+  // Human-readable report printed by `shoemaker check <name>`.
   readonly report: string;
   // Writes `--fix` should apply (empty when the check has no fixer).
   readonly fixes: ReadonlyArray<FileChange>;
 }
 
 // Repo checkers wired into package scripts (`catalog:check` ->
-// `shoe-box check catalog`), replacing the copy-pasted scripts/lint/*.ts.
+// `shoemaker check catalog`), replacing the copy-pasted scripts/lint/*.ts.
 export interface RepoCheck {
   readonly name: string;
   readonly description: string;

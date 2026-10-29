@@ -35,7 +35,7 @@ import type { FileStrategy, GeneratedFile } from './types.ts';
 // - conflict: differs and was hand-edited since the baseline (or a managed
 //   file lost or duplicated a region / a json-merge file is not JSON).
 // - untracked: differs and has no baseline (a repo being adopted).
-// - skip: a seed file that already exists, or that shoebox wrote and the
+// - skip: a seed file that already exists, or that shoemaker wrote and the
 //   user deleted.
 export type Action =
   | 'create'
@@ -50,7 +50,7 @@ export interface PlannedFile {
   readonly strategy: FileStrategy;
   readonly action: Action;
   readonly before: string | undefined;
-  // What shoebox writes (for conflict/untracked: what it would write).
+  // What shoemaker writes (for conflict/untracked: what it would write).
   readonly after: string;
   readonly executable: boolean;
   readonly generated: GeneratedFile;
@@ -72,7 +72,7 @@ export interface PlanOptions {
 
 const toLf = Str.replaceAll('\r\n', '\n');
 
-// A CRLF checkout (core.autocrlf) is hashed as LF, and an edit shoebox makes
+// A CRLF checkout (core.autocrlf) is hashed as LF, and an edit shoemaker makes
 // to it keeps CRLF, so line endings alone are never drift.
 const usesCrlf = (text: string) =>
   Option.exists(
@@ -111,7 +111,7 @@ export type Scope =
   | { readonly generated: string };
 
 // What the lock records per strategy, so hand edits can be told apart from
-// shoebox's own writes: the whole file for owned/seed, only the region bodies
+// shoemaker's own writes: the whole file for owned/seed, only the region bodies
 // for managed, only the owned keys for json-merge.
 export const fingerprint = (
   strategy: FileStrategy,
@@ -156,7 +156,7 @@ const scopeOf = (file: GeneratedFile, baseline: LockEntry | undefined) =>
     ? { owned: baseline.owned }
     : { generated: file.content };
 
-// The baseline for `written`, as shoebox wrote it from `file`.
+// The baseline for `written`, as shoemaker wrote it from `file`.
 export const lockEntry = (file: GeneratedFile, written: string): LockEntry => {
   const owned = ownedSet(file);
   return {
@@ -219,14 +219,14 @@ const desired = Effect.fnUntraced(function* (
       if (duplicates.length > 0) {
         return {
           after,
-          problem: `shoebox region(s) appear more than once: ${Arr.join(duplicates, ', ')}; keep one copy of each`,
+          problem: `shoemaker region(s) appear more than once: ${Arr.join(duplicates, ', ')}; keep one copy of each`,
         } satisfies Desired;
       }
       return lost.length === 0
         ? ({ after } satisfies Desired)
         : ({
             after,
-            problem: `missing shoebox region(s): ${Arr.join(lost, ', ')}`,
+            problem: `missing shoemaker region(s): ${Arr.join(lost, ', ')}`,
           } satisfies Desired);
     }
     case 'json-merge': {
@@ -263,7 +263,7 @@ const blocker = (
   if (baseline === undefined) {
     return {
       action: 'untracked',
-      reason: 'exists but shoebox has no baseline for it',
+      reason: 'exists but shoemaker has no baseline for it',
     } as const;
   }
   if (baseline.sha256 !== current) {
@@ -292,7 +292,7 @@ const classify = Effect.fnUntraced(function* (
   };
   const { after, problem } = yield* desired(file, disk, baseline);
   if (disk === undefined) {
-    // shoebox wrote this seed before, so its absence is the user's choice.
+    // shoemaker wrote this seed before, so its absence is the user's choice.
     if (file.strategy === 'seed' && baseline?.strategy === 'seed') {
       return {
         ...base,
@@ -355,8 +355,8 @@ export const isBlocked = (file: PlannedFile) =>
 
 // The lock after applying `plan`: written and unchanged files get a fresh
 // baseline; blocked files keep whatever baseline they had. A skipped seed
-// keeps the baseline of what shoebox wrote and gets none otherwise: content
-// the user wrote is never recorded as shoebox's.
+// keeps the baseline of what shoemaker wrote and gets none otherwise: content
+// the user wrote is never recorded as shoemaker's.
 export const nextLock = (
   previous: Lock | undefined,
   plan: Plan,

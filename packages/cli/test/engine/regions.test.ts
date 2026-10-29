@@ -31,7 +31,7 @@ describe('regions', () => {
   });
 
   it('ignores unbalanced markers', () => {
-    assert.deepStrictEqual(parseRegions('// shoebox:begin a\nbody\n'), []);
+    assert.deepStrictEqual(parseRegions('// shoemaker:begin a\nbody\n'), []);
   });
 
   it('replaces region bodies and keeps text outside them', () => {
@@ -55,23 +55,25 @@ describe('regions', () => {
 
   it('handles empty bodies', () => {
     const result = replaceRegions(
-      '// shoebox:begin a\n// shoebox:end a\n',
-      '// shoebox:begin a\nfilled\n// shoebox:end a\n',
+      '// shoemaker:begin a\n// shoemaker:end a\n',
+      '// shoemaker:begin a\nfilled\n// shoemaker:end a\n',
     );
     assert.strictEqual(
       result.content,
-      '// shoebox:begin a\nfilled\n// shoebox:end a\n',
+      '// shoemaker:begin a\nfilled\n// shoemaker:end a\n',
     );
     assert.strictEqual(
-      replaceRegions(result.content, '// shoebox:begin a\n// shoebox:end a\n')
-        .content,
-      '// shoebox:begin a\n// shoebox:end a\n',
+      replaceRegions(
+        result.content,
+        '// shoemaker:begin a\n// shoemaker:end a\n',
+      ).content,
+      '// shoemaker:begin a\n// shoemaker:end a\n',
     );
   });
 
   it('keeps a blank-line body distinct from no body', () => {
     const generated = `${region('a', '', '#')}\n`;
-    assert.strictEqual(generated, '# shoebox:begin a\n\n# shoebox:end a\n');
+    assert.strictEqual(generated, '# shoemaker:begin a\n\n# shoemaker:end a\n');
     assert.strictEqual(replaceRegions(generated, generated).content, generated);
   });
 

@@ -1,10 +1,10 @@
 {
-  "name": "shoe-box",
+  "name": "shoemaker",
   "version": "0.1.0",
   "description": "Scaffold and keep in sync Effect + bun monorepos with Ethan's tooling preferences",
   "license": "MIT",
   "bin": {
-    "shoe-box": "./src/bin.ts"
+    "shoemaker": "./src/bin.ts"
   },
   "files": [
     "src/**/*.ts",
@@ -18,7 +18,7 @@
   },
   "publishConfig": {
     "bin": {
-      "shoe-box": "./dist/bin.mjs"
+      "shoemaker": "./dist/bin.mjs"
     },
     "exports": {
       "./config": {
@@ -39,13 +39,13 @@
     "effect": "catalog:",
     "jsonc-parser": "catalog:",
     "oxfmt": "catalog:",
-    "shoe-box-oxfmt-config": "workspace:*"
+    "shoemaker-oxfmt-config": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "bun-types": "catalog:",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "vitest": "catalog:"
   }

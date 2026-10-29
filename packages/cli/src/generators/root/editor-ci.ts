@@ -1,9 +1,9 @@
-import type { ShoeboxConfig } from '../../config/schema.ts';
+import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator } from '../../engine/types.ts';
 import { hasApp, json, owned, seed } from '../shared.ts';
 import { jsonc } from '../task-runner/jsonc.ts';
 
-const vscodeSettings = (config: ShoeboxConfig) => ({
+const vscodeSettings = (config: ShoemakerConfig) => ({
   'editor.formatOnSave': true,
   'editor.defaultFormatter': 'oxc.oxc-vscode',
   'editor.codeActionsOnSave': { 'source.fixAll.oxc': 'explicit' },
@@ -35,7 +35,7 @@ const vscodeSettings = (config: ShoeboxConfig) => ({
     : {}),
 });
 
-const extensions = (config: ShoeboxConfig) => [
+const extensions = (config: ShoemakerConfig) => [
   'oxc.oxc-vscode',
   'mkhl.direnv',
   'jnoortheen.nix-ide',
@@ -89,7 +89,7 @@ runs:
         exit 1
 `;
 
-const lintSteps = (config: ShoeboxConfig) =>
+const lintSteps = (config: ShoemakerConfig) =>
   config.taskRunner === 'nx'
     ? `      - run: bunx nx affected -t lint:check
         env:
@@ -98,7 +98,7 @@ const lintSteps = (config: ShoeboxConfig) =>
       - run: bunx nx run ${config.name}:lint:check:root`
     : `      - run: bunx turbo run lint:check '//#lint:check:root' --affected --continue=dependencies-successful`;
 
-const ciWorkflow = (config: ShoeboxConfig) => `name: CI
+const ciWorkflow = (config: ShoemakerConfig) => `name: CI
 
 on:
   push:
@@ -126,8 +126,8 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       # Fails when generated tooling files were hand-edited or the repo is
-      # behind shoebox.config.ts; fix with \`shoe-box sync\`.
-      - run: bunx shoe-box sync --check --allow-dirty
+      # behind shoemaker.config.ts; fix with \`shoemaker sync\`.
+      - run: bunx shoemaker sync --check --allow-dirty
 ${lintSteps(config)}
 
   test:

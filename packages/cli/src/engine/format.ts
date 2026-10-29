@@ -1,14 +1,14 @@
 import { Array as Arr, Effect, String as Str } from 'effect';
 import { type FormatConfig, format } from 'oxfmt';
-import { shoeboxFormat } from 'shoe-box-oxfmt-config';
+import { shoemakerFormat } from 'shoemaker-oxfmt-config';
 
 import { matchesAny } from './glob.ts';
 import type { GeneratedFile } from './types.ts';
 
-// The options generated repos format with, so the bytes shoebox writes are
+// The options generated repos format with, so the bytes shoemaker writes are
 // what `oxfmt --write` produces there and a formatter run is never drift.
 // Tailwind class sorting is per repo (it needs the stylesheet) and left out.
-const { ignorePatterns, overrides, ...oxfmtOptions } = shoeboxFormat;
+const { ignorePatterns, overrides, ...oxfmtOptions } = shoemakerFormat;
 const baseOptions: FormatConfig = oxfmtOptions;
 
 // oxfmt's JS API ignores `overrides` (only its config loader applies them), so

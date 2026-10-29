@@ -10,7 +10,7 @@ import type { FileStrategy, GeneratedFile } from '../../src/engine/types.ts';
 import { json, region } from '../../src/generators/shared.ts';
 
 // Regression tests for ways a sync could overwrite or lose a user's work, or
-// report shoebox's own output as a hand edit.
+// report shoemaker's own output as a hand edit.
 
 const file = (
   path: string,
@@ -267,7 +267,7 @@ describe('managed regions', () => {
       const blocked = yield* sync({ 'AGENTS.md': mine }, generated, first.lock);
       const agents = planned(blocked.plan, 'AGENTS.md');
       assert.strictEqual(agents.action, 'conflict');
-      assert.include(agents.reason ?? '', 'missing shoebox region(s): two');
+      assert.include(agents.reason ?? '', 'missing shoemaker region(s): two');
       const forced = yield* sync({ 'AGENTS.md': mine }, generated, first.lock, [
         'AGENTS.md',
       ]);
@@ -311,7 +311,7 @@ describe('seeds', () => {
     }),
   );
 
-  it.effect('a seed the user did not get from shoebox gets no baseline', () =>
+  it.effect('a seed the user did not get from shoemaker gets no baseline', () =>
     Effect.gen(function* () {
       const v1 = [file('README.md', '# seed\n', 'seed')];
       const adopted = yield* sync({ 'README.md': '# theirs\n' }, v1, undefined);
@@ -361,18 +361,18 @@ describe('line endings', () => {
       const generated = [
         file(
           '.gitignore',
-          `${region('shoebox', 'node_modules\ndist', '#')}\n\nmine\n`,
+          `${region('shoemaker', 'node_modules\ndist', '#')}\n\nmine\n`,
           'managed',
         ),
       ];
       const disk = {
         '.gitignore':
-          '# shoebox:begin shoebox\r\nnode_modules\r\n# shoebox:end shoebox\r\n\r\nmine\r\n',
+          '# shoemaker:begin shoemaker\r\nnode_modules\r\n# shoemaker:end shoemaker\r\n\r\nmine\r\n',
       };
       const first = yield* sync(disk, generated, undefined, ['**']);
       assert.strictEqual(
         read(first.disk, '.gitignore'),
-        '# shoebox:begin shoebox\r\nnode_modules\r\ndist\r\n# shoebox:end shoebox\r\n\r\nmine\r\n',
+        '# shoemaker:begin shoemaker\r\nnode_modules\r\ndist\r\n# shoemaker:end shoemaker\r\n\r\nmine\r\n',
       );
       const second = yield* sync(first.disk, generated, first.lock);
       assert.strictEqual(

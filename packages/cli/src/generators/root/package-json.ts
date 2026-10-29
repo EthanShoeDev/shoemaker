@@ -1,6 +1,6 @@
 import { Array as Arr, Record as Rec, String as Str } from 'effect';
 
-import type { ShoeboxConfig } from '../../config/schema.ts';
+import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
 import { effectFamily } from '../../versions.ts';
 import { catalogDeps, json } from '../shared.ts';
@@ -10,13 +10,13 @@ export const PACKAGE_MANAGER = 'bun@1.4.4';
 // What the root itself runs: linters, formatters, checkers and the configs
 // root-level *.ts files import. The root depends on no internal workspace
 // package (turbo would hash that package's whole closure into every task).
-export const rootDevDependencies = (config: ShoeboxConfig) => [
+export const rootDevDependencies = (config: ShoemakerConfig) => [
   '@effect/tsgo',
-  'shoe-box',
-  'shoe-box-knip-config',
-  'shoe-box-oxfmt-config',
-  'shoe-box-oxlint-config',
-  'shoe-box-typescript-config',
+  'shoemaker',
+  'shoemaker-knip-config',
+  'shoemaker-oxfmt-config',
+  'shoemaker-oxlint-config',
+  'shoemaker-typescript-config',
   '@types/node',
   'bun-types',
   'jscpd',
@@ -39,7 +39,7 @@ export const rootTooling: Generator = (ctx) => ({
   catalog: [...rootDevDependencies(ctx.config), 'effect', '@effect/vitest'],
 });
 
-const scripts = (config: ShoeboxConfig) => ({
+const scripts = (config: ShoemakerConfig) => ({
   prepare: 'effect-tsgo patch --oxlint',
   typecheck: 'tsc --noEmit',
   test: 'vitest run',
@@ -54,12 +54,12 @@ const scripts = (config: ShoeboxConfig) => ({
   'jscpd:check': 'jscpd --config .jscpd.json',
   'knip:check': 'knip --no-config-hints --cache',
   'knip:fix:danger': 'knip --fix --no-config-hints --cache',
-  'catalog:check': 'shoe-box check catalog',
-  'catalog:fix': 'shoe-box check catalog --fix',
-  'effect-versions:check': 'shoe-box check effect-versions',
-  'nix:fmt:check': 'shoe-box check nix-fmt',
-  'nix:fmt:fix': 'shoe-box check nix-fmt --fix',
-  'shoe-box:sync': 'shoe-box sync',
+  'catalog:check': 'shoemaker check catalog',
+  'catalog:fix': 'shoemaker check catalog --fix',
+  'effect-versions:check': 'shoemaker check effect-versions',
+  'nix:fmt:check': 'shoemaker check nix-fmt',
+  'nix:fmt:fix': 'shoemaker check nix-fmt --fix',
+  'shoemaker:sync': 'shoemaker sync',
   ...(config.features.changesets
     ? {
         changeset: 'changeset',

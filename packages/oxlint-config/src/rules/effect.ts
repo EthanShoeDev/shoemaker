@@ -1,5 +1,5 @@
-import antiSlop from 'shoe-box-oxlint-plugins/vendor/anti-slop';
-import antiSlopEffect from 'shoe-box-oxlint-plugins/vendor/anti-slop/effect';
+import antiSlop from 'shoemaker-oxlint-plugins/vendor/anti-slop';
+import antiSlopEffect from 'shoemaker-oxlint-plugins/vendor/anti-slop/effect';
 
 import { effectTsgoRules, everyRuleOf } from '../helpers.ts';
 import type { OxlintRules } from '../helpers.ts';
@@ -29,8 +29,8 @@ export const effect: OxlintRules = {
   'effecttsgo/process-env-in-effect': 'off',
 };
 
-/** The custom rules from shoe-box-oxlint-plugins that apply everywhere. */
-export const custom = (scope: string): OxlintRules => ({
+/** The custom rules from shoemaker-oxlint-plugins that apply everywhere. */
+export const custom = (scope: string, varlock: boolean): OxlintRules => ({
   // effecttsgo/global-console and global-console-in-effect own console use;
   // both rules on would report every call twice.
   'no-console': 'off',
@@ -40,12 +40,14 @@ export const custom = (scope: string): OxlintRules => ({
   'import-boundaries/no-cross-package-relative-imports': 'error',
   // A dynamic import() must carry a `dynamic-import -- reason` comment.
   'dynamic-import/no-unexplained-dynamic-import': 'error',
-  // process.env / import.meta.env go through Effect Config, or the repo's own
-  // `@<scope>/env` package when it has one.
-  'env-access/no-raw-env-access': [
-    'error',
-    { allowedPackages: [`@${scope}/env`] },
-  ],
+  // With varlock, process.env / import.meta.env go through its `ENV` (client
+  // and server); the repo's own `@<scope>/env` package may read them.
+  'env-access/no-raw-env-access': varlock
+    ? [
+        'error',
+        { envPackage: 'varlock/env', allowedPackages: [`@${scope}/env`] },
+      ]
+    : 'off',
 });
 
 /** anti-slop (vendored jsPlugin), every rule at error minus the rejected ones. */

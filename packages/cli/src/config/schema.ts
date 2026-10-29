@@ -1,9 +1,9 @@
 import { Schema } from 'effect';
 
-// The wizard answers persisted in a repo's `shoebox.config.ts`. Everything
+// The wizard answers persisted in a repo's `shoemaker.config.ts`. Everything
 // that is "set in stone" (oxlint, oxfmt, jscpd, knip, nix, bun, Effect) is not
 // modelled here: it is always generated. Only per-project structural choices
-// live in this schema, so `shoe-box sync` can re-render a repo from it.
+// live in this schema, so `shoemaker sync` can re-render a repo from it.
 
 export const AppKind = Schema.Literals([
   'tanstack-start',
@@ -27,7 +27,7 @@ export const SecretsManager = Schema.Literals([
 ]);
 export type SecretsManager = typeof SecretsManager.Type;
 
-// Where the root alchemy.run.ts deploys the apps shoebox scaffolds. `none`
+// Where the root alchemy.run.ts deploys the apps shoemaker scaffolds. `none`
 // still generates the Stack, for resources added by hand.
 export const DeployTarget = Schema.Literals(['cloudflare', 'aws', 'none']);
 export type DeployTarget = typeof DeployTarget.Type;
@@ -71,7 +71,7 @@ export const Features = Schema.Struct({
 });
 export type Features = typeof Features.Type;
 
-export const ShoeboxConfig = Schema.Struct({
+export const ShoemakerConfig = Schema.Struct({
   // Repo name (kebab-case). Root package.json `name`.
   name: KebabName,
   // npm scope for workspace packages, without the `@` (e.g. `listening`).
@@ -86,12 +86,12 @@ export const ShoeboxConfig = Schema.Struct({
   features: Features,
   // Extra nixpkgs attribute names added to the default dev shell.
   nixPackages: Schema.Array(Schema.String),
-  // Repo-relative paths shoebox must never write, even if a generator emits them.
+  // Repo-relative paths shoemaker must never write, even if a generator emits them.
   unmanaged: Schema.Array(Schema.String),
 });
-export type ShoeboxConfig = typeof ShoeboxConfig.Type;
+export type ShoemakerConfig = typeof ShoemakerConfig.Type;
 
-export const defaultConfig = (name: string): ShoeboxConfig => ({
+export const defaultConfig = (name: string): ShoemakerConfig => ({
   name,
   scope: name,
   description: '',
@@ -106,4 +106,4 @@ export const defaultConfig = (name: string): ShoeboxConfig => ({
   unmanaged: [],
 });
 
-export const decodeConfig = Schema.decodeUnknownEffect(ShoeboxConfig);
+export const decodeConfig = Schema.decodeUnknownEffect(ShoemakerConfig);

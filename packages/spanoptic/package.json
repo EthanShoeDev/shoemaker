@@ -1,5 +1,5 @@
 {
-  "name": "shoe-box-spanoptic",
+  "name": "shoemaker-spanoptic",
   "version": "0.0.1",
   "description": "TUI OTEL visualizer for Effect programs",
   "bin": {
@@ -51,7 +51,7 @@
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "bun-types": "catalog:",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

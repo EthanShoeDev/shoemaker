@@ -6,17 +6,17 @@ Copied from upstream `src/` → this directory (rules, shared helpers, the `effe
 
 ## Local deltas
 
-Upstream compiles without `noUncheckedIndexedAccess`; `shoe-box-typescript-config` enables it, and this package's `tsc` program includes the tree. Re-apply after a refresh:
+Upstream compiles without `noUncheckedIndexedAccess`; `shoemaker-typescript-config` enables it, and this package's `tsc` program includes the tree. Re-apply after a refresh:
 
 - `shared/dictionary-types.ts` (TSIntersectionType branch): `? unsafeMembers[0]` → `? (unsafeMembers[0] ?? null)`. Behaviour-neutral: the index is guarded by `unsafeMembers.length > 0`.
 
 ## How it is wired
 
-- Entry points: `index.ts` (`anti-slop`) and `effect/index.ts` (`anti-slop-effect`), exported as `shoe-box-oxlint-plugins/vendor/anti-slop` and `…/vendor/anti-slop/effect`. Only these two are tsdown entries.
+- Entry points: `index.ts` (`anti-slop`) and `effect/index.ts` (`anti-slop-effect`), exported as `shoemaker-oxlint-plugins/vendor/anti-slop` and `…/vendor/anti-slop/effect`. Only these two are tsdown entries.
 - `@oxlint/plugins` is pinned in the root catalog to the same version as `oxlint`; upstream requires the two to match exactly, so bump them together.
 - Upstream's `.ts`-suffixed relative imports are kept; the base tsconfig sets `rewriteRelativeImportExtensions` for them.
 - The tree is excluded from `oxlint` (`ignorePatterns`), `oxfmt`, `jscpd` and `knip` so a refresh stays a diff against upstream. Do not reformat or lint-fix these files.
-- Which rules are on is decided in `shoe-box-oxlint-config` (every rule at `error`, rejected ones off with a reason), not here.
+- Which rules are on is decided in `shoemaker-oxlint-config` (every rule at `error`, rejected ones off with a reason), not here.
 
 ## Tests
 
@@ -24,4 +24,4 @@ The upstream RuleTester suites run unchanged under this package's vitest config 
 
 ## Refreshing
 
-Clone upstream at the target revision, copy `src/` over this directory and `LICENSE` beside it, diff against the previous copy, re-apply the local deltas, update the commit above, run `bun run test` and `bun run typecheck` here, then review any new rule in `shoe-box-oxlint-config` (a new rule lands at `error` through `everyRuleOf`).
+Clone upstream at the target revision, copy `src/` over this directory and `LICENSE` beside it, diff against the previous copy, re-apply the local deltas, update the commit above, run `bun run test` and `bun run typecheck` here, then review any new rule in `shoemaker-oxlint-config` (a new rule lands at `error` through `everyRuleOf`).

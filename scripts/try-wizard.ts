@@ -1,4 +1,4 @@
-// Runs the interactive `shoe-box init` wizard against locally packed packages,
+// Runs the interactive `shoemaker init` wizard against locally packed packages,
 // so it can be tried before anything is on npm. The repo lands in tmp/<name>
 // (gitignored), which is wiped first.
 //
@@ -42,7 +42,7 @@ const tryWizard = Command.make(
     yield* runInherit(
       'bun',
       [path.join(root, 'packages/cli/src/bin.ts'), 'init', out, '--no-install'],
-      { cwd: root, env: { SHOEBOX_VERSION_OVERRIDES: overridesFile } },
+      { cwd: root, env: { SHOEMAKER_VERSION_OVERRIDES: overridesFile } },
     );
     // Not installed, but pinned so a later `bun install` resolves the
     // tarballs, which depend on each other at versions not on npm yet.
@@ -54,9 +54,9 @@ const tryWizard = Command.make(
           '',
           `Generated ${path.relative(root, out)} (not installed).`,
           '`bun install` in it uses the local tarballs. To run',
-          '`bunx shoe-box sync` or `doctor` there without drift on the',
-          'shoe-box versions, first:',
-          `  export SHOEBOX_VERSION_OVERRIDES=${overridesFile}`,
+          '`bunx shoemaker sync` or `doctor` there without drift on the',
+          'shoemaker versions, first:',
+          `  export SHOEMAKER_VERSION_OVERRIDES=${overridesFile}`,
         ],
         '\n',
       ),

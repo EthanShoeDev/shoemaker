@@ -33,7 +33,7 @@ const BUN_SOURCES = [
 // A `#` region whose markers sit at the indentation of the body.
 const nixRegion = (id: string, body: string, pad: string) =>
   Arr.join(
-    [`${pad}# shoebox:begin ${id}`, body, `${pad}# shoebox:end ${id}`],
+    [`${pad}# shoemaker:begin ${id}`, body, `${pad}# shoemaker:end ${id}`],
     '\n',
   );
 

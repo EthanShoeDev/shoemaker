@@ -1,11 +1,11 @@
 import {
   defaultConfig,
-  type ShoeboxConfig,
+  type ShoemakerConfig,
 } from '../../packages/cli/src/config/schema.ts';
 
 // Sample configs the e2e harness generates, installs and lints. Together they
 // cover every wizard option at least once.
-export const presets: Readonly<Record<string, ShoeboxConfig>> = {
+export const presets: Readonly<Record<string, ShoemakerConfig>> = {
   minimal: {
     ...defaultConfig('sample-minimal'),
     packages: [{ name: 'core', kind: 'library' }],

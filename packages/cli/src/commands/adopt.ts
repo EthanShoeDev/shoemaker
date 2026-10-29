@@ -17,7 +17,7 @@ export const runAdopt = Effect.fnUntraced(function* (input: {
   const root = yield* resolveRoot(input.directory);
   if ((yield* configExists(root)) && !input.force) {
     return yield* fail(
-      `${root} already has ${CONFIG_PATH}. Run \`shoe-box sync\`, or pass --force to re-infer it.`,
+      `${root} already has ${CONFIG_PATH}. Run \`shoemaker sync\`, or pass --force to re-infer it.`,
     );
   }
   const config = yield* inferConfig(yield* makeRepo(root));
@@ -35,7 +35,7 @@ export const runAdopt = Effect.fnUntraced(function* (input: {
     allowDirty: true,
   }).pipe(Effect.catchTag('CommandFailed', () => Effect.void));
   yield* Console.log(
-    `\nNext: edit ${CONFIG_PATH} until the plan looks right, then \`shoe-box sync --force '<glob>'\` to take generated versions of untracked files.`,
+    `\nNext: edit ${CONFIG_PATH} until the plan looks right, then \`shoemaker sync --force '<glob>'\` to take generated versions of untracked files.`,
   );
 });
 
@@ -43,7 +43,7 @@ export const adoptCommand = Command.make(
   'adopt',
   {
     directory: Argument.String('directory').pipe(
-      Argument.withDescription('Existing repo to bring under shoebox'),
+      Argument.withDescription('Existing repo to bring under shoemaker'),
       Argument.withDefault('.'),
     ),
     force: Flag.Boolean('force').pipe(
@@ -54,6 +54,6 @@ export const adoptCommand = Command.make(
   runAdopt,
 ).pipe(
   Command.withDescription(
-    'Infer shoebox.config.ts for an existing repo and preview the sync',
+    'Infer shoemaker.config.ts for an existing repo and preview the sync',
   ),
 );

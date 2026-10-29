@@ -44,7 +44,7 @@ export const runCheck = Effect.fnUntraced(function* (input: {
   if (result.report !== '') yield* Console.log(result.report);
   if (!result.ok) {
     if (!input.fix && result.fixes.length > 0) {
-      yield* Console.log(s.dim(`Fixable: shoe-box check ${name} --fix`));
+      yield* Console.log(s.dim(`Fixable: shoemaker check ${name} --fix`));
     }
     return yield* fail(`check ${name} failed`);
   }

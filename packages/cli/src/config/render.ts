@@ -1,8 +1,8 @@
 import { Array as Arr, String as Str } from 'effect';
 
-import type { ShoeboxConfig } from './schema.ts';
+import type { ShoemakerConfig } from './schema.ts';
 
-// Renders `shoebox.config.ts` in oxfmt's style (single quotes, trailing
+// Renders `shoemaker.config.ts` in oxfmt's style (single quotes, trailing
 // commas, printWidth 80), so a formatter run is a no-op. Objects always
 // expand; string arrays stay on one line when they fit.
 
@@ -68,7 +68,7 @@ const objects =
   };
 
 // Field order follows the schema so diffs between renders stay small.
-const configLines = (config: ShoeboxConfig): ReadonlyArray<Line> => [
+const configLines = (config: ShoemakerConfig): ReadonlyArray<Line> => [
   prop('name', config.name),
   prop('scope', config.scope),
   prop('description', config.description),
@@ -123,10 +123,10 @@ export const renderInlineEntry = (entry: {
   readonly kind: string;
 }) => `{ name: ${quote(entry.name)}, kind: ${quote(entry.kind)} }`;
 
-export const renderConfigFile = (config: ShoeboxConfig) =>
+export const renderConfigFile = (config: ShoemakerConfig) =>
   Arr.join(
     [
-      "import { defineConfig } from 'shoe-box/config';",
+      "import { defineConfig } from 'shoemaker/config';",
       '',
       'export default defineConfig({',
       ...Arr.map(configLines(config), (line) => line('  ')),

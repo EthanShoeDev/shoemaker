@@ -98,7 +98,7 @@ describe('greeting', () => {
 
 // Expo's base config is the one RN type resolution needs (`react-native`
 // export condition, `module: preserve`), so it replaces the shared base; the
-// strictness flags shoebox cares about are restated on top of it.
+// strictness flags shoemaker cares about are restated on top of it.
 const tsconfig = (dir: string) =>
   owned(
     `${dir}/tsconfig.json`,

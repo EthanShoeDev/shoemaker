@@ -17,7 +17,7 @@ import { everyRuleOf } from './helpers.ts';
 export const declarationOverride = (
   files: Array<string> = declarationFiles,
 ): ScopedConfigItem => ({
-  name: 'shoebox/dts',
+  name: 'shoemaker/dts',
   files,
   rules: {
     // An `export {}` would turn `declare module` blocks into augmentations and
@@ -31,7 +31,7 @@ export const testOverride = ({
   files = testFiles,
   react = false,
 }: { files?: Array<string>; react?: boolean } = {}): ScopedConfigItem => ({
-  name: 'shoebox/tests',
+  name: 'shoemaker/tests',
   files,
   rules: {
     // Mock callbacks are often empty.
@@ -73,7 +73,7 @@ export const testOverride = ({
 export const toolingOverride = (
   files: Array<string> = toolingFiles,
 ): ScopedConfigItem => ({
-  name: 'shoebox/node-tooling',
+  name: 'shoemaker/node-tooling',
   files,
   rules: {
     // Tooling touches the filesystem and child processes directly.
@@ -103,7 +103,7 @@ export const toolingOverride = (
 export const vendoredOverride = (
   files: Array<string> = vendoredFiles,
 ): ScopedConfigItem => ({
-  name: 'shoebox/vendored',
+  name: 'shoemaker/vendored',
   files,
   rules: {
     // `Provider.effect(…, Effect.gen(…))` bodies that only build closures.
@@ -151,7 +151,7 @@ export const vendoredOverride = (
 export const playwrightOverride = (
   files: Array<string> = e2eFiles,
 ): ScopedConfigItem => ({
-  name: 'shoebox/playwright',
+  name: 'shoemaker/playwright',
   files,
   rules: {
     // `test`/`expect` come from @playwright/test, not vitest.
@@ -202,7 +202,7 @@ export const playwrightOverride = (
 export const testingLibraryOverride = (
   files: Array<string> = testingLibraryFiles,
 ): ScopedConfigItem => ({
-  name: 'shoebox/testing-library',
+  name: 'shoemaker/testing-library',
   files,
   rules: {
     ...everyRuleOf('testing-library', testingLibrary),
@@ -215,7 +215,7 @@ export const testingLibraryOverride = (
 export const routesOverride = (
   files: Array<string> = routeFiles,
 ): ScopedConfigItem => ({
-  name: 'shoebox/routes',
+  name: 'shoemaker/routes',
   files,
   rules: {
     // File routes export `Route` beside their component by contract; the

@@ -15,7 +15,7 @@ import {
   type App,
   AppKind,
   type Package,
-  type ShoeboxConfig,
+  type ShoemakerConfig,
   decodeConfig,
 } from '../config/schema.ts';
 import { ensureCleanTree, writeFile } from '../engine/apply.ts';
@@ -34,7 +34,7 @@ const shared = {
   cwd: cwdFlag,
 };
 
-const takenNames = (config: ShoeboxConfig) => [
+const takenNames = (config: ShoemakerConfig) => [
   ...Arr.map(config.apps, (app) => app.name),
   ...Arr.map(config.packages, (pkg) => pkg.name),
 ];
@@ -43,19 +43,19 @@ type Addition =
   | { readonly key: 'apps'; readonly entry: App }
   | { readonly key: 'packages'; readonly entry: Package };
 
-const withAddition = (config: ShoeboxConfig, addition: Addition) =>
+const withAddition = (config: ShoemakerConfig, addition: Addition) =>
   addition.key === 'apps'
     ? { ...config, apps: [...config.apps, addition.entry] }
     : { ...config, packages: [...config.packages, addition.entry] };
 
-// shoebox.config.ts is the user's file: re-rendering it is only safe when it
-// is exactly what shoebox renders; otherwise the entry is spliced into its
+// shoemaker.config.ts is the user's file: re-rendering it is only safe when it
+// is exactly what shoemaker renders; otherwise the entry is spliced into its
 // array literal and the result re-loaded to prove it decodes to `next`. On
 // any doubt the original bytes go back and false is returned.
 const writeConfig = Effect.fnUntraced(function* (
   root: string,
-  current: ShoeboxConfig,
-  next: ShoeboxConfig,
+  current: ShoemakerConfig,
+  next: ShoemakerConfig,
   addition: Addition,
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -79,12 +79,12 @@ const writeConfig = Effect.fnUntraced(function* (
   return false;
 });
 
-// load -> add an entry -> write shoebox.config.ts -> sync. The clean-tree
+// load -> add an entry -> write shoemaker.config.ts -> sync. The clean-tree
 // check runs before the config write, which would otherwise make the tree
 // dirty.
 const updateConfig = Effect.fnUntraced(function* (
   input: { readonly cwd: string; readonly allowDirty: boolean },
-  pick: (config: ShoeboxConfig) => Effect.Effect<Addition, CommandFailed>,
+  pick: (config: ShoemakerConfig) => Effect.Effect<Addition, CommandFailed>,
 ) {
   const root = yield* resolveRoot(input.cwd);
   const config = yield* loadConfig(root);
@@ -95,7 +95,7 @@ const updateConfig = Effect.fnUntraced(function* (
   if (!input.allowDirty) yield* ensureCleanTree(root);
   if (!(yield* writeConfig(root, config, next, addition))) {
     yield* Console.log(
-      `${CONFIG_PATH} has hand-written parts shoebox cannot edit safely, so it was left untouched.\nAdd this entry to its \`${addition.key}\` array, then run \`shoe-box sync\`:\n\n  ${renderInlineEntry(addition.entry)},`,
+      `${CONFIG_PATH} has hand-written parts shoemaker cannot edit safely, so it was left untouched.\nAdd this entry to its \`${addition.key}\` array, then run \`shoemaker sync\`:\n\n  ${renderInlineEntry(addition.entry)},`,
     );
     return yield* fail(`${CONFIG_PATH} not updated`);
   }
@@ -134,7 +134,7 @@ const addApp = Command.make(
       }
       return Effect.succeed({ key: 'apps', entry: app } as const);
     }),
-).pipe(Command.withDescription('Add an app to shoebox.config.ts and sync'));
+).pipe(Command.withDescription('Add an app to shoemaker.config.ts and sync'));
 
 const addPackage = Command.make(
   'package',

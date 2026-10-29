@@ -51,10 +51,14 @@
       "command": ["bun", "../../scripts/publish-package.ts"],
       "dependsOn": ["build", "^release:publish"],
       "cache": false,
+      // npm trusted publishing reads the GitHub Actions OIDC request vars, and
+      // provenance reads the GITHUB_*/RUNNER_* run metadata.
       "passThroughEnv": [
-        "BUN_AUTH_TOKEN",
-        "NPM_CONFIG_TOKEN",
-        "SHOE_BOX_RELEASE_DRY_RUN"
+        "ACTIONS_ID_TOKEN_REQUEST_*",
+        "CI",
+        "GITHUB_*",
+        "RUNNER_*",
+        "SHOEMAKER_RELEASE_DRY_RUN"
       ]
     },
     "oxlint:check": {

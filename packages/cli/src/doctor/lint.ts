@@ -24,8 +24,8 @@ import type { DoctorCheck, Finding } from './types.ts';
 
 const OXLINT_TS = 'oxlint.config.ts';
 const OXFMT_TS = 'oxfmt.config.ts';
-const SHARED_OXLINT = 'shoe-box-oxlint-config';
-const SHARED_OXFMT = 'shoe-box-oxfmt-config';
+const SHARED_OXLINT = 'shoemaker-oxlint-config';
+const SHARED_OXFMT = 'shoemaker-oxfmt-config';
 const CATEGORIES = [
   'correctness',
   'perf',
@@ -86,7 +86,7 @@ export const oxlintConfigFormat: DoctorCheck = {
       ? [pass(`${OXLINT_TS} present`)]
       : [
           fail(`no ${OXLINT_TS}`, {
-            fix: `add ${OXLINT_TS} with defineShoeboxConfig from ${SHARED_OXLINT}`,
+            fix: `add ${OXLINT_TS} with defineShoemakerConfig from ${SHARED_OXLINT}`,
           }),
         ];
   }),
@@ -125,7 +125,7 @@ export const oxlintSharedConfig: DoctorCheck = {
           `hand-rolled ${OXLINT_TS}: categories not at error: ${Arr.join(missing, ', ')}`,
           {
             path: OXLINT_TS,
-            fix: `switch to defineShoeboxConfig from ${SHARED_OXLINT} (sets all 6 categories to error)`,
+            fix: `switch to defineShoemakerConfig from ${SHARED_OXLINT} (sets all 6 categories to error)`,
           },
         ),
       );
@@ -152,7 +152,7 @@ export const oxlintSharedConfig: DoctorCheck = {
         ),
         fail(`${OXLINT_TS} is hand-rolled`, {
           path: OXLINT_TS,
-          fix: `move repo-specific rules into defineShoeboxConfig({ rules, overrides }) from ${SHARED_OXLINT} so preference changes arrive by version bump`,
+          fix: `move repo-specific rules into defineShoemakerConfig({ rules, overrides }) from ${SHARED_OXLINT} so preference changes arrive by version bump`,
         }),
       );
     }
@@ -289,7 +289,7 @@ export const oxfmtConfigFormat: DoctorCheck = {
             ? {
                 fix: `fold into the root ${OXFMT_TS} ignorePatterns/overrides and delete it`,
               }
-            : { fix: `move it to ${OXFMT_TS} on shoe-box-oxfmt-config` }),
+            : { fix: `move it to ${OXFMT_TS} on shoemaker-oxfmt-config` }),
         }),
       );
     }
@@ -297,7 +297,7 @@ export const oxfmtConfigFormat: DoctorCheck = {
       ? [pass(`${OXFMT_TS} present`)]
       : [
           fail(`no ${OXFMT_TS}`, {
-            fix: `add ${OXFMT_TS} with defineShoeboxFormat from ${SHARED_OXFMT}`,
+            fix: `add ${OXFMT_TS} with defineShoemakerFormat from ${SHARED_OXFMT}`,
           }),
         ];
   }),
@@ -323,7 +323,7 @@ export const oxfmtSortImports: DoctorCheck = {
         : [
             fail(`${OXFMT_TS} does not enable sortImports`, {
               path: OXFMT_TS,
-              fix: 'sortImports: true, or use defineShoeboxFormat',
+              fix: 'sortImports: true, or use defineShoemakerFormat',
             }),
           ];
     }
@@ -339,14 +339,14 @@ export const oxfmtSortImports: DoctorCheck = {
           : [
               fail(`${path} does not enable sortImports`, {
                 path,
-                fix: `use ${OXFMT_TS} on shoe-box-oxfmt-config, which enables it`,
+                fix: `use ${OXFMT_TS} on shoemaker-oxfmt-config, which enables it`,
               }),
             ];
       }
     }
     return [
       fail('no oxfmt config', {
-        fix: `add ${OXFMT_TS} with defineShoeboxFormat from ${SHARED_OXFMT}`,
+        fix: `add ${OXFMT_TS} with defineShoemakerFormat from ${SHARED_OXFMT}`,
       }),
     ];
   }),

@@ -36,7 +36,7 @@ export const effectTestDevDependencies = [
 // Catalog names for a package: its own deps plus the tsconfig base that
 // `workspacePackageJson` always adds.
 export const catalogOf = (...groups: ReadonlyArray<ReadonlyArray<string>>) => [
-  ...new Set([...groups.flat(), 'shoe-box-typescript-config']),
+  ...new Set([...groups.flat(), 'shoemaker-typescript-config']),
 ];
 
 export const mergeContributions = (

@@ -1,7 +1,7 @@
-export { defineShoeboxConfig } from './define.ts';
-export type { ShoeboxConfigOptions } from './define.ts';
-export { shoeboxPreset } from './preset.ts';
-export type { ShoeboxPresetOptions } from './preset.ts';
+export { defineShoemakerConfig } from './define.ts';
+export type { ShoemakerConfigOptions } from './define.ts';
+export { shoemakerPreset } from './preset.ts';
+export type { ShoemakerPresetOptions } from './preset.ts';
 // Re-exported so a repo that composes the preset needs no second install, and
 // the composer shares this package's oxlint-flat-config.
 export { composer } from '@oxlint-flat-config/composer';

@@ -1,17 +1,17 @@
-import type { ShoeboxConfig } from '../config/schema.ts';
+import type { ShoemakerConfig } from '../config/schema.ts';
 import type { EnvVar } from '../generators/secrets/model.ts';
 import type { TaskDef } from '../generators/task-runner/model.ts';
 
-// How `shoe-box sync` treats a generated file once it exists on disk.
+// How `shoemaker sync` treats a generated file once it exists on disk.
 //
-// - `owned`: shoebox renders the whole file. Re-rendered on every sync. A file
+// - `owned`: shoemaker renders the whole file. Re-rendered on every sync. A file
 //   whose on-disk hash no longer matches the lockfile baseline was hand-edited
 //   and is reported as a conflict instead of being overwritten.
 // - `seed`: written once when missing (app source, README). Never updated.
-// - `managed`: the file contains `shoebox:begin <id>` / `shoebox:end <id>`
+// - `managed`: the file contains `shoemaker:begin <id>` / `shoemaker:end <id>`
 //   regions. Sync rewrites region bodies only; text outside them is the
 //   user's. A missing file is written in full.
-// - `json-merge`: `content` is a JSON object of keys shoebox owns. Sync deep
+// - `json-merge`: `content` is a JSON object of keys shoemaker owns. Sync deep
 //   merges them into the existing JSON file (objects merge, everything else is
 //   replaced) and leaves unowned keys alone. Used for package.json.
 export type FileStrategy = 'owned' | 'seed' | 'managed' | 'json-merge';
@@ -27,7 +27,7 @@ export interface GeneratedFile {
 
 // Facts generators share. Generators are pure: config in, files out.
 export interface GenContext {
-  readonly config: ShoeboxConfig;
+  readonly config: ShoemakerConfig;
   // `@scope/name` for a workspace package.
   readonly pkg: (name: string) => string;
   // Pinned version spec for a dependency, from versions.ts. Throws on unknown

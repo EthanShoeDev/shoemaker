@@ -1,6 +1,6 @@
 import { Array as Arr, String as Str } from 'effect';
 
-import type { App, ShoeboxConfig, StateStore } from '../../config/schema.ts';
+import type { App, ShoemakerConfig, StateStore } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
 import { pascalCase } from '../apps/common.ts';
 import type { EnvVar } from '../secrets/model.ts';
@@ -43,7 +43,7 @@ const websites: Readonly<Record<Cloud, Partial<Record<App['kind'], Website>>>> =
 // The Effect API declares its own Worker (apps/<name>/src/worker.ts), which
 // the Stack imports by path: a root dependency on a workspace package would be
 // a cycle, as every package already depends on the root.
-const workerApps = (config: ShoeboxConfig) =>
+const workerApps = (config: ShoemakerConfig) =>
   deployTarget(config) === 'cloudflare'
     ? Arr.filter(config.apps, (app) => app.kind === 'effect-api')
     : [];
@@ -52,7 +52,7 @@ type Deployed =
   | { readonly app: App; readonly kind: 'website'; readonly statement: string }
   | { readonly app: App; readonly kind: 'worker' };
 
-const deployed = (config: ShoeboxConfig): ReadonlyArray<Deployed> => {
+const deployed = (config: ShoemakerConfig): ReadonlyArray<Deployed> => {
   const target = deployTarget(config);
   if (target === 'none') return [];
   const workers = new Set(workerApps(config));
@@ -78,7 +78,7 @@ const stateExpression = (state: StateStore) =>
     ? 'Alchemy.localState()'
     : `${providerModules[state].name}.state()`;
 
-const runSource = (config: ShoeboxConfig, state: StateStore) => {
+const runSource = (config: ShoemakerConfig, state: StateStore) => {
   const target = deployTarget(config);
   const list = deployed(config);
   const hasWebsite = Arr.some(list, (entry) => entry.kind === 'website');
@@ -164,7 +164,7 @@ const env: ReadonlyArray<EnvVar> = [
 // knip reads commands after `varlock run --` but not after `secretspec run
 // --`, so under secretspec the alchemy CLI goes through a plain `alchemy`
 // script, which keeps the root alchemy (and its Bun peer) visibly used.
-const infraScripts = (config: ShoeboxConfig) => {
+const infraScripts = (config: ShoemakerConfig) => {
   const indirect = config.secrets === 'secretspec';
   const alchemyCommand = (verb: string) =>
     withSecrets(
@@ -182,13 +182,13 @@ const infraScripts = (config: ShoeboxConfig) => {
 
 // The root typecheck and lint read alchemy.run.ts, which imports each
 // Worker's source, so those sources are part of their cache key.
-const rootInputs = (config: ShoeboxConfig) =>
+const rootInputs = (config: ShoemakerConfig) =>
   Arr.flatMap(workerApps(config), (app) => [
     `apps/${app.name}/package.json`,
     `apps/${app.name}/src/**`,
   ]);
 
-const rootTasks = (config: ShoeboxConfig): ReadonlyArray<TaskDef> => {
+const rootTasks = (config: ShoemakerConfig): ReadonlyArray<TaskDef> => {
   const inputs = rootInputs(config);
   return inputs.length === 0
     ? []

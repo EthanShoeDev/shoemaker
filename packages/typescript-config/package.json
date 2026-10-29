@@ -1,5 +1,5 @@
 {
-  "name": "shoe-box-typescript-config",
+  "name": "shoemaker-typescript-config",
   "version": "0.1.0",
   "description": "Shared strict tsconfig base for Effect + bun monorepos",
   "license": "MIT",

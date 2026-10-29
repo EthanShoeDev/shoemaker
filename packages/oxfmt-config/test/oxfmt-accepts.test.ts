@@ -9,8 +9,8 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
 const entry = fileURLToPath(new URL('../src/index.ts', import.meta.url));
 const config =
-  `import { defineShoeboxFormat } from ${JSON.stringify(entry)};\n` +
-  'export default defineShoeboxFormat();\n';
+  `import { defineShoemakerFormat } from ${JSON.stringify(entry)};\n` +
+  'export default defineShoemakerFormat();\n';
 const oxfmtBin = fileURLToPath(
   new URL('bin/oxfmt', import.meta.resolve('oxfmt/package.json')),
 );
@@ -30,7 +30,7 @@ layer(services)((it) => {
       const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const dir = yield* fs.makeTempDirectoryScoped({
-        prefix: 'shoebox-oxfmt-config-',
+        prefix: 'shoemaker-oxfmt-config-',
       });
 
       yield* fs.writeFileString(path.join(dir, 'oxfmt.config.ts'), config);

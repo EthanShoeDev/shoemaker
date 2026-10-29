@@ -10,7 +10,7 @@ import { format } from 'oxfmt';
 
 import {
   defaultConfig,
-  type ShoeboxConfig,
+  type ShoemakerConfig,
 } from '../../../src/config/schema.ts';
 import { makeContext } from '../../../src/engine/generate.ts';
 import type {
@@ -22,13 +22,13 @@ import type {
 import { versionOf } from '../../../src/versions.ts';
 
 export const sampleConfig = (
-  overrides: Partial<ShoeboxConfig> = {},
-): ShoeboxConfig => ({
+  overrides: Partial<ShoemakerConfig> = {},
+): ShoemakerConfig => ({
   ...defaultConfig('sample'),
   ...overrides,
 });
 
-export const contribute = (generator: Generator, config: ShoeboxConfig) => {
+export const contribute = (generator: Generator, config: ShoemakerConfig) => {
   const contribution = generator(makeContext(config));
   const files = contribution.files ?? [];
   const byPath = new Map(Arr.map(files, (file) => [file.path, file] as const));

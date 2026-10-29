@@ -1,19 +1,19 @@
-# shoe-box-oxlint-config
+# shoemaker-oxlint-config
 
 The shared `oxlint.config.ts` for Effect + bun monorepos, built on [oxlint-flat-config](https://github.com/liangmiQwQ/oxlint-flat-config). There are two ways to use it:
 
-- `defineShoeboxConfig(options)`: one call with a few options. This is what `shoe-box init` generates.
-- `shoeboxPreset(options)`: the same config as an array of named flat config blocks. Use it with the composer when a repo needs to change one block.
+- `defineShoemakerConfig(options)`: one call with a few options. This is what `shoemaker init` generates.
+- `shoemakerPreset(options)`: the same config as an array of named flat config blocks. Use it with the composer when a repo needs to change one block.
 
-Install it beside `oxlint`, `oxlint-tsgolint` and `@effect/tsgo` (peer dependencies), and run `effect-tsgo patch --oxlint` from `prepare` so the `effecttsgo/*` rules exist. The custom plugins (`shoe-box-oxlint-plugins`), the third-party eslint plugins, `oxlint-flat-config` and `@oxlint-flat-config/composer` are dependencies of this package. The `jsPlugins` entries are absolute paths resolved from here, so the consuming repo does not list the plugins itself.
+Install it beside `oxlint`, `oxlint-tsgolint` and `@effect/tsgo` (peer dependencies), and run `effect-tsgo patch --oxlint` from `prepare` so the `effecttsgo/*` rules exist. The custom plugins (`shoemaker-oxlint-plugins`), the third-party eslint plugins, `oxlint-flat-config` and `@oxlint-flat-config/composer` are dependencies of this package. The `jsPlugins` entries are absolute paths resolved from here, so the consuming repo does not list the plugins itself.
 
-## `defineShoeboxConfig`
+## `defineShoemakerConfig`
 
 ```ts
 // oxlint.config.ts
-import { defineShoeboxConfig } from 'shoe-box-oxlint-config';
+import { defineShoemakerConfig } from 'shoemaker-oxlint-config';
 
-export default defineShoeboxConfig({
+export default defineShoemakerConfig({
   scope: 'myproj', // workspace scope without the @
   react: true,
   tanstackRouter: true,
@@ -49,27 +49,27 @@ export default defineShoeboxConfig({
 | `overrides` | Appended after the shared blocks, so they win over them. An oxlint override (`{ files, excludeFiles?, rules }`) keeps oxlint's glob meaning (`*.ts` matches at any depth). A flat config item, meaning one with a `name`, `ignores`, `basePath` or `extends`, is passed through unchanged with flat-config globs. |
 | `rules` | Project rules. They sit after every shared global block and before the shared scoped blocks, where oxlint's root `rules` used to apply, so the test and tooling offs still win over them. |
 
-## `shoeboxPreset` and the composer
+## `shoemakerPreset` and the composer
 
-`shoeboxPreset(options)` takes the preset options (everything above except `ignorePatterns`, `overrides` and `rules`) and returns plain flat config items. Pass them to `defineFlatConfig` (oxlint-flat-config's `defineConfig`) or to `composer`; both are re-exported, so no second install is needed.
+`shoemakerPreset(options)` takes the preset options (everything above except `ignorePatterns`, `overrides` and `rules`) and returns plain flat config items. Pass them to `defineFlatConfig` (oxlint-flat-config's `defineConfig`) or to `composer`; both are re-exported, so no second install is needed.
 
 ```ts
 // oxlint.config.ts
-import { composer, shoeboxPreset } from 'shoe-box-oxlint-config';
+import { composer, shoemakerPreset } from 'shoemaker-oxlint-config';
 
-export default await composer(shoeboxPreset({ scope: 'myproj', react: true }))
+export default await composer(shoemakerPreset({ scope: 'myproj', react: true }))
   // This repo has no env package yet.
-  .override('shoebox/custom', {
+  .override('shoemaker/custom', {
     rules: { 'env-access/no-raw-env-access': 'off' },
   })
   // Benchmarks are linted like source code here.
-  .override('shoebox/tests', (block) => ({
+  .override('shoemaker/tests', (block) => ({
     ...block,
     files: block.files?.filter((glob) => glob !== '**/perf/**'),
   }))
   // No vendored code in this repo.
-  .remove('shoebox/vendored')
-  .insertAfter('shoebox/node-tooling', {
+  .remove('shoemaker/vendored')
+  .insertAfter('shoemaker/node-tooling', {
     name: 'myproj/codegen',
     files: ['packages/codegen/**'],
     rules: {
@@ -83,27 +83,27 @@ Blocks, in order:
 
 | Name | Kind | What |
 | --- | --- | --- |
-| `shoebox/ignores` | global ignores | Build output, generated code, cloned docs, agent dirs (+ `**/components/ui/**` with `react`) |
-| `shoebox/options` | global | `typeAware`, `typeCheck`, `reportUnusedDisableDirectives: 'error'` |
-| `shoebox/plugins` | global | The `jsPlugins` entries (+ `env.browser` with `web`) |
-| `shoebox/categories` | global | `category()`: all six categories at `error` for the enabled plugins |
-| `shoebox/base` | global | Formatter-owned, budget, style, TypeScript, Effect-shaped, promise, module, JSDoc and vitest offs |
-| `shoebox/react` | global | `react` only |
-| `shoebox/tanstack-router` | global | `tanstackRouter` only |
-| `shoebox/web` | global | `web` only |
-| `shoebox/effect` | global | `effectTsgoRules` and the rejected Effect rules |
-| `shoebox/custom` | global | The custom plugin rules (`env-access`, `import-boundaries`, …) |
-| `shoebox/anti-slop` | global | Every anti-slop rule at `error`, minus the rejected ones |
-| `shoebox/tanstack-query` | global | `tanstackQuery` only |
-| `shoebox/dts` | scoped | `**/*.d.ts` |
-| `shoebox/tests` | scoped | `testFiles` |
-| `shoebox/routes` | scoped | `routeFiles`, `react` + `tanstackRouter` only |
-| `shoebox/playwright` | scoped | `playwright` only |
-| `shoebox/testing-library` | scoped | `testingLibrary` only |
-| `shoebox/node-tooling` | scoped | `toolingFiles`: config files, vite and oxlint plugins (scripts are linted as Effect code) |
-| `shoebox/vendored` | scoped | `vendoredFiles` |
+| `shoemaker/ignores` | global ignores | Build output, generated code, cloned docs, agent dirs (+ `**/components/ui/**` with `react`) |
+| `shoemaker/options` | global | `typeAware`, `typeCheck`, `reportUnusedDisableDirectives: 'error'` |
+| `shoemaker/plugins` | global | The `jsPlugins` entries (+ `env.browser` with `web`) |
+| `shoemaker/categories` | global | `category()`: all six categories at `error` for the enabled plugins |
+| `shoemaker/base` | global | Formatter-owned, budget, style, TypeScript, Effect-shaped, promise, module, JSDoc and vitest offs |
+| `shoemaker/react` | global | `react` only |
+| `shoemaker/tanstack-router` | global | `tanstackRouter` only |
+| `shoemaker/web` | global | `web` only |
+| `shoemaker/effect` | global | `effectTsgoRules` and the rejected Effect rules |
+| `shoemaker/custom` | global | The custom plugin rules (`env-access`, `import-boundaries`, …) |
+| `shoemaker/anti-slop` | global | Every anti-slop rule at `error`, minus the rejected ones |
+| `shoemaker/tanstack-query` | global | `tanstackQuery` only |
+| `shoemaker/dts` | scoped | `**/*.d.ts` |
+| `shoemaker/tests` | scoped | `testFiles` |
+| `shoemaker/routes` | scoped | `routeFiles`, `react` + `tanstackRouter` only |
+| `shoemaker/playwright` | scoped | `playwright` only |
+| `shoemaker/testing-library` | scoped | `testingLibrary` only |
+| `shoemaker/node-tooling` | scoped | `toolingFiles`: config files, vite and oxlint plugins (scripts are linted as Effect code) |
+| `shoemaker/vendored` | scoped | `vendoredFiles` |
 
-Order matters as in ESLint: a later block wins. A rule added with `.append()` therefore also wins over `shoebox/tests`. To get `defineShoeboxConfig`'s placement for project rules, use `.insertBefore('shoebox/dts', { name: 'myproj/rules', rules })`. Patterns in flat items follow flat-config rules: `*.ts` matches only in the config's directory, so write `**/*.ts`. Global ignores are anchored, so write `**/dist` (see oxlint-flat-config's `docs/differences-from-eslint.md`).
+Order matters as in ESLint: a later block wins. A rule added with `.append()` therefore also wins over `shoemaker/tests`. To get `defineShoemakerConfig`'s placement for project rules, use `.insertBefore('shoemaker/dts', { name: 'myproj/rules', rules })`. Patterns in flat items follow flat-config rules: `*.ts` matches only in the config's directory, so write `**/*.ts`. Global ignores are anchored, so write `**/dist` (see oxlint-flat-config's `docs/differences-from-eslint.md`).
 
 ## Other exports
 

@@ -1,10 +1,10 @@
 import { defineConfig } from 'oxfmt';
-import { defineShoeboxFormat } from 'shoe-box-oxfmt-config';
+import { defineShoemakerFormat } from 'shoemaker-oxfmt-config';
 
 export default defineConfig(
-  defineShoeboxFormat({
+  defineShoemakerFormat({
     ignorePatterns: [
-      // Reference clones of the repos shoebox standardizes; read-only.
+      // Reference clones of the repos shoemaker standardizes; read-only.
       '.external/**',
     ],
   }),

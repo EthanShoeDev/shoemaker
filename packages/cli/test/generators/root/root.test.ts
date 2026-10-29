@@ -112,11 +112,11 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
   it('balances every managed region', () => {
     for (const f of Arr.filter(files, (g) => g.strategy === 'managed')) {
       const begins = Arr.map(
-        [...Str.matchAll(/shoebox:begin (\S+)/gu)(f.content)],
+        [...Str.matchAll(/shoemaker:begin (\S+)/gu)(f.content)],
         (m) => m[1],
       );
       const ends = Arr.map(
-        [...Str.matchAll(/shoebox:end (\S+)/gu)(f.content)],
+        [...Str.matchAll(/shoemaker:end (\S+)/gu)(f.content)],
         (m) => m[1],
       );
       assert.isAbove(begins.length, 0, f.path);
@@ -173,5 +173,19 @@ describe('lint config flags', () => {
     const minimal = render(preset('minimal')).file('oxlint.config.ts').content;
     assert.notInclude(minimal, 'react: true');
     assert.include(minimal, "scope: 'sample-minimal'");
+  });
+
+  it('turns the env rule on only with varlock', () => {
+    // web uses varlock; minimal and full (secretspec) do not.
+    assert.include(
+      render(preset('web')).file('oxlint.config.ts').content,
+      'varlock: true',
+    );
+    for (const name of ['minimal', 'full'] as const) {
+      assert.notInclude(
+        render(preset(name)).file('oxlint.config.ts').content,
+        'varlock',
+      );
+    }
   });
 });

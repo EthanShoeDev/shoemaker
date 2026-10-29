@@ -10,7 +10,7 @@ const oxlint = '1.90.0';
 const alchemy = '2.0.0-beta.84';
 const tanstackRouter = '^1.170.46';
 const expoSdk = '~58.0.21';
-const shoebox = '^0.1.0';
+const shoemaker = '^0.1.0';
 
 // Every runtime package Effect-TS/effect-smol publishes in lockstep with
 // `effect` (all exist at 4.0.6). Dependencies such as alchemy pull these with
@@ -49,13 +49,13 @@ export const effectFamily = [
 ] as const;
 
 export const versions = {
-  // shoe-box itself
-  'shoe-box': shoebox,
-  'shoe-box-oxlint-config': shoebox,
-  'shoe-box-oxlint-plugins': shoebox,
-  'shoe-box-oxfmt-config': shoebox,
-  'shoe-box-typescript-config': shoebox,
-  'shoe-box-knip-config': shoebox,
+  // shoemaker itself
+  shoemaker,
+  'shoemaker-oxlint-config': shoemaker,
+  'shoemaker-oxlint-plugins': shoemaker,
+  'shoemaker-oxfmt-config': shoemaker,
+  'shoemaker-typescript-config': shoemaker,
+  'shoemaker-knip-config': shoemaker,
 
   // Effect family: exact pins, all on the same version
   // (effect-versions check enforces it in bun.lock).

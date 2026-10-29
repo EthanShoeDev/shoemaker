@@ -21,14 +21,14 @@ import {
   type DeployTarget,
   type StateStore,
   type Package,
-  type ShoeboxConfig,
+  type ShoemakerConfig,
 } from '../config/schema.ts';
 import { SECRETS_FILES } from '../doctor/security.ts';
 import { globAll } from '../doctor/shared.ts';
 import type { Repo } from '../engine/repo.ts';
 
-// Reads an existing repo and guesses the shoebox.config.ts that describes it,
-// so `shoe-box adopt` can start from the repo's real shape.
+// Reads an existing repo and guesses the shoemaker.config.ts that describes it,
+// so `shoemaker adopt` can start from the repo's real shape.
 
 const MAX_SOURCE_FILES = 200;
 
@@ -78,8 +78,8 @@ const isAppShaped = (manifest: Manifest) =>
     hasDep(manifest.pkg, dep),
   );
 
-// Config and tooling packages are rendered by shoebox itself (or replaced by
-// shoe-box-*), and env/infra come from the secrets/infra generators.
+// Config and tooling packages are rendered by shoemaker itself (or replaced by
+// shoemaker-*), and env/infra come from the secrets/infra generators.
 const NOT_LIBRARY =
   /^(?:env|infra|assets|scripts|tooling|.*-config|.*-plugins?|config|tsconfig|eslint-.*)$/u;
 
@@ -145,7 +145,7 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
     ).pipe(Option.map(([value]) => value));
   return {
     kind: 'alchemy' as const,
-    // Cloudflare hosts every app kind shoebox scaffolds, so it wins a tie.
+    // Cloudflare hosts every app kind shoemaker scaffolds, so it wins a tie.
     deploy: Option.getOrElse(first(PROVIDERS), (): DeployTarget => 'none'),
     state: Option.getOrElse(first(STATE_STORES), (): StateStore => 'local'),
   };
@@ -167,7 +167,7 @@ const repoName = (repo: Repo, manifest: Manifest | undefined) => {
 
 export const inferConfig = (
   repo: Repo,
-): Effect.Effect<ShoeboxConfig, PlatformError> =>
+): Effect.Effect<ShoemakerConfig, PlatformError> =>
   Effect.gen(function* () {
     const workspace = yield* readWorkspace(repo);
     const name = repoName(repo, workspace?.root);
@@ -204,7 +204,7 @@ export const inferConfig = (
         : ('none' as const);
     const workflows = yield* repo.glob('.github/workflows/*.{yml,yaml}');
 
-    const config: ShoeboxConfig = {
+    const config: ShoemakerConfig = {
       ...base,
       scope: workspace.packages.length > 0 ? scopeFor(workspace) : name,
       description: workspace.root.pkg.description ?? '',

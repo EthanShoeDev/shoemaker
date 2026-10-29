@@ -18,7 +18,7 @@ import { allManifests, readWorkspace } from './workspace.ts';
 //
 // listening-astro's rule 2 (browser bundle must not reach the server tier)
 // needs a per-repo list of browser-bundled packages, so it is not ported until
-// shoebox.config.ts can declare one.
+// shoemaker.config.ts can declare one.
 
 const FIELDS = [
   'dependencies',

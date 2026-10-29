@@ -1,15 +1,15 @@
 import { Array as Arr } from 'effect';
 
-import type { ShoeboxConfig } from '../../config/schema.ts';
+import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { GenContext } from '../../engine/types.ts';
 
 export interface Workspace {
   readonly dir: string;
   readonly name: string;
-  readonly kind: ShoeboxConfig['apps'][number]['kind'] | 'library';
+  readonly kind: ShoemakerConfig['apps'][number]['kind'] | 'library';
 }
 
-// Every workspace package shoebox generates, in a stable order. Renderers that
+// Every workspace package shoemaker generates, in a stable order. Renderers that
 // list packages (vitest projects, nx project.json stubs, knip) read this.
 export const workspaces = (ctx: GenContext): ReadonlyArray<Workspace> => [
   ...Arr.map(ctx.config.apps, (app) => ({

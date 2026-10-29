@@ -1,11 +1,11 @@
 import { defineConfig } from 'oxlint';
-import { defineShoeboxConfig } from 'shoe-box-oxlint-config';
+import { defineShoemakerConfig } from 'shoemaker-oxlint-config';
 
 export default defineConfig(
-  defineShoeboxConfig({
-    scope: 'shoe-box',
+  defineShoemakerConfig({
+    scope: 'shoemaker',
     ignorePatterns: [
-      // Reference clones of the repos shoebox standardizes; read-only.
+      // Reference clones of the repos shoemaker standardizes; read-only.
       '.external/**',
       // The vendored anti-slop plugin (packages/oxlint-plugins/src/vendor/anti-slop/UPSTREAM.md)
       // is linted upstream; its own rules flag the patterns it is written with.

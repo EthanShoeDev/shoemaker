@@ -2,16 +2,20 @@
 // version. Each publishable package runs it as its `release:publish` script,
 // which turbo orders after `build` and after its dependencies' publishes.
 //
-// `bun publish` resolves catalog:/workspace: specs and runs prepack/postpack
-// (publish-manifest.ts swaps in publishConfig). SHOE_BOX_RELEASE_DRY_RUN=true
-// packs with --dry-run instead, which needs no npm auth.
-import { Config, Console, Effect, Path } from 'effect';
+// `bun pm pack` resolves catalog:/workspace: specs and runs prepack/postpack
+// (publish-manifest.ts swaps in publishConfig); npm then publishes that
+// tarball. npm, not `bun publish`, because only npm speaks trusted publishing
+// (OIDC), so CI needs no token (oven-sh/bun#15601). Locally it uses your
+// `npm login`. SHOEMAKER_RELEASE_DRY_RUN=true packs with --dry-run instead,
+// which needs no npm auth.
+import { Config, Console, Effect, FileSystem, Path } from 'effect';
 
 import { readJsonObject } from './lib/json.ts';
-import { isOnNpm } from './lib/packages.ts';
-import { runInherit, runScript } from './lib/run.ts';
+import { publishStatus } from './lib/packages.ts';
+import { run, runInherit, runScript } from './lib/run.ts';
 
 const program = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const cwd = path.resolve('.');
   const manifest = yield* readJsonObject(path.join(cwd, 'package.json'));
@@ -19,15 +23,28 @@ const program = Effect.gen(function* () {
     name: String(manifest.name),
     version: String(manifest.version),
   };
-  const dryRun = yield* Config.Boolean('SHOE_BOX_RELEASE_DRY_RUN').pipe(
+  const dryRun = yield* Config.Boolean('SHOEMAKER_RELEASE_DRY_RUN').pipe(
     Config.withDefault(false),
   );
-  if (yield* isOnNpm(pkg)) {
+  const status = yield* publishStatus(pkg);
+  if (status === 'published') {
     return yield* Console.log(`skip ${pkg.name}@${pkg.version} (on npm)`);
   }
-  yield* dryRun
-    ? runInherit('bun', ['pm', 'pack', '--dry-run'], { cwd })
-    : runInherit('bun', ['publish', '--access', 'public'], { cwd });
+  if (status === 'unclaimed') {
+    return yield* Console.log(
+      `skip ${pkg.name}@${pkg.version} (not on npm yet; publish it once by hand)`,
+    );
+  }
+  if (dryRun) {
+    return yield* runInherit('bun', ['pm', 'pack', '--dry-run'], { cwd });
+  }
+  const tarball = path.join(yield* fs.makeTempDirectoryScoped(), 'package.tgz');
+  yield* run('bun', ['pm', 'pack', '--filename', tarball], { cwd });
+  yield* runInherit(
+    'bun',
+    ['run', 'npm', 'publish', tarball, '--access', 'public'],
+    { cwd },
+  );
 });
 
-runScript(program);
+runScript(Effect.scoped(program));

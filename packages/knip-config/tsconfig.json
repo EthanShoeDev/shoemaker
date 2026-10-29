@@ -1,5 +1,5 @@
 {
-  "extends": "shoe-box-typescript-config/tsconfig.base.json",
+  "extends": "shoemaker-typescript-config/tsconfig.base.json",
   "compilerOptions": {
     // knip evaluates the config in its Node host, never under Bun.
     "types": ["node"]

@@ -1,11 +1,11 @@
 {
-  "name": "shoe-box-oxfmt-config",
+  "name": "shoemaker-oxfmt-config",
   "version": "0.1.0",
-  "description": "Shared oxfmt options and defineShoeboxFormat() for oxfmt.config.ts",
+  "description": "Shared oxfmt options and defineShoemakerFormat() for oxfmt.config.ts",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
+    "url": "git+https://github.com/EthanShoeDev/shoemaker.git",
     "directory": "packages/oxfmt-config"
   },
   "files": [
@@ -39,7 +39,7 @@
     "@types/node": "catalog:",
     "effect": "catalog:",
     "oxfmt": "catalog:",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

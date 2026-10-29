@@ -411,7 +411,7 @@ const config = {
     Flag.optional,
   ),
   unmanaged: Flag.String('unmanaged').pipe(
-    Flag.withDescription('Comma list of paths shoebox must never write'),
+    Flag.withDescription('Comma list of paths shoemaker must never write'),
     Flag.map(splitList),
     Flag.optional,
   ),
@@ -458,7 +458,7 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
     );
     if (entries.length > 0) {
       return yield* fail(
-        `${root} is not empty. Use \`shoe-box adopt\` for an existing repo, or pass --force.`,
+        `${root} is not empty. Use \`shoemaker adopt\` for an existing repo, or pass --force.`,
       );
     }
   }
@@ -486,21 +486,21 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
     ),
     unmanaged: Option.getOrElse(input.unmanaged, () => defaults.unmanaged),
   };
-  const shoeboxConfig = yield* decodeConfig(draft).pipe(
+  const shoemakerConfig = yield* decodeConfig(draft).pipe(
     Effect.catch((error) => fail(`Invalid answers:\n${error.message}`)),
   );
 
-  const files = yield* renderFiles(shoeboxConfig);
+  const files = yield* renderFiles(shoemakerConfig);
   yield* fs.makeDirectory(root, { recursive: true });
   const repo = yield* makeRepo(root);
   const plan = yield* makePlan(repo, files, undefined, {
     force: input.force ? ['**'] : [],
   });
   yield* applyPlan(root, plan);
-  yield* writeFile(root, CONFIG_PATH, renderConfigFile(shoeboxConfig));
+  yield* writeFile(root, CONFIG_PATH, renderConfigFile(shoemakerConfig));
   yield* writeLock(root, nextLock(undefined, plan, cliVersion));
   yield* Console.log(renderSummary(plan, s));
-  yield* Console.log(s.green(`Created ${shoeboxConfig.name} in ${root}`));
+  yield* Console.log(s.green(`Created ${shoemakerConfig.name} in ${root}`));
 
   if (input.git && !(yield* fs.exists(path.join(root, '.git')))) {
     const code = yield* runInherit('git', ['init', '-q'], root);
@@ -524,10 +524,10 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
         ...(cd === '' ? [] : [`  cd ${cd}`]),
         ...(input.install ? [] : ['  bun install']),
         // lint:check is a task-runner aggregate, not a package script.
-        shoeboxConfig.taskRunner === 'nx'
-          ? `  bunx nx run-many -t lint:check && bunx nx run ${shoeboxConfig.name}:lint:check:root`
+        shoemakerConfig.taskRunner === 'nx'
+          ? `  bunx nx run-many -t lint:check && bunx nx run ${shoemakerConfig.name}:lint:check:root`
           : "  bunx turbo run lint:check '//#lint:check:root'",
-        '  bunx shoe-box doctor',
+        '  bunx shoemaker doctor',
       ],
       '\n',
     ),

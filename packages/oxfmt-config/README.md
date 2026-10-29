@@ -1,19 +1,19 @@
-# shoe-box-oxfmt-config
+# shoemaker-oxfmt-config
 
 Shared [oxfmt](https://oxc.rs/docs/guide/usage/formatter) options. oxfmt has no `extends`, so the config is a function you call from `oxfmt.config.ts`:
 
 ```ts
 // oxfmt.config.ts
-import { defineShoeboxFormat } from 'shoe-box-oxfmt-config';
+import { defineShoemakerFormat } from 'shoemaker-oxfmt-config';
 
-export default defineShoeboxFormat({
+export default defineShoemakerFormat({
   // Tailwind v4 entry stylesheet; turns on class sorting.
   tailwindStylesheet: 'apps/web/src/styles.css',
   ignorePatterns: ['legacy/**'],
 });
 ```
 
-Or spread the plain options object: `export default { ...shoeboxFormat, printWidth: 100 }`.
+Or spread the plain options object: `export default { ...shoemakerFormat, printWidth: 100 }`.
 
 ## Values
 

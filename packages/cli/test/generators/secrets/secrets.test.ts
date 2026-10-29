@@ -1,14 +1,14 @@
 import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Option, pipe, String as Str } from 'effect';
 
-import type { ShoeboxConfig } from '../../../src/config/schema.ts';
+import type { ShoemakerConfig } from '../../../src/config/schema.ts';
 import { allEnvVars } from '../../../src/generators/secrets/env-vars.ts';
 import { parseJson, preset, record, render } from '../root/fixtures.ts';
 
 const withSecrets = (
-  config: ShoeboxConfig,
-  secrets: ShoeboxConfig['secrets'],
-): ShoeboxConfig => ({ ...config, secrets });
+  config: ShoemakerConfig,
+  secrets: ShoemakerConfig['secrets'],
+): ShoemakerConfig => ({ ...config, secrets });
 
 // A `[section]` table's body, up to the next table header.
 const tomlTable = (toml: string, table: string) => {
@@ -108,7 +108,7 @@ describe('secretspec', () => {
 
 describe('env package', () => {
   // How apps read env (server vs client, secrets vs plain vars) is
-  // project-specific, so shoebox generates no package for it.
+  // project-specific, so shoemaker generates no package for it.
   it('is never generated', () => {
     for (const name of ['minimal', 'web', 'full'] as const) {
       const { byPath } = render(preset(name));

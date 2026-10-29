@@ -79,7 +79,7 @@ const lastCodeChar = (code: string, before: number) => {
 };
 
 // Appends `entry` to the one `key: [...]` array literal in a
-// shoebox.config.ts source, leaving every other byte alone. Undefined when
+// shoemaker.config.ts source, leaving every other byte alone. Undefined when
 // that literal is not there exactly once (a const, a spread, a computed
 // value): the caller then asks the user to make the edit.
 export const insertListEntry = (

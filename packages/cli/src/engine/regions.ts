@@ -1,4 +1,4 @@
-// `shoebox:begin <id>` / `shoebox:end <id>` regions inside managed files. The
+// `shoemaker:begin <id>` / `shoemaker:end <id>` regions inside managed files. The
 // markers sit in `//`, `#` or `<!-- -->` comments (see `region()` in
 // generators/shared.ts). A region body is the lines between its markers.
 // Text is expected with LF line endings (plan.ts normalises CRLF first).
@@ -6,7 +6,7 @@
 import { Array as Arr, Option, pipe, String as Str } from 'effect';
 
 const MARKER =
-  /^\s*(?:\/\/|#|<!--)\s*shoebox:(?<kind>begin|end)\s+(?<id>[^\s>]+?)\s*(?:-->)?\s*$/u;
+  /^\s*(?:\/\/|#|<!--)\s*shoemaker:(?<kind>begin|end)\s+(?<id>[^\s>]+?)\s*(?:-->)?\s*$/u;
 
 const FENCE = /^ {0,3}(?<fence>`{3,}|~{3,})/u;
 
@@ -106,7 +106,7 @@ const regionLines = (text: string, options: RegionOptions) => {
 };
 
 // Rewrites the bodies of `existing`'s regions with `generated`'s. Text outside
-// regions, and regions shoebox no longer generates, are left alone.
+// regions, and regions shoemaker no longer generates, are left alone.
 export const replaceRegions = (
   existing: string,
   generated: string,

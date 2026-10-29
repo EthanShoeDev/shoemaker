@@ -6,7 +6,7 @@ import {
   String as Str,
 } from 'effect';
 
-import type { ShoeboxConfig } from '../../config/schema.ts';
+import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
 import { hasApp, json, managed, owned, region } from '../shared.ts';
 import { type Workspace, workspaces } from './workspaces.ts';
@@ -35,7 +35,7 @@ const tsArray = (key: string, items: ReadonlyArray<string>, depth: number) => {
   return `${pad}${key}: [\n${Arr.join(lines, '\n')}\n${pad}],`;
 };
 
-export const lintFlags = (config: ShoeboxConfig) => {
+export const lintFlags = (config: ShoemakerConfig) => {
   const start = hasApp(config, 'tanstack-start');
   return {
     react: start || hasApp(config, 'expo'),
@@ -44,12 +44,13 @@ export const lintFlags = (config: ShoeboxConfig) => {
     playwright: start,
     testingLibrary: start,
     web: start || hasApp(config, 'foldkit'),
+    varlock: config.secrets === 'varlock',
   };
 };
 
 // Tailwind v4 entry of the first TanStack Start app; oxfmt sorts classes
 // against it.
-export const tailwindStylesheet = (config: ShoeboxConfig) =>
+export const tailwindStylesheet = (config: ShoemakerConfig) =>
   pipe(
     Arr.findFirst(config.apps, (a) => a.kind === 'tanstack-start'),
     Option.map((app) => `./apps/${app.name}/src/styles.css`),
@@ -75,9 +76,9 @@ export const oxlintConfig: Renderer = (ctx, aggregate) => {
   return [
     managed(
       'oxlint.config.ts',
-      `import { defineShoeboxConfig } from 'shoe-box-oxlint-config';
+      `import { defineShoemakerConfig } from 'shoemaker-oxlint-config';
 
-export default defineShoeboxConfig({
+export default defineShoemakerConfig({
 ${indent(region('options', options), 2)}
   // Project rules: every change carries a one-line reason above it.
   rules: {},
@@ -100,9 +101,9 @@ export const oxfmtConfig: Renderer = (ctx, aggregate) => {
   return [
     managed(
       'oxfmt.config.ts',
-      `import { defineShoeboxFormat } from 'shoe-box-oxfmt-config';
+      `import { defineShoemakerFormat } from 'shoemaker-oxfmt-config';
 
-export default defineShoeboxFormat({
+export default defineShoemakerFormat({
 ${indent(region('options', options.length > 0 ? Arr.join(options, '\n') : '// Shared defaults only.'), 2)}
 });
 `,
@@ -189,7 +190,7 @@ export const knipConfig: Renderer = (ctx, aggregate) => {
   return [
     managed(
       'knip.ts',
-      `import { defineKnipConfig } from 'shoe-box-knip-config';
+      `import { defineKnipConfig } from 'shoemaker-knip-config';
 
 export default defineKnipConfig({
 ${indent(region('workspaces', body), 2)}
@@ -259,7 +260,7 @@ export const rootTsconfig: Generator = () => ({
     owned(
       'tsconfig.json',
       `{
-  "extends": "shoe-box-typescript-config/tsconfig.base.json",
+  "extends": "shoemaker-typescript-config/tsconfig.base.json",
   // Root config files default-export objects typed by tool packages, which
   // declaration emit cannot name; nothing here is published.
   "compilerOptions": {
@@ -275,7 +276,7 @@ export const rootTsconfig: Generator = () => ({
   ],
 });
 
-// Every workspace shoebox generates carries a test dir, so each is a project.
+// Every workspace shoemaker generates carries a test dir, so each is a project.
 export const vitestConfig: Renderer = (ctx) => {
   const projects = Arr.map(workspaces(ctx), (w) => w.dir);
   return [

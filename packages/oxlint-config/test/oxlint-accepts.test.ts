@@ -7,7 +7,7 @@ import { expect, layer } from '@effect/vitest';
 import { Effect, FileSystem, Layer, Path, Stream } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
-import type { ShoeboxConfigOptions } from '../src/index.ts';
+import type { ShoemakerConfigOptions } from '../src/index.ts';
 
 const entry = JSON.stringify(
   fileURLToPath(new URL('../src/index.ts', import.meta.url)),
@@ -48,7 +48,7 @@ const lint = Effect.fnUntraced(function* (
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const dir = yield* fs.makeTempDirectoryScoped({
-    prefix: `shoebox-oxlint-config-${name}-`,
+    prefix: `shoemaker-oxlint-config-${name}-`,
   });
   yield* fs.writeFileString(path.join(dir, 'oxlint.config.ts'), config);
   for (const [file, source] of Object.entries(files)) {
@@ -87,9 +87,9 @@ const lint = Effect.fnUntraced(function* (
   return { status: Number(status), output };
 });
 
-const facade = (options: ShoeboxConfigOptions) =>
-  `import { defineShoeboxConfig } from ${entry};\n` +
-  `export default defineShoeboxConfig(${JSON.stringify(options)});\n`;
+const facade = (options: ShoemakerConfigOptions) =>
+  `import { defineShoemakerConfig } from ${entry};\n` +
+  `export default defineShoemakerConfig(${JSON.stringify(options)});\n`;
 
 /** `file:line` → every rule reported there. */
 const reportsAt = (output: string, file: string) =>
@@ -99,24 +99,34 @@ const reportsAt = (output: string, file: string) =>
     // unix format: `file:line:col: message [Error/plugin(rule)]`
     .map((line) => line.replace(/^.*\[\w+\/([^\]]+)\]$/u, '$1'));
 
-layer(services)('defineShoeboxConfig under oxlint', (it) => {
-  it.effect(
-    'loads the minimal config and reports through the custom plugins',
-    () =>
-      Effect.gen(function* () {
-        const { status, output } = yield* lint(
-          'minimal',
-          facade({ scope: 'probe' }),
-          {
-            'probe.tsx': envRead + backdrop,
-          },
-        );
-        expect(output).toContain('env-access(no-raw-env-access)');
-        expect(output).toContain('Read it through Effect `Config`');
-        // web is off, so the backdrop-filter plugin is neither loaded nor enabled.
-        expect(output).not.toContain('backdrop-filter');
-        expect(status).toBe(1);
-      }),
+layer(services)('defineShoemakerConfig under oxlint', (it) => {
+  it.effect('loads the minimal config without the optional rules', () =>
+    Effect.gen(function* () {
+      const { status, output } = yield* lint(
+        'minimal',
+        facade({ scope: 'probe' }),
+        {
+          'probe.tsx': envRead + backdrop,
+        },
+      );
+      // varlock is off, so raw env access is the repo's own business.
+      expect(output).not.toContain('env-access(no-raw-env-access)');
+      // web is off, so the backdrop-filter plugin is neither loaded nor enabled.
+      expect(output).not.toContain('backdrop-filter');
+      expect(status).toBe(1);
+    }),
+  );
+
+  it.effect('points raw env access at varlock/env with varlock on', () =>
+    Effect.gen(function* () {
+      const { output } = yield* lint(
+        'varlock',
+        facade({ scope: 'probe', varlock: true }),
+        { 'probe.ts': envRead },
+      );
+      expect(output).toContain('env-access(no-raw-env-access)');
+      expect(output).toContain('Read it through `varlock/env`');
+    }),
   );
 
   it.effect('loads every optional plugin when every flag is on', () =>
@@ -131,6 +141,7 @@ layer(services)('defineShoeboxConfig under oxlint', (it) => {
           playwright: true,
           testingLibrary: true,
           web: true,
+          varlock: true,
         }),
         { 'probe.tsx': envRead + backdrop },
       );
@@ -170,6 +181,7 @@ layer(services)('defineShoeboxConfig under oxlint', (it) => {
           'project-rules',
           facade({
             scope: 'probe',
+            varlock: true,
             rules: {
               'env-access/no-raw-env-access': 'off',
               'dynamic-import/no-unexplained-dynamic-import': 'error',
@@ -201,6 +213,7 @@ layer(services)('defineShoeboxConfig under oxlint', (it) => {
           'project-globs',
           facade({
             scope: 'probe',
+            varlock: true,
             ignorePatterns: ['skipped.ts'],
             overrides: [
               {
@@ -228,15 +241,15 @@ layer(services)('defineShoeboxConfig under oxlint', (it) => {
   );
 });
 
-layer(services)('shoeboxPreset with the composer', (it) => {
+layer(services)('shoemakerPreset with the composer', (it) => {
   it.effect('overrides and removes blocks by name', () =>
     Effect.gen(function* () {
       const { output } = yield* lint(
         'composer',
-        `import { composer, shoeboxPreset } from ${entry};\n` +
-          "export default await composer(shoeboxPreset({ scope: 'probe' }))\n" +
-          "  .override('shoebox/custom', { rules: { 'env-access/no-raw-env-access': 'off' } })\n" +
-          "  .remove('shoebox/tests');\n",
+        `import { composer, shoemakerPreset } from ${entry};\n` +
+          "export default await composer(shoemakerPreset({ scope: 'probe' }))\n" +
+          "  .override('shoemaker/custom', { rules: { 'env-access/no-raw-env-access': 'off' } })\n" +
+          "  .remove('shoemaker/tests');\n",
         {
           'probe.ts': envRead,
           'probe.test.ts': unexplainedImport,
@@ -245,7 +258,7 @@ layer(services)('shoeboxPreset with the composer', (it) => {
       expect(reportsAt(output, 'probe.ts')).not.toContain(
         'env-access(no-raw-env-access)',
       );
-      // Without shoebox/tests, the dynamic-import off for tests is gone.
+      // Without shoemaker/tests, the dynamic-import off for tests is gone.
       expect(reportsAt(output, 'probe.test.ts')).toContain(
         'dynamic-import(no-unexplained-dynamic-import)',
       );

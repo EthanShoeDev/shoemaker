@@ -1,6 +1,6 @@
-# shoe-box
+# shoemaker
 
-Shared tooling (`shoe-box-*` config packages) plus the `shoe-box` CLI that
+Shared tooling (`shoemaker-*` config packages) plus the `shoemaker` CLI that
 scaffolds new repos and keeps existing ones on Ethan's current preferences.
 
 README.md is the only prose doc; keep it current when behavior changes. The

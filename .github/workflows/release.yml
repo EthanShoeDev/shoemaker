@@ -18,6 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      # npm trusted publishing needs Node >= 22.14 to run the pinned npm.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       # Opens a "Version packages" PR from pending changesets; once that PR is
       # merged, publishes every package whose version is not on npm yet.
       - uses: changesets/action@v1
@@ -26,7 +30,7 @@ jobs:
           publish: bun scripts/release.ts
           commit: 'chore: version packages'
           title: 'chore: version packages'
+        # No NPM_TOKEN: npm authenticates through trusted publishing (OIDC,
+        # the id-token permission above).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-          BUN_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

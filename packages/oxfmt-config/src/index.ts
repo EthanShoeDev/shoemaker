@@ -14,7 +14,7 @@ export const sharedIgnorePatterns = [
   '**/*.vendored.*',
   // Lockfiles and tool output.
   'bun.lock',
-  'shoebox.lock.jsonc',
+  'shoemaker.lock.jsonc',
   '**/dist/**',
   '**/.turbo/**',
   '**/.output/**',
@@ -34,7 +34,7 @@ export const sharedIgnorePatterns = [
 export const tailwindFunctions = ['cn', 'clsx', 'cva'];
 
 /** The shared formatter options. oxfmt has no `extends`, so spread this. */
-export const shoeboxFormat = {
+export const shoemakerFormat = {
   printWidth: 80,
   tabWidth: 2,
   useTabs: false,
@@ -51,7 +51,7 @@ export const shoeboxFormat = {
   ignorePatterns: sharedIgnorePatterns,
 } satisfies OxfmtConfig;
 
-export type ShoeboxFormatOptions = {
+export type ShoemakerFormatOptions = {
   /**
    * Tailwind v4 entry stylesheet, relative to oxfmt.config.ts. Setting it
    * turns on class sorting for `class`/`className` and `cn`/`clsx`/`cva`.
@@ -62,11 +62,11 @@ export type ShoeboxFormatOptions = {
 };
 
 /** The oxfmt.config.ts default export. */
-export const defineShoeboxFormat = ({
+export const defineShoemakerFormat = ({
   tailwindStylesheet,
   ignorePatterns = [],
-}: ShoeboxFormatOptions = {}): OxfmtConfig => ({
-  ...shoeboxFormat,
+}: ShoemakerFormatOptions = {}): OxfmtConfig => ({
+  ...shoemakerFormat,
   ignorePatterns: [...sharedIgnorePatterns, ...ignorePatterns],
   ...(tailwindStylesheet === undefined
     ? {}

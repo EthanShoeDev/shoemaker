@@ -9,7 +9,7 @@ import {
 } from 'effect';
 
 import { loadConfig } from '../../src/config/load.ts';
-import type { ShoeboxConfig } from '../../src/config/schema.ts';
+import type { ShoemakerConfig } from '../../src/config/schema.ts';
 import { readLock } from '../../src/engine/lock.ts';
 import { makeRepo } from '../../src/engine/repo-live.ts';
 import { Generate } from '../../src/engine/sync.ts';
@@ -19,7 +19,7 @@ import { run, scratch, withBun } from './helpers.ts';
 
 // Stands in for the real generators so these tests exercise the commands and
 // engine, not generator output.
-const fakeGenerate = (config: ShoeboxConfig) => ({
+const fakeGenerate = (config: ShoemakerConfig) => ({
   files: [
     {
       path: 'package.json',

@@ -2,7 +2,7 @@ import { Array as Arr, Console, Effect } from 'effect';
 import { Command, Flag } from 'effect/cli';
 
 import { loadConfig } from '../config/load.ts';
-import type { ShoeboxConfig } from '../config/schema.ts';
+import type { ShoemakerConfig } from '../config/schema.ts';
 import { applyPlan, ensureCleanTree, writeLock } from '../engine/apply.ts';
 import { LOCK_PATH, renderLock } from '../engine/lock.ts';
 import { cliVersion } from '../engine/meta.ts';
@@ -19,8 +19,8 @@ export interface SyncOptions {
   readonly force: ReadonlyArray<string>;
   readonly allowDirty: boolean;
   readonly verbose?: boolean;
-  // Skip loading shoebox.config.ts (adopt passes the inferred config).
-  readonly config?: ShoeboxConfig;
+  // Skip loading shoemaker.config.ts (adopt passes the inferred config).
+  readonly config?: ShoemakerConfig;
 }
 
 // Plans, prints and (unless dry-run) applies. Fails when conflicts or
@@ -59,7 +59,7 @@ export const runSync = Effect.fnUntraced(function* (options: SyncOptions) {
   }
   if (options.check === true && Arr.some(plan.files, isWrite)) {
     return yield* fail(
-      'repo has drifted from shoebox.config.ts; run `shoe-box sync`',
+      'repo has drifted from shoemaker.config.ts; run `shoemaker sync`',
     );
   }
   return plan;
@@ -104,6 +104,6 @@ export const syncCommand = Command.make(
   }),
 ).pipe(
   Command.withDescription(
-    'Re-render the repo from shoebox.config.ts and apply safe changes',
+    'Re-render the repo from shoemaker.config.ts and apply safe changes',
   ),
 );

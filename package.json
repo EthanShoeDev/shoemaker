@@ -1,5 +1,5 @@
 {
-  "name": "shoe-box-monorepo",
+  "name": "shoemaker-monorepo",
   "private": true,
   "workspaces": {
     "packages": [
@@ -28,6 +28,7 @@
       "jscpd": "^5.4.2",
       "jsonc-parser": "^3.3.1",
       "knip": "^6.43.0",
+      "npm": "11.21.1",
       "oxfmt": "0.75.0",
       "oxlint": "1.90.0",
       "oxlint-flat-config": "^0.4.0",
@@ -59,7 +60,7 @@
     "effect-versions:check": "bun packages/cli/src/bin.ts check effect-versions",
     "nix:fmt:check": "bun packages/cli/src/bin.ts check nix-fmt",
     "nix:fmt:fix": "bun packages/cli/src/bin.ts check nix-fmt --fix",
-    "shoe-box": "bun packages/cli/src/bin.ts",
+    "shoemaker": "bun packages/cli/src/bin.ts",
     "wizard:local": "bun scripts/try-wizard.ts",
     "changeset": "changeset",
     "changeset:status": "changeset status",
@@ -81,13 +82,14 @@
     "effect": "catalog:",
     "jscpd": "catalog:",
     "knip": "catalog:",
+    "npm": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "shoe-box-knip-config": "workspace:*",
-    "shoe-box-oxfmt-config": "workspace:*",
-    "shoe-box-oxlint-config": "workspace:*",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-knip-config": "workspace:*",
+    "shoemaker-oxfmt-config": "workspace:*",
+    "shoemaker-oxlint-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

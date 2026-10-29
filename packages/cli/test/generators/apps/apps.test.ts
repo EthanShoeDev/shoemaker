@@ -1,7 +1,7 @@
 import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Effect, Option, pipe, String as Str } from 'effect';
 
-import type { App, ShoeboxConfig } from '../../../src/config/schema.ts';
+import type { App, ShoemakerConfig } from '../../../src/config/schema.ts';
 import type { FileStrategy } from '../../../src/engine/types.ts';
 import { appGenerators } from '../../../src/generators/apps/index.ts';
 import { libraryGenerator } from '../../../src/generators/apps/library.ts';
@@ -15,7 +15,7 @@ import {
   sampleConfig,
 } from './helpers.ts';
 
-const allApps = (config: ShoeboxConfig) => {
+const allApps = (config: ShoemakerConfig) => {
   const contributions = Arr.map(appGenerators, (generator) =>
     contribute(generator, config),
   );
@@ -229,7 +229,7 @@ describe('kind specifics', () => {
     assert.strictEqual(tsconfig.extends, 'expo/tsconfig.base');
     assert.notProperty(
       record(manifest.devDependencies),
-      'shoe-box-typescript-config',
+      'shoemaker-typescript-config',
     );
     // ESM config in a CommonJS package: `.mts`, and typechecked.
     assert.include(
@@ -264,7 +264,7 @@ describe('kind specifics', () => {
 
   it('tanstack-start wires varlock only outside Cloudflare', () => {
     const apps: ReadonlyArray<App> = [{ name: 'web', kind: 'tanstack-start' }];
-    const vite = (config: ShoeboxConfig) =>
+    const vite = (config: ShoemakerConfig) =>
       allApps(config).file('apps/web/vite.config.ts').content;
     assert.include(vite(sampleConfig({ apps })), 'varlockVitePlugin()');
     assert.notInclude(

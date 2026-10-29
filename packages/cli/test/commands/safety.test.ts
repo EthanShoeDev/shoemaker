@@ -9,7 +9,7 @@ import {
 } from 'effect';
 
 import { loadConfig } from '../../src/config/load.ts';
-import type { ShoeboxConfig } from '../../src/config/schema.ts';
+import type { ShoemakerConfig } from '../../src/config/schema.ts';
 import { ensureCleanTree } from '../../src/engine/apply.ts';
 import { readLock } from '../../src/engine/lock.ts';
 import { makeRepo } from '../../src/engine/repo-live.ts';
@@ -19,7 +19,7 @@ import { json } from '../../src/generators/shared.ts';
 import { pkgIn } from '../checks/helpers.ts';
 import { git, readText, run, scratch, withBun, writeText } from './helpers.ts';
 
-// Command-level regression tests: shoebox must never overwrite the user's
+// Command-level regression tests: shoemaker must never overwrite the user's
 // work, and must not report its own output as a hand edit.
 
 const emptyAggregate = {
@@ -33,7 +33,7 @@ const emptyAggregate = {
 
 // A generator whose root package.json owns one script, `script` -> `command`.
 const scriptGenerate =
-  (script: string, command: string) => (config: ShoeboxConfig) => ({
+  (script: string, command: string) => (config: ShoemakerConfig) => ({
     files: [
       {
         path: 'package.json',
@@ -47,7 +47,7 @@ const scriptGenerate =
     aggregate: emptyAggregate,
   });
 
-const handWritten = `import { defineConfig } from 'shoe-box/config';
+const handWritten = `import { defineConfig } from 'shoemaker/config';
 
 // Why we picked turbo: see ADR-7
 const DESC = 'from a const';
@@ -136,12 +136,12 @@ describe('add', () => {
       withBun(
         Effect.gen(function* () {
           const dir = yield* scratch();
-          yield* writeText(dir, 'shoebox.config.ts', handWritten);
+          yield* writeText(dir, 'shoemaker.config.ts', handWritten);
           yield* run(
             ['add', 'app', 'effect-cli', '--allow-dirty', '--cwd', dir],
             [],
           ).pipe(Effect.provideService(Generate, scriptGenerate('x', 'y')));
-          const source = yield* readText(dir, 'shoebox.config.ts');
+          const source = yield* readText(dir, 'shoemaker.config.ts');
           assert.strictEqual(
             source,
             Str.replace(
@@ -161,7 +161,7 @@ describe('add', () => {
             [],
           ).pipe(Effect.provideService(Generate, scriptGenerate('x', 'y')));
           assert.include(
-            yield* readText(dir, 'shoebox.config.ts'),
+            yield* readText(dir, 'shoemaker.config.ts'),
             "  packages: [\n    {\n      name: 'core',\n      kind: 'library',\n    },\n  ],",
           );
         }),
@@ -183,7 +183,7 @@ describe('add', () => {
               "const APPS = [{ name: 'api', kind: 'effect-api' as const }];\nconst DESC",
             )(handWritten),
           );
-          yield* writeText(dir, 'shoebox.config.ts', computed);
+          yield* writeText(dir, 'shoemaker.config.ts', computed);
           const out: Array<string> = [];
           const error = yield* Effect.flip(
             run(
@@ -193,7 +193,7 @@ describe('add', () => {
           );
           assert.strictEqual(error._tag, 'CommandFailed');
           assert.strictEqual(
-            yield* readText(dir, 'shoebox.config.ts'),
+            yield* readText(dir, 'shoemaker.config.ts'),
             computed,
           );
           assert.include(

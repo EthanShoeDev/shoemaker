@@ -8,7 +8,7 @@ import {
 } from 'effect';
 import { type ParseError, parse } from 'jsonc-parser';
 
-import type { ShoeboxConfig } from '../../../src/config/schema.ts';
+import type { ShoemakerConfig } from '../../../src/config/schema.ts';
 import type { GeneratedFile } from '../../../src/engine/types.ts';
 import { parseRef } from '../../../src/generators/task-runner/refs.ts';
 import { packageCommands } from '../../../src/generators/task-runner/tasks.ts';
@@ -25,9 +25,9 @@ const parseJsonc = (content: string) => {
 };
 
 const withRunner = (
-  config: ShoeboxConfig,
-  taskRunner: ShoeboxConfig['taskRunner'],
-): ShoeboxConfig => ({ ...config, taskRunner });
+  config: ShoemakerConfig,
+  taskRunner: ShoemakerConfig['taskRunner'],
+): ShoemakerConfig => ({ ...config, taskRunner });
 
 const workspaceScripts = (files: ReadonlyArray<GeneratedFile>) =>
   pipe(

@@ -1,5 +1,6 @@
 import {
   Array as Arr,
+  Config,
   Effect,
   FileSystem,
   Path,
@@ -39,13 +40,22 @@ export const publishablePackages = Effect.gen(function* () {
   return Arr.filter(found, Predicate.isNotUndefined);
 });
 
-// The registry answers 404 for a version it has never seen.
-export const isOnNpm = Effect.fnUntraced(function* (pkg: {
+// The registry answers 404 for a name or version it has never seen.
+const onNpm = Effect.fnUntraced(function* (path: string) {
+  const response = yield* HttpClient.get(`https://registry.npmjs.org/${path}`);
+  return response.status === 200;
+});
+
+// CI publishes through npm trusted publishing (OIDC), which can only publish
+// to a package that already exists and names this repo as a trusted
+// publisher. A name npm has never seen is `unclaimed` there: its first
+// version goes out by hand (README, Release).
+export const publishStatus = Effect.fnUntraced(function* (pkg: {
   readonly name: string;
   readonly version: string;
 }) {
-  const response = yield* HttpClient.get(
-    `https://registry.npmjs.org/${pkg.name}/${pkg.version}`,
-  );
-  return response.status === 200;
+  if (yield* onNpm(`${pkg.name}/${pkg.version}`)) return 'published' as const;
+  const ci = yield* Config.Boolean('CI').pipe(Config.withDefault(false));
+  if (ci && !(yield* onNpm(pkg.name))) return 'unclaimed' as const;
+  return 'pending' as const;
 });

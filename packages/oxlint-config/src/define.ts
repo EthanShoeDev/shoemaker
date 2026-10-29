@@ -3,10 +3,10 @@ import { defineConfig, globalIgnores } from 'oxlint-flat-config';
 import type { FlatConfigItem } from 'oxlint-flat-config';
 
 import type { OxlintRules } from './helpers.ts';
-import { shoeboxPresetParts } from './preset.ts';
-import type { ShoeboxPresetOptions } from './preset.ts';
+import { shoemakerPresetParts } from './preset.ts';
+import type { ShoemakerPresetOptions } from './preset.ts';
 
-export type ShoeboxConfigOptions = ShoeboxPresetOptions & {
+export type ShoemakerConfigOptions = ShoemakerPresetOptions & {
   /** Appended to the shared ignore patterns (gitignore syntax, as in oxlint). */
   ignorePatterns?: Array<string>;
   /**
@@ -64,17 +64,17 @@ const toFlatItem = (
 };
 
 /**
- * The shared oxlint config as one call: shoeboxPreset(options) plus the
+ * The shared oxlint config as one call: shoemakerPreset(options) plus the
  * project's ignores, rules and overrides, compiled by oxlint-flat-config.
  * Strictness model: every category at `error`, every jsPlugin rule at
  * `error`, and each rule these codebases reject turned off WITH its reason on
  * the line above it. Zero warnings.
  */
-export const defineShoeboxConfig = (
-  options: ShoeboxConfigOptions,
+export const defineShoemakerConfig = (
+  options: ShoemakerConfigOptions,
 ): OxlintConfig => {
   const { ignorePatterns = [], overrides = [], rules } = options;
-  const { global, scoped } = shoeboxPresetParts(options);
+  const { global, scoped } = shoemakerPresetParts(options);
 
   return defineConfig(
     global,

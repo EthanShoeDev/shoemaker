@@ -1,5 +1,5 @@
 /**
- * @module shoe-box-spanoptic
+ * @module shoemaker-spanoptic
  *
  * TUI OTEL visualizer for Effect programs.
  * Inspired by Kit Langton's spanoptic.
@@ -649,7 +649,7 @@ const runKeys = (
  * ```ts
  * import { BunRuntime } from "@effect/platform-bun"
  * import { Effect } from "effect"
- * import { traceVisualize, withTracedSpan } from "shoe-box-spanoptic"
+ * import { traceVisualize, withTracedSpan } from "shoemaker-spanoptic"
  *
  * const program = Effect.gen(function* () {
  *   yield* Effect.log("Starting...")
@@ -710,7 +710,7 @@ export const traceVisualize = <A, E, R>(
  * ```ts
  * import { BunRuntime, BunServices } from "@effect/platform-bun"
  * import { Effect, FileSystem } from "effect"
- * import { decodeTraceExport, replayVisualize } from "shoe-box-spanoptic"
+ * import { decodeTraceExport, replayVisualize } from "shoemaker-spanoptic"
  *
  * const program = Effect.gen(function* () {
  *   const fs = yield* FileSystem.FileSystem

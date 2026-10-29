@@ -42,7 +42,7 @@ import {
 import { antiSlopRules, custom, effect } from './rules/effect.ts';
 import { react, reactCompiler } from './rules/react.ts';
 
-export type ShoeboxPresetOptions = {
+export type ShoemakerPresetOptions = {
   /** Workspace scope without the `@` (`myproj` for `@myproj/*`). */
   scope: string;
   /** react, react-perf and jsx-a11y, plus the React Compiler offs. */
@@ -61,6 +61,12 @@ export type ShoeboxPresetOptions = {
   testingLibraryFiles?: Array<string>;
   /** Browser globals and backdrop-filter/no-backdrop-filter. */
   web?: boolean;
+  /**
+   * env-access/no-raw-env-access, pointing at varlock's `ENV` (`varlock/env`),
+   * which works on client and server. Off without varlock: there is no one
+   * right way to read env then.
+   */
+  varlock?: boolean;
 };
 
 /** The built-in plugins whose categories are on; react-only ones are added with `react`. */
@@ -78,14 +84,14 @@ const categoryPlugins = [
 
 const reactPlugins = ['react', 'react-perf', 'jsx-a11y'] as const;
 
-const plugins = 'shoe-box-oxlint-plugins';
+const plugins = 'shoemaker-oxlint-plugins';
 
 /**
  * The preset in two halves: items without `files` (they compile to `**\/*`
- * overrides) and scoped items. defineShoeboxConfig puts the project's rules
+ * overrides) and scoped items. defineShoemakerConfig puts the project's rules
  * between them, where oxlint's root `rules` used to sit.
  */
-export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
+export const shoemakerPresetParts = (options: ShoemakerPresetOptions) => {
   const {
     scope,
     react: withReact = false,
@@ -94,15 +100,16 @@ export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
     playwright = false,
     testingLibrary = false,
     web = false,
+    varlock = false,
   } = options;
 
   const global: Array<FlatConfigItem> = [
     globalIgnores(
       [...sharedIgnorePatterns, ...(withReact ? reactIgnorePatterns : [])],
-      'shoebox/ignores',
+      'shoemaker/ignores',
     ),
     {
-      name: 'shoebox/options',
+      name: 'shoemaker/options',
       options: {
         typeAware: true,
         typeCheck: true,
@@ -110,7 +117,7 @@ export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
       },
     },
     {
-      name: 'shoebox/plugins',
+      name: 'shoemaker/plugins',
       jsPlugins: [
         resolvedPlugin(
           'disable-comments',
@@ -166,10 +173,10 @@ export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
         style: 'error',
         plugins: [...categoryPlugins, ...(withReact ? reactPlugins : [])],
       },
-      { name: 'shoebox/categories' },
+      { name: 'shoemaker/categories' },
     ),
     {
-      name: 'shoebox/base',
+      name: 'shoemaker/base',
       rules: {
         ...ownedByOxfmt,
         ...budgets,
@@ -183,11 +190,11 @@ export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
       },
     },
     withReact && {
-      name: 'shoebox/react',
+      name: 'shoemaker/react',
       rules: { ...react, ...reactCompiler },
     },
     tanstackRouter && {
-      name: 'shoebox/tanstack-router',
+      name: 'shoemaker/tanstack-router',
       rules: {
         // TanStack Router uses `throw redirect()` / `throw notFound()` as control flow.
         'typescript/only-throw-error': 'off',
@@ -198,18 +205,18 @@ export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
       },
     },
     web && {
-      name: 'shoebox/web',
+      name: 'shoemaker/web',
       rules: {
         // Backdrop filters re-filter the backdrop every frame and make
         // open/close animations stutter.
         'backdrop-filter/no-backdrop-filter': 'error',
       },
     },
-    { name: 'shoebox/effect', rules: effect },
-    { name: 'shoebox/custom', rules: custom(scope) },
-    { name: 'shoebox/anti-slop', rules: antiSlopRules },
+    { name: 'shoemaker/effect', rules: effect },
+    { name: 'shoemaker/custom', rules: custom(scope, varlock) },
+    { name: 'shoemaker/anti-slop', rules: antiSlopRules },
     withTanstackQuery && {
-      name: 'shoebox/tanstack-query',
+      name: 'shoemaker/tanstack-query',
       rules: everyRuleOf('@tanstack/query', tanstackQuery),
     },
   ].filter((item): item is GlobalConfigItem => item !== false);
@@ -242,9 +249,9 @@ export const shoeboxPresetParts = (options: ShoeboxPresetOptions) => {
  * codebases reject turned off WITH its reason on the line above it.
  */
 // Annotated because the inferred type names flat-config's unexported ConfigFields.
-export const shoeboxPreset = (
-  options: ShoeboxPresetOptions,
+export const shoemakerPreset = (
+  options: ShoemakerPresetOptions,
 ): Array<FlatConfigItem> => {
-  const { global, scoped } = shoeboxPresetParts(options);
+  const { global, scoped } = shoemakerPresetParts(options);
   return [...global, ...scoped];
 };

@@ -1,6 +1,6 @@
 import { Array as Arr, Record as Rec, String as Str } from 'effect';
 
-import type { ShoeboxConfig } from '../config/schema.ts';
+import type { ShoemakerConfig } from '../config/schema.ts';
 import type { GenContext, GeneratedFile } from '../engine/types.ts';
 import { packageCommands } from './task-runner/tasks.ts';
 
@@ -33,9 +33,9 @@ export const region = (id: string, body: string, comment = '//') => {
   const close = comment === '<!--' ? ' -->' : '';
   return Arr.join(
     [
-      `${comment} shoebox:begin ${id}${close}`,
+      `${comment} shoemaker:begin ${id}${close}`,
       Str.replace(/\n$/u, '')(body),
-      `${comment} shoebox:end ${id}${close}`,
+      `${comment} shoemaker:end ${id}${close}`,
     ],
     '\n',
   );
@@ -53,7 +53,7 @@ export const catalogDeps = (names: ReadonlyArray<string>) =>
 // there every package gets a copy. Aggregates (`lint`, `lint:check`) are
 // task-runner tasks with no script.
 export const packageScripts = (
-  config: ShoeboxConfig,
+  config: ShoemakerConfig,
   extra: Readonly<Record<string, string>> = {},
 ) => ({
   ...(config.taskRunner === 'nx'
@@ -77,7 +77,7 @@ export interface WorkspacePackage {
   // Expo apps are not ESM packages.
   readonly module?: boolean;
   // False when the package's tsconfig extends something other than
-  // shoe-box-typescript-config (Expo extends expo/tsconfig.base).
+  // shoemaker-typescript-config (Expo extends expo/tsconfig.base).
   readonly sharedTsconfig?: boolean;
   readonly extra?: Readonly<Record<string, unknown>>;
 }
@@ -117,7 +117,9 @@ export const workspacePackageJson = (
         ...catalogDeps(pkg.dependencies ?? []),
       },
       devDependencies: catalogDeps([
-        ...(pkg.sharedTsconfig === false ? [] : ['shoe-box-typescript-config']),
+        ...(pkg.sharedTsconfig === false
+          ? []
+          : ['shoemaker-typescript-config']),
         ...(pkg.devDependencies ?? []),
       ]),
       ...pkg.extra,
@@ -137,7 +139,7 @@ export const packageTsconfig = (
   owned(
     `${dir}/tsconfig.json`,
     json({
-      extends: `shoe-box-typescript-config/${
+      extends: `shoemaker-typescript-config/${
         options.react === true ? 'tsconfig.react.json' : 'tsconfig.base.json'
       }`,
       ...(options.compilerOptions === undefined
@@ -149,7 +151,7 @@ export const packageTsconfig = (
 
 // Wrap a command so it runs with the repo's env/secrets loaded.
 export const withSecrets = (
-  config: ShoeboxConfig,
+  config: ShoemakerConfig,
   command: string,
   profile = 'development',
 ) => {
@@ -167,6 +169,6 @@ export const withSecrets = (
 };
 
 export const hasApp = (
-  config: ShoeboxConfig,
-  kind: ShoeboxConfig['apps'][number]['kind'],
+  config: ShoemakerConfig,
+  kind: ShoemakerConfig['apps'][number]['kind'],
 ) => Arr.some(config.apps, (app) => app.kind === kind);

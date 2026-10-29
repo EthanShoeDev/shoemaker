@@ -10,12 +10,12 @@ import { type ParseError, parse } from 'jsonc-parser';
 
 import type { Repo } from './repo.ts';
 
-export const LOCK_PATH = 'shoebox.lock.jsonc';
+export const LOCK_PATH = 'shoemaker.lock.jsonc';
 
 const Strategy = Schema.Literals(['owned', 'seed', 'managed', 'json-merge']);
 
 export const LockEntry = Schema.Struct({
-  // Fingerprint of what shoebox last wrote (see plan.ts `fingerprint`).
+  // Fingerprint of what shoemaker last wrote (see plan.ts `fingerprint`).
   sha256: Schema.String,
   strategy: Strategy,
   // What the fingerprint covered when it was taken: region ids (managed) or

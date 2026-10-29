@@ -288,8 +288,11 @@ describe('tooling doctor checks', () => {
         'scripts/catalog-check.ts': '',
         'scripts/lint/effect-versions-check.ts': '',
       });
-      assert.include(found[0]?.fix ?? '', 'shoe-box check catalog');
-      assert.include(found[1]?.message ?? '', 'shoe-box check effect-versions');
+      assert.include(found[0]?.fix ?? '', 'shoemaker check catalog');
+      assert.include(
+        found[1]?.message ?? '',
+        'shoemaker check effect-versions',
+      );
     }),
   );
 

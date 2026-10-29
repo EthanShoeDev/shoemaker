@@ -54,7 +54,7 @@ export const packLocal = Effect.fnUntraced(function* (outDir: string) {
 });
 
 // The tarballs depend on each other at versions not on npm yet, so pin every
-// shoe-box package to its tarball for the whole install tree.
+// shoemaker package to its tarball for the whole install tree.
 export const pinTarballs = Effect.fnUntraced(function* (
   manifestPath: string,
   overrides: Record<string, string>,

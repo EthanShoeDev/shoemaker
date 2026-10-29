@@ -1,11 +1,11 @@
 {
-  "name": "shoe-box-knip-config",
+  "name": "shoemaker-knip-config",
   "version": "0.1.0",
   "description": "defineKnipConfig(): knip.ts with the shared ignores",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
+    "url": "git+https://github.com/EthanShoeDev/shoemaker.git",
     "directory": "packages/knip-config"
   },
   "files": [
@@ -36,7 +36,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "knip": "catalog:",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },

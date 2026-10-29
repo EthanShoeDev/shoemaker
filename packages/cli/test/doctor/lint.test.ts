@@ -14,7 +14,7 @@ import {
 import { failures, json } from './helpers.ts';
 
 const shared =
-  "import { defineShoeboxConfig } from 'shoe-box-oxlint-config';\nexport default defineShoeboxConfig({ scope: 'x' });\n";
+  "import { defineShoemakerConfig } from 'shoemaker-oxlint-config';\nexport default defineShoemakerConfig({ scope: 'x' });\n";
 const handRolled = (categories: string, options: string) =>
   `import { defineConfig } from 'oxlint';\nexport default defineConfig({\n  options: { ${options} },\n  categories: { ${categories} },\n});\n`;
 const allCategories =
@@ -34,11 +34,11 @@ describe('oxlint doctor checks', () => {
           [
             [
               '.oxlintrc.json',
-              'move it to oxlint.config.ts on shoe-box-oxlint-config',
+              'move it to oxlint.config.ts on shoemaker-oxlint-config',
             ],
             [
               'apps/a/.oxlintrc.json',
-              'move it to oxlint.config.ts on shoe-box-oxlint-config',
+              'move it to oxlint.config.ts on shoemaker-oxlint-config',
             ],
           ],
         );

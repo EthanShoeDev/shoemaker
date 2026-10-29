@@ -10,7 +10,7 @@ import { initCommand } from './init.ts';
 import { CommandFailed, style } from './shared.ts';
 import { syncCommand } from './sync.ts';
 
-export const shoebox = Command.make('shoe-box').pipe(
+export const shoemaker = Command.make('shoemaker').pipe(
   Command.withDescription(
     "Scaffold and keep in sync Effect + bun monorepos with Ethan's preferences",
   ),
@@ -38,12 +38,12 @@ const toFailure = (error: unknown) =>
 // flags are parsed, before any handler, so `--yes` switches prompting off up
 // front. Expected failures print one line and exit 1; CLI parse errors are
 // already rendered by Command.run.
-export const runShoebox = Effect.fnUntraced(function* (
+export const runShoemaker = Effect.fnUntraced(function* (
   args: ReadonlyArray<string>,
 ) {
   const capabilities = yield* TerminalCapabilities.TerminalCapabilities;
   const yes = args.includes('--yes') || args.includes('-y');
-  return yield* Command.runWith(shoebox, { version: cliVersion })(args).pipe(
+  return yield* Command.runWith(shoemaker, { version: cliVersion })(args).pipe(
     Effect.provideService(TerminalCapabilities.TerminalCapabilities, {
       canColor: capabilities.canColor,
       canAnimate: capabilities.canAnimate,

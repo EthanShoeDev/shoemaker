@@ -6,7 +6,7 @@ import {
   String as Str,
 } from 'effect';
 
-import type { ShoeboxConfig } from '../config/schema.ts';
+import type { ShoemakerConfig } from '../config/schema.ts';
 import { generators, renderers } from '../generators/index.ts';
 import { versionOf } from '../versions.ts';
 import type {
@@ -17,13 +17,13 @@ import type {
 } from './types.ts';
 
 export interface GenerateOptions {
-  // Replace pinned versions, e.g. point `shoe-box-*` at local tarballs
+  // Replace pinned versions, e.g. point `shoemaker-*` at local tarballs
   // (`file:/tmp/packs/oxlint-config.tgz`) for end-to-end tests before publish.
   readonly versionOverrides?: Readonly<Record<string, string>>;
 }
 
 export const makeContext = (
-  config: ShoeboxConfig,
+  config: ShoemakerConfig,
   options: GenerateOptions = {},
 ): GenContext => ({
   config,
@@ -109,7 +109,7 @@ const mergeFiles = (
 
 // Renders the full file tree for a config. Pure: no filesystem access.
 export const generate = (
-  config: ShoeboxConfig,
+  config: ShoemakerConfig,
   options: GenerateOptions = {},
 ): {
   readonly files: ReadonlyArray<GeneratedFile>;

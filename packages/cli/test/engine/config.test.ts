@@ -4,10 +4,13 @@ import { Effect, FileSystem, Path, String as Str } from 'effect';
 
 import { CONFIG_PATH, loadConfig } from '../../src/config/load.ts';
 import { renderConfigFile } from '../../src/config/render.ts';
-import { defaultConfig, type ShoeboxConfig } from '../../src/config/schema.ts';
+import {
+  defaultConfig,
+  type ShoemakerConfig,
+} from '../../src/config/schema.ts';
 import { formatContent } from '../../src/engine/format.ts';
 
-const full: ShoeboxConfig = {
+const full: ShoemakerConfig = {
   ...defaultConfig('listening'),
   scope: 'listen',
   description: 'Ethan\'s "listening" app \\ with escapes',
@@ -30,7 +33,7 @@ const full: ShoeboxConfig = {
   unmanaged: ['apps/web/src/routes/index.tsx'],
 };
 
-const roundTrip = (config: ShoeboxConfig) =>
+const roundTrip = (config: ShoemakerConfig) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -42,7 +45,7 @@ const roundTrip = (config: ShoeboxConfig) =>
     return yield* loadConfig(dir);
   });
 
-describe('shoebox.config.ts', () => {
+describe('shoemaker.config.ts', () => {
   it.effect('render -> load round-trips', () =>
     Effect.gen(function* () {
       assert.deepStrictEqual(yield* roundTrip(full), full);
@@ -67,7 +70,7 @@ describe('shoebox.config.ts', () => {
     assert.strictEqual(text, renderConfigFile({ ...full }));
     assert.isTrue(
       Str.startsWith(
-        "import { defineConfig } from 'shoe-box/config';\n\nexport default defineConfig({\n",
+        "import { defineConfig } from 'shoemaker/config';\n\nexport default defineConfig({\n",
       )(text),
     );
   });

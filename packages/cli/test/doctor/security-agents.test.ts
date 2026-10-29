@@ -119,6 +119,7 @@ describe('security doctor checks', () => {
   it.effect('raw-env-access counts reads outside env/config/test files', () =>
     Effect.gen(function* () {
       const found = yield* failures(rawEnvAccess, {
+        '.env.schema': '',
         'apps/api/src/main.ts':
           'const a = process.env.A;\nconst b = process.env.B;\n',
         'packages/env/src/index.ts': 'process.env.A',
@@ -128,6 +129,13 @@ describe('security doctor checks', () => {
       assert.include(
         found[0]?.message ?? '',
         '2 raw process.env/Bun.env reads in 1 file(s): apps/api/src/main.ts (2)',
+      );
+      // Without varlock, raw access is not a finding.
+      assert.lengthOf(
+        yield* failures(rawEnvAccess, {
+          'apps/api/src/main.ts': 'process.env.A',
+        }),
+        0,
       );
     }),
   );

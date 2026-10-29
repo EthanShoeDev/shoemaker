@@ -1,6 +1,5 @@
 // Manager-neutral env/secret schema, rendered to varlock `.env.schema` or
-// `secretspec.toml`. App code never reads env directly: it goes through
-// Effect `Config`.
+// `secretspec.toml`.
 
 export interface EnvVar {
   // SCREAMING_SNAKE name, identical in the schema, the process env and the

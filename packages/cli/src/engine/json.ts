@@ -23,7 +23,7 @@ const isSorted = (keys: ReadonlyArray<string>) =>
     (key, index) => index === 0 || (keys[index - 1] ?? '') <= key,
   );
 
-// Where a key shoebox adds goes, so an upgraded file reads like a fresh one:
+// Where a key shoemaker adds goes, so an upgraded file reads like a fresh one:
 // in sorted position when both sides are sorted (the catalog), else right
 // after the owned key that precedes it in the generated object.
 const insertionIndex = (
@@ -81,7 +81,7 @@ export const mergeJson = (
 };
 
 // RFC 6901 pointers to every owned leaf: what the lock records as the key
-// paths shoebox owned when it wrote the file.
+// paths shoemaker owned when it wrote the file.
 const escapeKey = (key: string) =>
   Str.replaceAll('/', '~1')(Str.replaceAll('~', '~0')(key));
 const unescapeKey = (key: string) =>
@@ -116,7 +116,7 @@ export const shapeOf = (pointers: ReadonlyArray<string>) => {
   return root;
 };
 
-// The slice of `existing` at the key paths shoebox owns. Hashing this tells a
+// The slice of `existing` at the key paths shoemaker owns. Hashing this tells a
 // hand edit of an owned value apart from keys the user added alongside.
 export const ownedProjection = (
   existing: Record<string, unknown>,

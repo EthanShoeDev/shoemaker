@@ -1,4 +1,4 @@
-// Generates a sample repo from a preset with locally packed shoe-box
+// Generates a sample repo from a preset with locally packed shoemaker
 // packages, writing files directly (no lockfile, no sync engine), then
 // installs it. Use it to prove generator output builds and lints.
 //

@@ -181,8 +181,12 @@ const SHOWN = 8;
 
 export const rawEnvAccess: DoctorCheck = {
   id: 'raw-env-access',
-  description: 'No raw process.env outside the env package (heuristic scan)',
+  description:
+    'With varlock, no raw process.env outside env/config files (heuristic scan)',
   run: Effect.fnUntraced(function* (repo) {
+    // Without varlock there is no one right way to read env.
+    if (!(yield* repo.exists('.env.schema')))
+      return [pass('no varlock; env access is up to the repo')];
     const { raw, truncated } = yield* envUsage(repo);
     if (raw.length === 0)
       return [pass('no raw process.env outside env/config files')];
@@ -200,7 +204,7 @@ export const rawEnvAccess: DoctorCheck = {
       fail(
         `${total} raw process.env/Bun.env reads in ${raw.length} file(s)${truncated ? ` (first ${MAX_FILES} files scanned)` : ''}: ${listSome(top, SHOWN)}`,
         {
-          fix: 'read env through Effect Config; no-raw-env-access enforces it',
+          fix: 'read env through `ENV` from varlock/env; no-raw-env-access enforces it',
         },
       ),
     ];

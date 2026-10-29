@@ -1,11 +1,11 @@
 {
-  "name": "shoe-box-oxlint-config",
+  "name": "shoemaker-oxlint-config",
   "version": "0.1.0",
-  "description": "defineShoeboxConfig(): the shared oxlint.config.ts for Effect + bun monorepos",
+  "description": "defineShoemakerConfig(): the shared oxlint.config.ts for Effect + bun monorepos",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
+    "url": "git+https://github.com/EthanShoeDev/shoemaker.git",
     "directory": "packages/oxlint-config"
   },
   "files": [
@@ -39,7 +39,7 @@
     "eslint-plugin-playwright": "catalog:",
     "eslint-plugin-testing-library": "catalog:",
     "oxlint-flat-config": "catalog:",
-    "shoe-box-oxlint-plugins": "workspace:*"
+    "shoemaker-oxlint-plugins": "workspace:*"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",
@@ -48,7 +48,7 @@
     "@types/node": "catalog:",
     "effect": "catalog:",
     "oxlint": "catalog:",
-    "shoe-box-typescript-config": "workspace:*",
+    "shoemaker-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
