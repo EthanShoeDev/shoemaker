@@ -17,7 +17,7 @@ import type {
 } from './types.ts';
 
 export interface GenerateOptions {
-  // Replace pinned versions, e.g. point `@shoe-box-tools/*` at local tarballs
+  // Replace pinned versions, e.g. point `shoe-box-*` at local tarballs
   // (`file:/tmp/packs/oxlint-config.tgz`) for end-to-end tests before publish.
   readonly versionOverrides?: Readonly<Record<string, string>>;
 }

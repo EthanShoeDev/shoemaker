@@ -78,7 +78,7 @@ const categoryPlugins = [
 
 const reactPlugins = ['react', 'react-perf', 'jsx-a11y'] as const;
 
-const plugins = '@shoe-box-tools/oxlint-plugins';
+const plugins = 'shoe-box-oxlint-plugins';
 
 /**
  * The preset in two halves: items without `files` (they compile to `**\/*`

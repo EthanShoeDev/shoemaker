@@ -9,13 +9,13 @@ export interface Finding {
   readonly message: string;
   // How to fix it by hand, when not covered by a migration.
   readonly fix?: string;
-  // Id of the migration that fixes it (`shoebox migrate <id>`).
+  // Id of the migration that fixes it (`shoe-box migrate <id>`).
   readonly migration?: string;
   readonly path?: string;
 }
 
 // A doctor check audits any repo (shoebox-managed or not) against the current
-// preferences in docs/preferences.md.
+// preferences.
 export interface DoctorCheck {
   readonly id: string;
   readonly description: string;

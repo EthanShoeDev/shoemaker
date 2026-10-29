@@ -51,7 +51,7 @@ export const runMigrate = Effect.fnUntraced(function* (input: {
     );
     if (Option.isNone(found)) {
       return yield* fail(
-        `Unknown migration ${input.id.value}. See \`shoebox migrate --list\`.`,
+        `Unknown migration ${input.id.value}. See \`shoe-box migrate --list\`.`,
       );
     }
     const migration = found.value;
@@ -95,7 +95,7 @@ export const runMigrate = Effect.fnUntraced(function* (input: {
       `${s.bold(migration.id)} ${s.dim(`- ${migration.description}`)}`,
     );
     // Formatted like sync output, so a migrated repo passes oxfmt:check and
-    // the first `shoebox sync` afterwards is not a formatting diff.
+    // the first `shoe-box sync` afterwards is not a formatting diff.
     const changes = yield* Effect.forEach(
       yield* migration.run(view),
       (change) =>

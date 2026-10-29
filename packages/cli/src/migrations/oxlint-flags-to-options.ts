@@ -31,7 +31,7 @@ const hasFlags = Effect.fnUntraced(function* (repo: Repo) {
 // Adds the missing type-aware options to a hand-rolled config. Configs built
 // with defineShoeboxConfig already set them.
 export const addOptions = (source: string) => {
-  if (Str.includes('@shoe-box-tools/oxlint-config')(source)) return source;
+  if (Str.includes('shoe-box-oxlint-config')(source)) return source;
   const missing = Arr.filter(
     OPTIONS,
     ([key]) => !new RegExp(String.raw`\b${key}\s*:`, 'u').test(source),

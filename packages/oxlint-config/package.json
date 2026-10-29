@@ -1,14 +1,16 @@
 {
-  "name": "@shoe-box-tools/oxlint-config",
+  "name": "shoe-box-oxlint-config",
   "version": "0.1.0",
   "description": "defineShoeboxConfig(): the shared oxlint.config.ts for Effect + bun monorepos",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box-tools.git",
+    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
     "directory": "packages/oxlint-config"
   },
   "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
     "dist",
     "README.md"
   ],
@@ -35,21 +37,25 @@
     "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
     "test": "vitest run",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
-    "postpack": "bun ../../scripts/publish-manifest.ts restore"
+    "postpack": "bun ../../scripts/publish-manifest.ts restore",
+    "release:publish": "bun ../../scripts/publish-package.ts"
   },
   "dependencies": {
     "@oxlint-flat-config/composer": "catalog:",
-    "@shoe-box-tools/oxlint-plugins": "workspace:*",
     "@tanstack/eslint-plugin-query": "catalog:",
     "eslint-plugin-playwright": "catalog:",
     "eslint-plugin-testing-library": "catalog:",
-    "oxlint-flat-config": "catalog:"
+    "oxlint-flat-config": "catalog:",
+    "shoe-box-oxlint-plugins": "workspace:*"
   },
   "devDependencies": {
+    "@effect/platform-bun": "catalog:",
     "@effect/tsgo": "catalog:",
-    "@shoe-box-tools/typescript-config": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "oxlint": "catalog:",
+    "shoe-box-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

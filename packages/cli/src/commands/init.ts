@@ -422,7 +422,7 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
     );
     if (entries.length > 0) {
       return yield* fail(
-        `${root} is not empty. Use \`shoebox adopt\` for an existing repo, or pass --force.`,
+        `${root} is not empty. Use \`shoe-box adopt\` for an existing repo, or pass --force.`,
       );
     }
   }
@@ -491,7 +491,7 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
         shoeboxConfig.taskRunner === 'nx'
           ? `  bunx nx run-many -t lint:check && bunx nx run ${shoeboxConfig.name}:lint:check:root`
           : "  bunx turbo run lint:check '//#lint:check:root'",
-        '  bunx shoebox doctor',
+        '  bunx shoe-box doctor',
       ],
       '\n',
     ),

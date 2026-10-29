@@ -17,7 +17,7 @@ export const runAdopt = Effect.fnUntraced(function* (input: {
   const root = yield* resolveRoot(input.directory);
   if ((yield* configExists(root)) && !input.force) {
     return yield* fail(
-      `${root} already has ${CONFIG_PATH}. Run \`shoebox sync\`, or pass --force to re-infer it.`,
+      `${root} already has ${CONFIG_PATH}. Run \`shoe-box sync\`, or pass --force to re-infer it.`,
     );
   }
   const config = yield* inferConfig(yield* makeRepo(root));
@@ -35,7 +35,7 @@ export const runAdopt = Effect.fnUntraced(function* (input: {
     allowDirty: true,
   }).pipe(Effect.catchTag('CommandFailed', () => Effect.void));
   yield* Console.log(
-    `\nNext: edit ${CONFIG_PATH} until the plan looks right, then \`shoebox sync --force '<glob>'\` to take generated versions of untracked files.`,
+    `\nNext: edit ${CONFIG_PATH} until the plan looks right, then \`shoe-box sync --force '<glob>'\` to take generated versions of untracked files.`,
   );
 });
 

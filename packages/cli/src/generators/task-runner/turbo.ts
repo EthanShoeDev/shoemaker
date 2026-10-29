@@ -1,4 +1,4 @@
-import { Array as Arr, pipe, Record as Rec } from 'effect';
+import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
 
 import type { GeneratedFile, Renderer } from '../../engine/types.ts';
 import { hasEnvPackage, workspaces } from '../root/workspaces.ts';
@@ -6,6 +6,11 @@ import { hasApp, owned } from '../shared.ts';
 import { commented, type Jsonc, jsonc } from './jsonc.ts';
 import type { TaskDef } from './model.ts';
 import { mergeTasks, taskKey } from './refs.ts';
+
+// The schema turbo ships matches the installed version and needs no network,
+// so VS Code never asks to trust a remote schema host.
+const schemaFrom = (dir: string) =>
+  `${dir === '.' ? './' : Str.repeat(Str.split(dir, '/').length)('../')}node_modules/turbo/schema.json`;
 
 const HEADER = `Task-inheritance pattern:
   "^task"        -> run \`task\` in all DEPENDENCY packages first
@@ -72,7 +77,7 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
   const root = owned(
     'turbo.jsonc',
     jsonc({
-      $schema: 'https://turborepo.dev/schema.json',
+      $schema: schemaFrom('.'),
       ui: 'tui',
       globalPassThroughEnv: ['NIX_*', 'TMPDIR', ...secretEnv],
       globalEnv: envPackage ? ['APP_ENV', ...plainEnv] : undefined,
@@ -101,7 +106,7 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
       owned(
         `${dir}/turbo.jsonc`,
         jsonc({
-          $schema: 'https://turborepo.dev/schema.json',
+          $schema: schemaFrom(dir),
           extends: ['//'],
           tasks: tasksObject(pkgTasks, (task) => task.name),
         }),

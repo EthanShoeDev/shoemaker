@@ -1,10 +1,10 @@
-# @shoe-box-tools/knip-config
+# shoe-box-knip-config
 
 `defineKnipConfig()` for `knip.ts`, with the ignores every shoebox repo shares.
 
 ```ts
 // knip.ts
-import { defineKnipConfig } from '@shoe-box-tools/knip-config';
+import { defineKnipConfig } from 'shoe-box-knip-config';
 
 export default defineKnipConfig({
   ignoreDependencies: ['tailwindcss'],

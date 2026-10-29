@@ -1,5 +1,5 @@
 {
-  "name": "shoe-box-tools",
+  "name": "shoe-box-monorepo",
   "private": true,
   "workspaces": {
     "packages": [
@@ -57,9 +57,9 @@
     "catalog:check": "bun packages/cli/src/bin.ts check catalog",
     "catalog:fix": "bun packages/cli/src/bin.ts check catalog --fix",
     "effect-versions:check": "bun packages/cli/src/bin.ts check effect-versions",
-    "nix:fmt:check": "./scripts/lint/nix-fmt.sh flake.nix -- -c",
-    "nix:fmt:fix": "./scripts/lint/nix-fmt.sh flake.nix",
-    "shoebox": "bun packages/cli/src/bin.ts",
+    "nix:fmt:check": "bun packages/cli/src/bin.ts check nix-fmt",
+    "nix:fmt:fix": "bun packages/cli/src/bin.ts check nix-fmt --fix",
+    "shoe-box": "bun packages/cli/src/bin.ts",
     "changeset": "changeset",
     "changeset:status": "changeset status",
     "changeset:version": "changeset version && bun install --lockfile-only",
@@ -75,10 +75,6 @@
     "@changesets/cli": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/tsgo": "catalog:",
-    "@shoe-box-tools/knip-config": "workspace:*",
-    "@shoe-box-tools/oxfmt-config": "workspace:*",
-    "@shoe-box-tools/oxlint-config": "workspace:*",
-    "@shoe-box-tools/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "bun-types": "catalog:",
     "effect": "catalog:",
@@ -87,6 +83,10 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "shoe-box-knip-config": "workspace:*",
+    "shoe-box-oxfmt-config": "workspace:*",
+    "shoe-box-oxlint-config": "workspace:*",
+    "shoe-box-typescript-config": "workspace:*",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

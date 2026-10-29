@@ -67,7 +67,7 @@ describe('shoebox.config.ts', () => {
     assert.strictEqual(text, renderConfigFile({ ...full }));
     assert.isTrue(
       Str.startsWith(
-        "import { defineConfig } from '@shoe-box-tools/cli/config';\n\nexport default defineConfig({\n",
+        "import { defineConfig } from 'shoe-box/config';\n\nexport default defineConfig({\n",
       )(text),
     );
   });

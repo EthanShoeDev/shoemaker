@@ -19,13 +19,11 @@ export const testingLibraryFiles = [
 ];
 
 /**
- * Build tooling and one-off scripts: no Effect runtime to reach (vite plugins
+ * Tool configs and plugins loaded by other tools: no Effect runtime to reach (vite plugins
  * hand Node streams to the dev server; oxlint plugin rules run synchronously
  * inside the plugin host) and the terminal is the output.
  */
 export const toolingFiles = [
-  'scripts/**',
-  '**/scripts/**',
   '**/vite-plugins/**',
   '**/oxlint-plugins/**',
   '**/*.config.{ts,mts,js,mjs,cjs}',

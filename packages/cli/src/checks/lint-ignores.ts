@@ -152,9 +152,9 @@ const runLintIgnores = Effect.fnUntraced(function* (repo: Repo) {
   };
 });
 
-export const lintIgnoresCheck: RepoCheck = {
+export const lintIgnoresCheck = {
   name: 'lint-ignores',
   description:
     'Reports every oxlint/eslint/ts/biome/oxfmt disable directive and whether it has a description',
   run: runLintIgnores,
-};
+} satisfies RepoCheck;

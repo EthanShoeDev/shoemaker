@@ -1,62 +1,66 @@
-import { mkdirSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-
-// Builds and packs every publishable @shoe-box-tools package into a directory,
-// so generated sample repos can install them before they exist on npm.
-// `bun pm pack` resolves catalog:/workspace: specs but does NOT apply
-// publishConfig.exports, so each package swaps its exports in prepack/postpack.
+// Builds and packs every publishable package into a directory, so generated
+// sample repos can install them before they exist on npm. `bun pm pack`
+// resolves catalog:/workspace: specs but does NOT apply publishConfig.exports,
+// so each package swaps its exports in prepack/postpack.
 //
 //   bun scripts/e2e/pack-local.ts <outDir>   -> prints {name: "file:<tgz>"} JSON
-import { $ } from 'bun';
-import { Array as Arr, Option, String as Str } from 'effect';
+import {
+  Array as Arr,
+  Console,
+  Effect,
+  FileSystem,
+  Path,
+  Record as Rec,
+  String as Str,
+} from 'effect';
+import { Argument, Command } from 'effect/cli';
 
-import { readJsonObject, stringRecord } from '../lib/json.ts';
+import { renderJson } from '../../packages/cli/src/engine/json.ts';
+import { publishablePackages, repoRoot } from '../lib/packages.ts';
+import { run, runScript } from '../lib/run.ts';
 
-export const PUBLISHED = [
-  'typescript-config',
-  'oxlint-plugins',
-  'oxlint-config',
-  'oxfmt-config',
-  'knip-config',
-  'cli',
-];
-
-const root = resolve(import.meta.dirname, '../..');
-
-export const packLocal = async (outDir: string) => {
-  const dest = resolve(outDir);
-  mkdirSync(dest, { recursive: true });
-  const overrides: Record<string, string> = {};
-  for (const dir of PUBLISHED) {
-    const cwd = join(root, 'packages', dir);
-    const manifest = await readJsonObject(join(cwd, 'package.json'));
-    const name = String(manifest.name);
-    if (stringRecord(manifest.scripts).build !== undefined) {
-      await $`bun run build`.cwd(cwd).quiet();
-    }
-    const before = new Set(readdirSync(dest));
-    await $`bun pm pack --destination ${dest} --quiet`.cwd(cwd).quiet();
-    const tgz = Option.orElse(
-      Arr.findFirst(
-        readdirSync(dest),
-        (f) => !before.has(f) && Str.endsWith('.tgz')(f),
+export const packLocal = Effect.fnUntraced(function* (outDir: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const dest = path.resolve(outDir);
+  yield* fs.makeDirectory(dest, { recursive: true });
+  const packages = yield* publishablePackages;
+  // One turbo run builds them in dependency order (and skips cached builds).
+  yield* run(
+    'bunx',
+    [
+      'turbo',
+      'run',
+      'build',
+      ...Arr.flatMap(packages, (pkg) => ['--filter', pkg.name]),
+    ],
+    { cwd: yield* repoRoot, env: { TURBO_TELEMETRY_DISABLED: '1' } },
+  );
+  const entries = yield* Effect.forEach(
+    packages,
+    (pkg) =>
+      run('bun', ['pm', 'pack', '--destination', dest, '--quiet'], {
+        cwd: pkg.cwd,
+      }).pipe(
+        Effect.as([
+          pkg.name,
+          `file:${path.join(dest, `${pkg.name}-${pkg.version}.tgz`)}`,
+        ] as const),
       ),
-      () =>
-        Arr.findFirst(
-          readdirSync(dest),
-          Str.startsWith(Str.replace('/', '-')(Str.replace('@', '')(name))),
-        ),
-    );
-    if (Option.isNone(tgz)) {
-      throw new Error(`pack produced nothing for ${dir}`);
-    }
-    overrides[name] = `file:${join(dest, tgz.value)}`;
-  }
-  return overrides;
-};
+    { concurrency: 'unbounded' },
+  );
+  return Rec.fromEntries(entries);
+});
+
+const packLocalCommand = Command.make(
+  'pack-local',
+  { outDir: Argument.String('outDir') },
+  Effect.fnUntraced(function* ({ outDir }) {
+    const overrides = yield* packLocal(outDir);
+    yield* Console.log(Str.trimEnd(renderJson(overrides)));
+  }),
+).pipe(Command.withDescription('Pack every publishable package locally'));
 
 if (import.meta.main) {
-  const outDir = process.argv[2];
-  if (outDir === undefined) throw new Error('usage: pack-local.ts <outDir>');
-  console.log(JSON.stringify(await packLocal(outDir), null, 2));
+  runScript(Command.run(packLocalCommand, { version: '0.0.0' }));
 }

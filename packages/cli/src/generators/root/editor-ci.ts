@@ -126,8 +126,8 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       # Fails when generated tooling files were hand-edited or the repo is
-      # behind shoebox.config.ts; fix with \`shoebox sync\`.
-      - run: bunx shoebox sync --check --allow-dirty
+      # behind shoebox.config.ts; fix with \`shoe-box sync\`.
+      - run: bunx shoe-box sync --check --allow-dirty
 ${lintSteps(config)}
 
   test:

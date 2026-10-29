@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 
 import { addEnvrc } from '../../src/migrations/add-envrc.ts';
 import { catalogCheckToShoebox } from '../../src/migrations/catalog-check-to-shoebox.ts';
+import { nixFmtScriptToShoebox } from '../../src/migrations/nix-fmt-script-to-shoe-box.ts';
 import { oxfmtrcToTs } from '../../src/migrations/oxfmtrc-to-ts.ts';
 import { turboJsonToJsonc } from '../../src/migrations/turbo-json-to-jsonc.ts';
 import { json, pkgIn, plan } from './helpers.ts';
@@ -36,7 +37,7 @@ describe('oxfmtrc-to-ts', () => {
         const config = file('oxfmt.config.ts') ?? '';
         assert.include(
           config,
-          "import { defineShoeboxFormat } from '@shoe-box-tools/oxfmt-config';",
+          "import { defineShoeboxFormat } from 'shoe-box-oxfmt-config';",
         );
         assert.include(
           config,
@@ -60,9 +61,7 @@ describe('oxfmtrc-to-ts', () => {
           'oxfmt -c oxfmt.config.ts --write .',
         );
         assert.strictEqual(
-          pkgIn(file('package.json')).devDependencies[
-            '@shoe-box-tools/oxfmt-config'
-          ],
+          pkgIn(file('package.json')).devDependencies['shoe-box-oxfmt-config'],
           '^0.1.0',
         );
       }),
@@ -130,14 +129,50 @@ describe('catalog-check-to-shoebox', () => {
       assert.isUndefined(file('scripts/lint/catalog-check.ts'));
       const root = pkgIn(file('package.json'));
       assert.deepStrictEqual(root.scripts, {
-        'catalog:check': 'shoebox check catalog',
-        'catalog:fix': 'shoebox check catalog --fix',
+        'catalog:check': 'shoe-box check catalog',
+        'catalog:fix': 'shoe-box check catalog --fix',
       });
-      assert.strictEqual(root.catalog['@shoe-box-tools/cli'], '^0.1.0');
-      assert.strictEqual(
-        root.devDependencies['@shoe-box-tools/cli'],
-        'catalog:',
-      );
+      assert.strictEqual(root.catalog['shoe-box'], '^0.1.0');
+      assert.strictEqual(root.devDependencies['shoe-box'], 'catalog:');
+    }),
+  );
+});
+
+describe('nix-fmt-script-to-shoe-box', () => {
+  it.effect('deletes the bash script and points scripts at the CLI', () =>
+    Effect.gen(function* () {
+      const { applies, file } = yield* plan(nixFmtScriptToShoebox, {
+        'package.json': json({
+          name: 'demo',
+          workspaces: { packages: [], catalog: { effect: '4.0.6' } },
+          scripts: {
+            'nix:fmt:check': './scripts/lint/nix-fmt.sh flake.nix -- -c',
+            'nix:fmt:fix': './scripts/lint/nix-fmt.sh flake.nix',
+            'fmt:all': 'bash scripts/lint/nix-fmt.sh -- -c flake.nix && oxfmt',
+            build: 'tsc ',
+          },
+        }),
+        'scripts/lint/nix-fmt.sh': '#!/usr/bin/env bash\n',
+      });
+      assert.isTrue(applies);
+      assert.isUndefined(file('scripts/lint/nix-fmt.sh'));
+      const root = pkgIn(file('package.json'));
+      assert.deepStrictEqual(root.scripts, {
+        'nix:fmt:check': 'shoe-box check nix-fmt',
+        'nix:fmt:fix': 'shoe-box check nix-fmt --fix',
+        'fmt:all': 'shoe-box check nix-fmt && oxfmt',
+        build: 'tsc ',
+      });
+      assert.strictEqual(root.devDependencies['shoe-box'], 'catalog:');
+    }),
+  );
+
+  it.effect('does not apply without the script', () =>
+    Effect.gen(function* () {
+      const { applies } = yield* plan(nixFmtScriptToShoebox, {
+        'package.json': json({ name: 'demo' }),
+      });
+      assert.isFalse(applies);
     }),
   );
 });

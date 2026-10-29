@@ -73,7 +73,7 @@ export const oxlintConfig: Renderer = (ctx, aggregate) => {
   return [
     managed(
       'oxlint.config.ts',
-      `import { defineShoeboxConfig } from '@shoe-box-tools/oxlint-config';
+      `import { defineShoeboxConfig } from 'shoe-box-oxlint-config';
 
 export default defineShoeboxConfig({
 ${indent(region('options', options), 2)}
@@ -98,7 +98,7 @@ export const oxfmtConfig: Renderer = (ctx, aggregate) => {
   return [
     managed(
       'oxfmt.config.ts',
-      `import { defineShoeboxFormat } from '@shoe-box-tools/oxfmt-config';
+      `import { defineShoeboxFormat } from 'shoe-box-oxfmt-config';
 
 export default defineShoeboxFormat({
 ${indent(region('options', options.length > 0 ? Arr.join(options, '\n') : '// Shared defaults only.'), 2)}
@@ -191,7 +191,7 @@ export const knipConfig: Renderer = (ctx, aggregate) => {
   return [
     managed(
       'knip.ts',
-      `import { defineKnipConfig } from '@shoe-box-tools/knip-config';
+      `import { defineKnipConfig } from 'shoe-box-knip-config';
 
 export default defineKnipConfig({
 ${indent(region('workspaces', body), 2)}
@@ -261,7 +261,7 @@ export const rootTsconfig: Generator = () => ({
     owned(
       'tsconfig.json',
       `{
-  "extends": "@shoe-box-tools/typescript-config/tsconfig.base.json",
+  "extends": "shoe-box-typescript-config/tsconfig.base.json",
   // Root config files default-export objects typed by tool packages, which
   // declaration emit cannot name; nothing here is published.
   "compilerOptions": {

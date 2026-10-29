@@ -2,7 +2,7 @@ import type { ShoeboxConfig } from '../config/schema.ts';
 import type { EnvVar } from '../generators/secrets/model.ts';
 import type { TaskDef } from '../generators/task-runner/model.ts';
 
-// How `shoebox sync` treats a generated file once it exists on disk.
+// How `shoe-box sync` treats a generated file once it exists on disk.
 //
 // - `owned`: shoebox renders the whole file. Re-rendered on every sync. A file
 //   whose on-disk hash no longer matches the lockfile baseline was hand-edited

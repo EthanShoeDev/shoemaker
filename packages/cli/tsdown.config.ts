@@ -10,6 +10,6 @@ export default defineConfig({
   // Declarations for src only: the default tsconfig also covers test/, which
   // imports repo fixtures and would emit .d.ts files beside them.
   tsconfig: 'tsconfig.build.json',
-  dts: true,
+  dts: { sourcemap: true },
   sourcemap: true,
 });

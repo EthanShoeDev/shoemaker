@@ -1,17 +1,17 @@
-# @shoe-box-tools/oxlint-config
+# shoe-box-oxlint-config
 
 The shared `oxlint.config.ts` for Effect + bun monorepos, built on [oxlint-flat-config](https://github.com/liangmiQwQ/oxlint-flat-config). There are two ways to use it:
 
-- `defineShoeboxConfig(options)`: one call with a few options. This is what `shoebox init` generates.
+- `defineShoeboxConfig(options)`: one call with a few options. This is what `shoe-box init` generates.
 - `shoeboxPreset(options)`: the same config as an array of named flat config blocks. Use it with the composer when a repo needs to change one block.
 
-Install it beside `oxlint`, `oxlint-tsgolint` and `@effect/tsgo` (peer dependencies), and run `effect-tsgo patch --oxlint` from `prepare` so the `effecttsgo/*` rules exist. The custom plugins (`@shoe-box-tools/oxlint-plugins`), the third-party eslint plugins, `oxlint-flat-config` and `@oxlint-flat-config/composer` are dependencies of this package. The `jsPlugins` entries are absolute paths resolved from here, so the consuming repo does not list the plugins itself.
+Install it beside `oxlint`, `oxlint-tsgolint` and `@effect/tsgo` (peer dependencies), and run `effect-tsgo patch --oxlint` from `prepare` so the `effecttsgo/*` rules exist. The custom plugins (`shoe-box-oxlint-plugins`), the third-party eslint plugins, `oxlint-flat-config` and `@oxlint-flat-config/composer` are dependencies of this package. The `jsPlugins` entries are absolute paths resolved from here, so the consuming repo does not list the plugins itself.
 
 ## `defineShoeboxConfig`
 
 ```ts
 // oxlint.config.ts
-import { defineShoeboxConfig } from '@shoe-box-tools/oxlint-config';
+import { defineShoeboxConfig } from 'shoe-box-oxlint-config';
 
 export default defineShoeboxConfig({
   scope: 'myproj', // workspace scope without the @
@@ -55,7 +55,7 @@ export default defineShoeboxConfig({
 
 ```ts
 // oxlint.config.ts
-import { composer, shoeboxPreset } from '@shoe-box-tools/oxlint-config';
+import { composer, shoeboxPreset } from 'shoe-box-oxlint-config';
 
 export default await composer(shoeboxPreset({ scope: 'myproj', react: true }))
   // This repo has no env package yet.
@@ -100,7 +100,7 @@ Blocks, in order:
 | `shoebox/routes` | scoped | `routeFiles`, `react` + `tanstackRouter` only |
 | `shoebox/playwright` | scoped | `playwright` only |
 | `shoebox/testing-library` | scoped | `testingLibrary` only |
-| `shoebox/node-tooling` | scoped | `toolingFiles`: scripts, config files, oxlint plugins |
+| `shoebox/node-tooling` | scoped | `toolingFiles`: config files, vite and oxlint plugins (scripts are linted as Effect code) |
 | `shoebox/vendored` | scoped | `vendoredFiles` |
 
 Order matters as in ESLint: a later block wins. A rule added with `.append()` therefore also wins over `shoebox/tests`. To get `defineShoeboxConfig`'s placement for project rules, use `.insertBefore('shoebox/dts', { name: 'myproj/rules', rules })`. Patterns in flat items follow flat-config rules: `*.ts` matches only in the config's directory, so write `**/*.ts`. Global ignores are anchored, so write `**/dist` (see oxlint-flat-config's `docs/differences-from-eslint.md`).

@@ -46,6 +46,8 @@ export const shoeboxFormat = {
   // oxlint's `sort-imports` is off so the formatter owns import order; this
   // is what turns that on (oxfmt leaves imports unsorted by default).
   sortImports: true,
+  // VS Code's JSONC mode warns on trailing commas (turbo.jsonc and friends).
+  overrides: [{ files: ['*.jsonc'], options: { trailingComma: 'none' } }],
   ignorePatterns: sharedIgnorePatterns,
 } satisfies OxfmtConfig;
 

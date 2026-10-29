@@ -1,14 +1,16 @@
 {
-  "name": "@shoe-box-tools/oxlint-plugins",
+  "name": "shoe-box-oxlint-plugins",
   "version": "0.1.0",
-  "description": "Generic oxlint JS plugin rules plus vendored anti-slop, used by @shoe-box-tools/oxlint-config",
+  "description": "Generic oxlint JS plugin rules plus vendored anti-slop, used by shoe-box-oxlint-config",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box-tools.git",
+    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
     "directory": "packages/oxlint-plugins"
   },
   "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
     "dist",
     "README.md"
   ],
@@ -70,15 +72,16 @@
     "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
     "test": "vitest run",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
-    "postpack": "bun ../../scripts/publish-manifest.ts restore"
+    "postpack": "bun ../../scripts/publish-manifest.ts restore",
+    "release:publish": "bun ../../scripts/publish-package.ts"
   },
   "dependencies": {
     "@oxlint/plugins": "catalog:"
   },
   "devDependencies": {
-    "@shoe-box-tools/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
+    "shoe-box-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

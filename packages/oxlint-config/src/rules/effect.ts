@@ -1,5 +1,5 @@
-import antiSlop from '@shoe-box-tools/oxlint-plugins/vendor/anti-slop';
-import antiSlopEffect from '@shoe-box-tools/oxlint-plugins/vendor/anti-slop/effect';
+import antiSlop from 'shoe-box-oxlint-plugins/vendor/anti-slop';
+import antiSlopEffect from 'shoe-box-oxlint-plugins/vendor/anti-slop/effect';
 
 import { effectTsgoRules, everyRuleOf } from '../helpers.ts';
 import type { OxlintRules } from '../helpers.ts';
@@ -29,7 +29,7 @@ export const effect: OxlintRules = {
   'effecttsgo/process-env-in-effect': 'off',
 };
 
-/** The custom rules from @shoe-box-tools/oxlint-plugins that apply everywhere. */
+/** The custom rules from shoe-box-oxlint-plugins that apply everywhere. */
 export const custom = (scope: string): OxlintRules => ({
   // effecttsgo/global-console and global-console-in-effect own console use;
   // both rules on would report every call twice.

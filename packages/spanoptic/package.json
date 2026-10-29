@@ -1,12 +1,13 @@
 {
-  "name": "@shoe-box-tools/spanoptic",
+  "name": "shoe-box-spanoptic",
   "version": "0.0.1",
-  "private": true,
   "description": "TUI OTEL visualizer for Effect programs",
   "bin": {
     "spanoptic": "./src/cli.ts"
   },
   "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
     "dist",
     "README.md"
   ],
@@ -41,7 +42,8 @@
     "test": "vitest run",
     "demo": "bun src/demo.ts",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
-    "postpack": "bun ../../scripts/publish-manifest.ts restore"
+    "postpack": "bun ../../scripts/publish-manifest.ts restore",
+    "release:publish": "bun ../../scripts/publish-package.ts"
   },
   "dependencies": {
     "@effect/opentelemetry": "catalog:",
@@ -54,9 +56,9 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@shoe-box-tools/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "bun-types": "catalog:",
+    "shoe-box-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

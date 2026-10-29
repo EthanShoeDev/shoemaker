@@ -35,7 +35,7 @@ import {
 import type { Migration } from './types.ts';
 
 const ROOT_RCS = ['.oxlintrc.json', '.oxlintrc.jsonc'];
-const SHARED = '@shoe-box-tools/oxlint-config';
+const SHARED = 'shoe-box-oxlint-config';
 
 // Plugins oxlint ships plus the jsPlugins defineShoeboxConfig registers. A
 // rule from any other plugin would fail to resolve once its jsPlugins entry
@@ -349,7 +349,7 @@ const renderConfig = (input: {
     ]);
 
   const notes = [
-    `// Migrated from ${input.source} by \`shoebox migrate ${MigrationId.oxlintrcToTs}\`.`,
+    `// Migrated from ${input.source} by \`shoe-box migrate ${MigrationId.oxlintrcToTs}\`.`,
   ];
   const extended = strings(rc.extends);
   if (extended.length > 0)

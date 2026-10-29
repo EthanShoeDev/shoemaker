@@ -1,12 +1,14 @@
 {
-  "name": "@shoe-box-tools/cli",
+  "name": "shoe-box",
   "version": "0.1.0",
   "description": "Scaffold and keep in sync Effect + bun monorepos with Ethan's tooling preferences",
   "license": "MIT",
   "bin": {
-    "shoebox": "./src/bin.ts"
+    "shoe-box": "./src/bin.ts"
   },
   "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
     "dist"
   ],
   "type": "module",
@@ -16,7 +18,7 @@
   },
   "publishConfig": {
     "bin": {
-      "shoebox": "./dist/bin.mjs"
+      "shoe-box": "./dist/bin.mjs"
     },
     "exports": {
       "./config": {
@@ -35,20 +37,21 @@
     "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
     "test": "bun --bun vitest run",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
-    "postpack": "bun ../../scripts/publish-manifest.ts restore"
+    "postpack": "bun ../../scripts/publish-manifest.ts restore",
+    "release:publish": "bun ../../scripts/publish-package.ts"
   },
   "dependencies": {
     "@effect/platform-bun": "catalog:",
-    "@shoe-box-tools/oxfmt-config": "workspace:*",
     "effect": "catalog:",
     "jsonc-parser": "catalog:",
-    "oxfmt": "catalog:"
+    "oxfmt": "catalog:",
+    "shoe-box-oxfmt-config": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@shoe-box-tools/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "bun-types": "catalog:",
+    "shoe-box-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "vitest": "catalog:"
   }

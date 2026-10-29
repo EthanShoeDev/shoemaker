@@ -1,12 +1,25 @@
-import { Array as Arr, Predicate, Record as Rec } from 'effect';
+import {
+  Array as Arr,
+  Effect,
+  FileSystem,
+  Predicate,
+  Record as Rec,
+  Schema,
+} from 'effect';
+
+import { renderJson } from '../../packages/cli/src/engine/json.ts';
+
+const JsonObject = Schema.fromJsonString(
+  Schema.Record(Schema.String, Schema.Unknown),
+);
 
 // package.json and friends as plain objects: unknown keys are kept, so a
 // read-modify-write round trip never drops fields.
-export const readJsonObject = async (file: string) => {
-  const raw: unknown = await Bun.file(file).json();
-  if (!Predicate.isObject(raw)) throw new Error(`${file} is not a JSON object`);
-  return raw;
-};
+export const readJsonObject = Effect.fnUntraced(function* (file: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const raw = yield* fs.readFileString(file);
+  return { ...(yield* Schema.decodeEffect(JsonObject)(raw)) };
+});
 
 export const stringRecord = (value: unknown): Record<string, string> =>
   Predicate.isObject(value)
@@ -17,5 +30,10 @@ export const stringRecord = (value: unknown): Record<string, string> =>
       )
     : {};
 
-export const writeJson = (file: string, value: unknown) =>
-  Bun.write(file, `${JSON.stringify(value, null, 2)}\n`);
+export const writeJson = Effect.fnUntraced(function* (
+  file: string,
+  value: unknown,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  yield* fs.writeFileString(file, renderJson(value));
+});

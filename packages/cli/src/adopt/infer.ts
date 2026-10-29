@@ -27,7 +27,7 @@ import { globAll } from '../doctor/shared.ts';
 import type { Repo } from '../engine/repo.ts';
 
 // Reads an existing repo and guesses the shoebox.config.ts that describes it,
-// so `shoebox adopt` can start from the repo's real shape.
+// so `shoe-box adopt` can start from the repo's real shape.
 
 const MAX_SOURCE_FILES = 200;
 
@@ -78,7 +78,7 @@ const isAppShaped = (manifest: Manifest) =>
   );
 
 // Config and tooling packages are rendered by shoebox itself (or replaced by
-// @shoe-box-tools/*), and env/infra come from the secrets/infra generators.
+// shoe-box-*), and env/infra come from the secrets/infra generators.
 const NOT_LIBRARY =
   /^(?:env|infra|assets|scripts|tooling|.*-config|.*-plugins?|config|tsconfig|eslint-.*)$/u;
 

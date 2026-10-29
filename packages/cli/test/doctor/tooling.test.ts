@@ -229,7 +229,7 @@ describe('tooling doctor checks', () => {
         found[0]?.migration,
         MigrationId.catalogCheckToShoebox,
       );
-      assert.include(found[1]?.message ?? '', 'shoebox check effect-versions');
+      assert.include(found[1]?.message ?? '', 'shoe-box check effect-versions');
     }),
   );
 

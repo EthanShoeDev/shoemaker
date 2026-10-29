@@ -1,5 +1,5 @@
 {
-  "name": "@shoe-box-tools/utils",
+  "name": "shoe-box-utils",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -17,8 +17,8 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@shoe-box-tools/typescript-config": "workspace:*",
     "@types/node": "catalog:",
-    "bun-types": "catalog:"
+    "bun-types": "catalog:",
+    "shoe-box-typescript-config": "workspace:*"
   }
 }

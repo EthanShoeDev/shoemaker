@@ -18,7 +18,7 @@ const renderFinding = (finding: Finding, s: Style) => {
   }
   if (!finding.ok && finding.migration !== undefined) {
     lines.push(
-      `      ${s.dim('run:')} ${s.cyan(`shoebox migrate ${finding.migration}`)}`,
+      `      ${s.dim('run:')} ${s.cyan(`shoe-box migrate ${finding.migration}`)}`,
     );
   }
   return Arr.join(lines, '\n');

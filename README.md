@@ -1,41 +1,38 @@
-# shoe-box-tools
+# shoe-box
 
-My repo tooling in one place: shared config packages, plus `shoebox`, a CLI
+My repo tooling in one place: shared config packages, plus `shoe-box`, a CLI
 that scaffolds new monorepos with my current preferences and keeps existing
 repos up to date as those preferences change.
-
-- `docs/preferences.md`: what the preferences are and where each came from.
-- `docs/architecture.md`: how the packages and the CLI fit together.
 
 ## Packages
 
 | Package | Use it as |
 |---|---|
-| `@shoe-box-tools/oxlint-config` | `oxlint.config.ts`: `export default defineShoeboxConfig({ scope, react, ... })` |
-| `@shoe-box-tools/oxlint-plugins` | Custom rules + vendored anti-slop (loaded by oxlint-config) |
-| `@shoe-box-tools/oxfmt-config` | `oxfmt.config.ts`: `export default defineShoeboxFormat({ ... })` |
-| `@shoe-box-tools/typescript-config` | `"extends": "@shoe-box-tools/typescript-config/tsconfig.base.json"` |
-| `@shoe-box-tools/knip-config` | `knip.ts`: `export default defineKnipConfig({ ... })` |
-| `@shoe-box-tools/cli` | `shoebox` binary + `defineConfig` for `shoebox.config.ts` |
+| `shoe-box-oxlint-config` | `oxlint.config.ts`: `export default defineShoeboxConfig({ scope, react, ... })` |
+| `shoe-box-oxlint-plugins` | Custom rules + vendored anti-slop (loaded by oxlint-config) |
+| `shoe-box-oxfmt-config` | `oxfmt.config.ts`: `export default defineShoeboxFormat({ ... })` |
+| `shoe-box-typescript-config` | `"extends": "shoe-box-typescript-config/tsconfig.base.json"` |
+| `shoe-box-knip-config` | `knip.ts`: `export default defineKnipConfig({ ... })` |
+| `shoe-box` | `shoe-box` binary + `defineConfig` for `shoebox.config.ts` |
 
 Lint rules, format options and tsconfig strictness live in these packages, so
 changing a preference means publishing a new version and bumping it in each
 repo.
 
-## shoebox
+## shoe-box
 
 ```sh
-shoebox init my-app            # wizard; every question is also a flag
-shoebox init my-app --yes --apps tanstack-start,effect-api --secrets varlock
+shoe-box init my-app            # wizard; every question is also a flag
+shoe-box init my-app --yes --apps tanstack-start,effect-api --secrets varlock
 
-shoebox sync --dry-run         # re-render from shoebox.config.ts, show the diff
-shoebox sync                   # apply safe changes; hand edits become conflicts
-shoebox add app expo mobile    # add to shoebox.config.ts, then sync
+shoe-box sync --dry-run         # re-render from shoebox.config.ts, show the diff
+shoe-box sync                   # apply safe changes; hand edits become conflicts
+shoe-box add app expo mobile    # add to shoebox.config.ts, then sync
 
-shoebox doctor ../some-repo    # audit any repo against current preferences
-shoebox adopt ../some-repo     # infer shoebox.config.ts for an existing repo
-shoebox migrate --list         # one-shot structural migrations (.oxlintrc.json -> TS, ...)
-shoebox check catalog --fix    # repo checkers used by package scripts
+shoe-box doctor ../some-repo    # audit any repo against current preferences
+shoe-box adopt ../some-repo     # infer shoebox.config.ts for an existing repo
+shoe-box migrate --list         # one-shot structural migrations (.oxlintrc.json -> TS, ...)
+shoe-box check catalog --fix    # repo checkers used by package scripts
 ```
 
 What the wizard asks: apps (tanstack-start, foldkit, expo, effect-api,
@@ -74,7 +71,7 @@ bun scripts/e2e/generate-sample.ts web /tmp/sample-web   # prove generated repos
 ## Release
 
 ```sh
-bun run changeset              # describe the change (all @shoe-box-tools/* move together)
+bun run changeset              # describe the change (all shoe-box-* move together)
 bun run release:dry-run        # build + show each tarball's contents, no npm auth needed
 ```
 

@@ -49,13 +49,13 @@ export const effectFamily = [
 ] as const;
 
 export const versions = {
-  // shoe-box-tools itself
-  '@shoe-box-tools/cli': shoebox,
-  '@shoe-box-tools/oxlint-config': shoebox,
-  '@shoe-box-tools/oxlint-plugins': shoebox,
-  '@shoe-box-tools/oxfmt-config': shoebox,
-  '@shoe-box-tools/typescript-config': shoebox,
-  '@shoe-box-tools/knip-config': shoebox,
+  // shoe-box itself
+  'shoe-box': shoebox,
+  'shoe-box-oxlint-config': shoebox,
+  'shoe-box-oxlint-plugins': shoebox,
+  'shoe-box-oxfmt-config': shoebox,
+  'shoe-box-typescript-config': shoebox,
+  'shoe-box-knip-config': shoebox,
 
   // Effect family: exact pins, all on the same version
   // (effect-versions check enforces it in bun.lock).

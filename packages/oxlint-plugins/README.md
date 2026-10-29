@@ -1,6 +1,6 @@
-# @shoe-box-tools/oxlint-plugins
+# shoe-box-oxlint-plugins
 
-Generic [oxlint JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins.html) shared by every shoebox repo, plus a vendored copy of [anti-slop](https://github.com/dmmulroy/anti-slop). You normally do not list these yourself: [`@shoe-box-tools/oxlint-config`](../oxlint-config) resolves and enables them.
+Generic [oxlint JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins.html) shared by every shoebox repo, plus a vendored copy of [anti-slop](https://github.com/dmmulroy/anti-slop). You normally do not list these yourself: [`shoe-box-oxlint-config`](../oxlint-config) resolves and enables them.
 
 Each subpath export is one plugin. In the workspace, exports point at `src/*.ts` (oxlint type-strips them under Node); the published package points at `dist/*.mjs` built by tsdown, because Node refuses to type-strip files under `node_modules`.
 
@@ -19,7 +19,7 @@ Retired: `unknown-cast/require-comment` (`anti-slop/no-chained-type-assertions` 
 
 ## Vendored anti-slop
 
-`./vendor/anti-slop` (plugin `anti-slop`) and `./vendor/anti-slop/effect` (plugin `anti-slop-effect`) are dmmulroy/anti-slop at `c44ef22`, MIT. See [`src/vendor/anti-slop/UPSTREAM.md`](src/vendor/anti-slop/UPSTREAM.md) for the local delta (`?? null`), how to refresh, and why the tree is excluded from lint and format. `@shoe-box-tools/oxlint-config` turns every rule on and off-lists the rejected ones with reasons.
+`./vendor/anti-slop` (plugin `anti-slop`) and `./vendor/anti-slop/effect` (plugin `anti-slop-effect`) are dmmulroy/anti-slop at `c44ef22`, MIT. See [`src/vendor/anti-slop/UPSTREAM.md`](src/vendor/anti-slop/UPSTREAM.md) for the local delta (`?? null`), how to refresh, and why the tree is excluded from lint and format. `shoe-box-oxlint-config` turns every rule on and off-lists the rejected ones with reasons.
 
 ## Development
 

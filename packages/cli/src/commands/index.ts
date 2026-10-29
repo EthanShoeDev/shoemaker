@@ -11,7 +11,7 @@ import { migrateCommand } from './migrate.ts';
 import { CommandFailed, style } from './shared.ts';
 import { syncCommand } from './sync.ts';
 
-export const shoebox = Command.make('shoebox').pipe(
+export const shoebox = Command.make('shoe-box').pipe(
   Command.withDescription(
     "Scaffold and keep in sync Effect + bun monorepos with Ethan's preferences",
   ),

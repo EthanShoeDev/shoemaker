@@ -15,7 +15,7 @@ import { MigrationId } from '../../src/migrations/ids.ts';
 import { failures, json } from './helpers.ts';
 
 const shared =
-  "import { defineShoeboxConfig } from '@shoe-box-tools/oxlint-config';\nexport default defineShoeboxConfig({ scope: 'x' });\n";
+  "import { defineShoeboxConfig } from 'shoe-box-oxlint-config';\nexport default defineShoeboxConfig({ scope: 'x' });\n";
 const handRolled = (categories: string, options: string) =>
   `import { defineConfig } from 'oxlint';\nexport default defineConfig({\n  options: { ${options} },\n  categories: { ${categories} },\n});\n`;
 const allCategories =

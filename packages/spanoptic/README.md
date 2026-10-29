@@ -1,4 +1,4 @@
-# @shoe-box-tools/spanoptic
+# shoe-box-spanoptic
 
 TUI OTEL visualizer for Effect programs. Visualize your Effect traces in real-time with a terminal UI.
 
@@ -16,7 +16,7 @@ Inspired by [Kit Langton's spanoptic](https://x.com/kitlangton/status/1994799261
 ## Installation
 
 ```bash
-bun add @shoe-box-tools/spanoptic
+bun add shoe-box-spanoptic
 ```
 
 ## Usage
@@ -28,8 +28,8 @@ Wrap your Effect program with `traceVisualize` to visualize traces:
 ```typescript
 import { BunRuntime } from '@effect/platform-bun';
 import { Effect } from 'effect';
-import { traceVisualize, withTracedSpan } from '@shoe-box-tools/spanoptic';
-import type { TraceExport } from '@shoe-box-tools/spanoptic';
+import { traceVisualize, withTracedSpan } from 'shoe-box-spanoptic';
+import type { TraceExport } from 'shoe-box-spanoptic';
 
 let lastExport: TraceExport | undefined;
 
@@ -63,13 +63,13 @@ The package includes a CLI for running demos and replaying traces:
 
 ```bash
 # Run the built-in demo
-bunx @shoe-box-tools/spanoptic demo
+bunx shoe-box-spanoptic demo
 
 # Run demo and export to a specific file
-bunx @shoe-box-tools/spanoptic demo --output trace.json
+bunx shoe-box-spanoptic demo --output trace.json
 
 # Replay a previously exported trace
-bunx @shoe-box-tools/spanoptic replay trace.json
+bunx shoe-box-spanoptic replay trace.json
 ```
 
 ## TUI Layout
@@ -117,7 +117,7 @@ log span adds the span name to console log output when the program runs
 outside the TUI.
 
 ```typescript
-import { withTracedSpan } from '@shoe-box-tools/spanoptic';
+import { withTracedSpan } from 'shoe-box-spanoptic';
 
 const myEffect = Effect.gen(function* () {
   yield* Effect.log('This log will be associated with mySpan');
@@ -142,7 +142,7 @@ Convert a `TraceExport` to and from the pretty-printed JSON file the CLI writes
 (`TraceExportJson` is the underlying `Schema`):
 
 ```typescript
-import { decodeTraceExport, replayVisualize } from '@shoe-box-tools/spanoptic';
+import { decodeTraceExport, replayVisualize } from 'shoe-box-spanoptic';
 
 const program = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

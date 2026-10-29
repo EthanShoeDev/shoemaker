@@ -47,7 +47,7 @@ export const turboJsonc: DoctorCheck = {
       return [pass('nx.json (task runner: nx)')];
     return [
       fail('no task runner config (turbo.jsonc or nx.json)', {
-        fix: 'shoebox adopt, then shoebox sync renders turbo.jsonc',
+        fix: 'shoe-box adopt, then shoe-box sync renders turbo.jsonc',
       }),
     ];
   }),
@@ -295,7 +295,7 @@ export const nixDevShell: DoctorCheck = {
     if (flake === undefined) {
       return [
         fail('no flake.nix', {
-          fix: 'shoebox sync renders flake.nix (nixpkgs-unstable, alejandra, bun pinned to packageManager)',
+          fix: 'shoe-box sync renders flake.nix (nixpkgs-unstable, alejandra, bun pinned to packageManager)',
         }),
       ];
     }
@@ -413,13 +413,13 @@ export const knip: DoctorCheck = {
       findings.push(
         fail(`${Arr.join(json, ', ')} should be knip.ts`, {
           path: json[0] ?? '',
-          fix: 'convert to knip.ts with defineKnipConfig from @shoe-box-tools/knip-config',
+          fix: 'convert to knip.ts with defineKnipConfig from shoe-box-knip-config',
         }),
       );
     } else if (!ts) {
       findings.push(
         fail('knip is not configured', {
-          fix: 'add knip.ts with defineKnipConfig from @shoe-box-tools/knip-config',
+          fix: 'add knip.ts with defineKnipConfig from shoe-box-knip-config',
         }),
       );
     }
@@ -450,7 +450,7 @@ export const knip: DoctorCheck = {
 export const catalog: DoctorCheck = {
   id: 'catalog',
   description:
-    'Every dependency uses catalog: (summary of `shoebox check catalog`)',
+    'Every dependency uses catalog: (summary of `shoe-box check catalog`)',
   run: Effect.fnUntraced(function* (repo) {
     const analysis = yield* analyzeCatalog(repo);
     if (analysis === undefined) return [fail('no root package.json')];
@@ -466,7 +466,7 @@ export const catalog: DoctorCheck = {
       fail(
         `${violations.length} pinned dep(s) that should be catalog:/workspace:*, ${notInCatalog.length} dep(s) missing from the catalog`,
         {
-          fix: 'shoebox check catalog --fix, then bun install',
+          fix: 'shoe-box check catalog --fix, then bun install',
         },
       ),
     ];
@@ -484,7 +484,7 @@ const COPIED = [
 export const copiedScripts: DoctorCheck = {
   id: 'copied-scripts',
   description:
-    'No copy-pasted check scripts (scripts/**/catalog-check.ts etc.): use `shoebox check <name>`',
+    'No copy-pasted check scripts (scripts/**/catalog-check.ts etc.): use `shoe-box check <name>`',
   run: Effect.fnUntraced(function* (repo) {
     const findings: Array<Finding> = [];
     for (const script of COPIED) {
@@ -495,12 +495,12 @@ export const copiedScripts: DoctorCheck = {
       );
       for (const path of yield* repo.glob(`scripts/**/${script}.ts`)) {
         findings.push(
-          fail(`${path} is a copy of \`shoebox check ${check}\``, {
+          fail(`${path} is a copy of \`shoe-box check ${check}\``, {
             path,
             ...(script === 'catalog-check'
               ? { migration: MigrationId.catalogCheckToShoebox }
               : {
-                  fix: `point its script at \`shoebox check ${check}\` and delete the copy (keep it if it has repo-specific rules)`,
+                  fix: `point its script at \`shoe-box check ${check}\` and delete the copy (keep it if it has repo-specific rules)`,
                 }),
           }),
         );
@@ -607,7 +607,7 @@ export const vscode: DoctorCheck = {
     if (settings === undefined)
       return [
         fail('no .vscode/settings.json', {
-          fix: 'shoebox sync renders .vscode (vscode feature)',
+          fix: 'shoe-box sync renders .vscode (vscode feature)',
         }),
       ];
     return Str.includes('oxc.oxc-vscode')(settings)

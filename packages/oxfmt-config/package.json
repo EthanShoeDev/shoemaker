@@ -1,14 +1,16 @@
 {
-  "name": "@shoe-box-tools/oxfmt-config",
+  "name": "shoe-box-oxfmt-config",
   "version": "0.1.0",
   "description": "Shared oxfmt options and defineShoeboxFormat() for oxfmt.config.ts",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EthanShoeDev/shoe-box-tools.git",
+    "url": "git+https://github.com/EthanShoeDev/shoe-box.git",
     "directory": "packages/oxfmt-config"
   },
   "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
     "dist",
     "README.md"
   ],
@@ -35,12 +37,16 @@
     "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
     "test": "vitest run",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
-    "postpack": "bun ../../scripts/publish-manifest.ts restore"
+    "postpack": "bun ../../scripts/publish-manifest.ts restore",
+    "release:publish": "bun ../../scripts/publish-package.ts"
   },
   "devDependencies": {
-    "@shoe-box-tools/typescript-config": "workspace:*",
+    "@effect/platform-bun": "catalog:",
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "oxfmt": "catalog:",
+    "shoe-box-typescript-config": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

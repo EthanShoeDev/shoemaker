@@ -168,7 +168,7 @@ it.effect('APP_ENV rejects an unknown stage', () =>
 const readme = (scope: string) => `# @${scope}/env
 
 Every environment variable this repo reads, as Effect \`Config\` values.
-\`src/index.ts\` is rendered by \`shoebox sync\` from the env schema; edit the
+\`src/index.ts\` is rendered by \`shoe-box sync\` from the env schema; edit the
 schema (or the generator that declares the variable), not the file.
 
 \`\`\`ts

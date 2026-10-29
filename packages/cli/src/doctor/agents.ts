@@ -16,7 +16,7 @@ export const agentsMd: DoctorCheck = {
         fail('no AGENTS.md', {
           fix:
             claude === undefined
-              ? 'add AGENTS.md (shoebox sync renders it with the agents feature) and CLAUDE.md containing `@AGENTS.md`'
+              ? 'add AGENTS.md (shoe-box sync renders it with the agents feature) and CLAUDE.md containing `@AGENTS.md`'
               : 'move CLAUDE.md to AGENTS.md, then make CLAUDE.md contain only `@AGENTS.md`',
         }),
       );

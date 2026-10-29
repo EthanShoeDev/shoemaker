@@ -10,7 +10,7 @@ import { collectComments, objectLiteral, quote, toTs } from './ts-literal.ts';
 import type { Migration } from './types.ts';
 
 const ROOT_RCS = ['.oxfmtrc.jsonc', '.oxfmtrc.json'];
-const SHARED = '@shoe-box-tools/oxfmt-config';
+const SHARED = 'shoe-box-oxfmt-config';
 
 // What defineShoeboxFormat already sets; anything else in the rc is listed
 // in a comment rather than silently lost.
@@ -26,7 +26,7 @@ const SHARED_OPTIONS: Readonly<Record<string, unknown>> = {
   sortImports: true,
   experimentalSortImports: true,
 };
-// Mirrors a few of @shoe-box-tools/oxfmt-config's sharedIgnorePatterns so the
+// Mirrors a few of shoe-box-oxfmt-config's sharedIgnorePatterns so the
 // migrated file only lists what is specific to the repo (duplicates are
 // harmless, so this need not be exhaustive).
 const SHARED_IGNORES = new Set([
@@ -111,7 +111,7 @@ const render = (
       (!Rec.has(SHARED_OPTIONS, key) || SHARED_OPTIONS[key] !== value),
   );
   const notes = [
-    `// Migrated from ${source} by \`shoebox migrate ${MigrationId.oxfmtrcToTs}\`.`,
+    `// Migrated from ${source} by \`shoe-box migrate ${MigrationId.oxfmtrcToTs}\`.`,
   ];
   if (differing.length > 0) {
     notes.push(

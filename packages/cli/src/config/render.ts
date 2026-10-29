@@ -120,7 +120,7 @@ export const renderInlineEntry = (entry: {
 export const renderConfigFile = (config: ShoeboxConfig) =>
   Arr.join(
     [
-      "import { defineConfig } from '@shoe-box-tools/cli/config';",
+      "import { defineConfig } from 'shoe-box/config';",
       '',
       'export default defineConfig({',
       ...Arr.map(configLines(config), (line) => line('  ')),

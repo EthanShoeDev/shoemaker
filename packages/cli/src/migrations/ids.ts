@@ -9,4 +9,5 @@ export const MigrationId = {
   tsgoToTsc: '2026-10-28-tsgo-to-tsc',
   addEnvrc: '2026-10-28-add-envrc',
   catalogCheckToShoebox: '2026-10-28-catalog-check-to-shoebox',
+  nixFmtScriptToShoebox: '2026-10-29-nix-fmt-script-to-shoe-box',
 } as const;

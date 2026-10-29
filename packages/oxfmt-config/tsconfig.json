@@ -1,5 +1,5 @@
 {
-  "extends": "@shoe-box-tools/typescript-config/tsconfig.base.json",
+  "extends": "shoe-box-typescript-config/tsconfig.base.json",
   "compilerOptions": {
     // oxfmt evaluates the config in its Node host, never under Bun.
     "types": ["node"]

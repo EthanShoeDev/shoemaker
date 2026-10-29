@@ -87,8 +87,8 @@ const runPackageBoundaries = Effect.fnUntraced(function* (repo: Repo) {
   };
 });
 
-export const packageBoundariesCheck: RepoCheck = {
+export const packageBoundariesCheck = {
   name: 'package-boundaries',
   description: 'Nothing (no app, package or the root) depends on an app',
   run: runPackageBoundaries,
-};
+} satisfies RepoCheck;

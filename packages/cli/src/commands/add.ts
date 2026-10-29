@@ -95,7 +95,7 @@ const updateConfig = Effect.fnUntraced(function* (
   if (!input.allowDirty) yield* ensureCleanTree(root);
   if (!(yield* writeConfig(root, config, next, addition))) {
     yield* Console.log(
-      `${CONFIG_PATH} has hand-written parts shoebox cannot edit safely, so it was left untouched.\nAdd this entry to its \`${addition.key}\` array, then run \`shoebox sync\`:\n\n  ${renderInlineEntry(addition.entry)},`,
+      `${CONFIG_PATH} has hand-written parts shoebox cannot edit safely, so it was left untouched.\nAdd this entry to its \`${addition.key}\` array, then run \`shoe-box sync\`:\n\n  ${renderInlineEntry(addition.entry)},`,
     );
     return yield* fail(`${CONFIG_PATH} not updated`);
   }

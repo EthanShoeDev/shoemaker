@@ -46,9 +46,6 @@ export const testOverride = ({
     'effecttsgo/global-random': 'off',
     // Playwright specs and canaries talk to the server directly.
     'effecttsgo/global-fetch': 'off',
-    // Fixtures read files off disk, stand up raw servers and spawn processes;
-    // `skipIf` probes run at collection time, before any runtime.
-    'effecttsgo/node-builtin-import': 'off',
     // Shared suites take any layer and fixtures mint arbitrary-error effects.
     'effecttsgo/any-unknown-in-error-context': 'off',
     // Harness, perf and spec output goes to the runner's console.
@@ -72,7 +69,7 @@ export const testOverride = ({
   },
 });
 
-/** Build tooling and one-off scripts; see toolingFiles. */
+/** Tool configs and plugins loaded by other tools; see toolingFiles. */
 export const toolingOverride = (
   files: Array<string> = toolingFiles,
 ): ScopedConfigItem => ({

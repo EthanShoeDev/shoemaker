@@ -35,16 +35,16 @@ export const runCheck = Effect.fnUntraced(function* (input: {
 
   const root = yield* resolveRoot(input.cwd);
   const repo = yield* makeRepo(root);
-  let result = yield* check.run(repo);
+  let result = yield* check.run(repo, { fix: input.fix });
   if (input.fix && result.fixes.length > 0) {
     yield* applyChanges(root, result.fixes);
     // Re-run so the exit code reflects the fixed repo.
-    result = yield* check.run(repo);
+    result = yield* check.run(repo, { fix: false });
   }
   if (result.report !== '') yield* Console.log(result.report);
   if (!result.ok) {
     if (!input.fix && result.fixes.length > 0) {
-      yield* Console.log(s.dim(`Fixable: shoebox check ${name} --fix`));
+      yield* Console.log(s.dim(`Fixable: shoe-box check ${name} --fix`));
     }
     return yield* fail(`check ${name} failed`);
   }

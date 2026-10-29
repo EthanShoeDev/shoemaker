@@ -3,7 +3,7 @@ import { Schema } from 'effect';
 // The wizard answers persisted in a repo's `shoebox.config.ts`. Everything
 // that is "set in stone" (oxlint, oxfmt, jscpd, knip, nix, bun, Effect) is not
 // modelled here: it is always generated. Only per-project structural choices
-// live in this schema, so `shoebox sync` can re-render a repo from it.
+// live in this schema, so `shoe-box sync` can re-render a repo from it.
 
 export const AppKind = Schema.Literals([
   'tanstack-start',

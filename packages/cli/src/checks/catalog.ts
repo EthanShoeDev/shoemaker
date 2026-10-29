@@ -222,9 +222,9 @@ const runCatalog = Effect.fnUntraced(function* (repo: Repo) {
   return { ok, report: Arr.join(lines, '\n'), fixes };
 });
 
-export const catalogCheck: RepoCheck = {
+export const catalogCheck = {
   name: 'catalog',
   description:
     'Every workspace dependency uses `catalog:` (or `workspace:*`); --fix rewrites them and adds missing catalog entries',
   run: runCatalog,
-};
+} satisfies RepoCheck;

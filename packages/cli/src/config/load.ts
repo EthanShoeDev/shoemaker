@@ -13,7 +13,7 @@ export class ConfigError extends Schema.TaggedError<
 >()('ConfigError', { message: Schema.String }) {}
 
 const DEFINE_IMPORT =
-  /import\s*\{\s*defineConfig\s*\}\s*from\s*['"]@shoe-box-tools\/cli\/config['"];?/u;
+  /import\s*\{\s*defineConfig\s*\}\s*from\s*['"]shoe-box\/config['"];?/u;
 
 const describe = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -35,7 +35,7 @@ const importDefault = Effect.fnUntraced(function* (
   }).pipe(Effect.map((module) => module.default));
 });
 
-// Before `bun install` the repo cannot resolve `@shoe-box-tools/cli/config`.
+// Before `bun install` the repo cannot resolve `shoe-box/config`.
 // `defineConfig` is the identity, so load a copy with the import inlined.
 const importStandalone = Effect.fnUntraced(function* (source: string) {
   const fs = yield* FileSystem.FileSystem;
@@ -67,7 +67,7 @@ export const loadConfig = Effect.fnUntraced(function* (root: string) {
   const exists = yield* fs.exists(file);
   if (!exists) {
     return yield* ConfigError.make({
-      message: `No ${CONFIG_PATH} in ${path.resolve(root)}. Run \`shoebox init\` or \`shoebox adopt\` first.`,
+      message: `No ${CONFIG_PATH} in ${path.resolve(root)}. Run \`shoe-box init\` or \`shoe-box adopt\` first.`,
     });
   }
   const source = yield* fs.readFileString(file);

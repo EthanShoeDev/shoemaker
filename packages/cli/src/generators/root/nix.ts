@@ -122,21 +122,7 @@ ${nixRegion('shell-hook', '          export TZ=UTC', '          ')}
   return [managed('flake.nix', content)];
 };
 
-const NIX_FMT = `#!/usr/bin/env bash
-# Formats nix files with the flake formatter (alejandra). Skips quietly when nix
-# is not installed so contributors without nix can still run \`lint:check\`.
-set -euo pipefail
-if ! command -v nix >/dev/null 2>&1; then
-  echo "nix not installed; skipping nix fmt"
-  exit 0
-fi
-exec nix fmt "$@"
-`;
-
 export const nixFiles: Generator = () => ({
-  files: [
-    owned('.envrc', 'use flake\n'),
-    { ...owned('scripts/lint/nix-fmt.sh', NIX_FMT), executable: true },
-  ],
+  files: [owned('.envrc', 'use flake\n')],
   gitignore: ['.direnv', 'result', 'result-*'],
 });

@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  dts: true,
+  dts: { sourcemap: true },
   entry: [
     'src/*.ts',
     // The vendored anti-slop plugin: only its two entry points are bundled,

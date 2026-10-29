@@ -1,5 +1,5 @@
 {
-  "extends": "@shoe-box-tools/typescript-config/tsconfig.base.json",
+  "extends": "shoe-box-typescript-config/tsconfig.base.json",
   "compilerOptions": {
     // Plugins run inside oxlint's Node host, never under Bun.
     "types": ["node"]

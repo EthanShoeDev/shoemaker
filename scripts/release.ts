@@ -1,67 +1,56 @@
-import { join } from 'node:path';
-
-// Publishes every public @shoe-box-tools package whose current version is not
-// on npm yet, then tags the release. Used by .github/workflows/release.yml as
-// the changesets `publish` step.
+// Publishes every publishable package whose version is not on npm yet, then
+// tags the release. Used by .github/workflows/release.yml as the changesets
+// `publish` step (`changeset publish` shells out to npm, which cannot resolve
+// bun's catalog: and workspace: specs).
 //
-// `changeset publish` shells out to npm, which cannot resolve bun's catalog:
-// and workspace: specs, so each package goes through `bun publish` instead
-// (it resolves them and runs prepack/postpack, which swap in publishConfig).
+// Turbo runs each package's `release:publish` (scripts/publish-package.ts)
+// after its build and its dependencies' publishes, so no order is kept here.
 //
 //   bun scripts/release.ts [--dry-run]
-import { $ } from 'bun';
-import { Array as Arr, Predicate, String as Str } from 'effect';
+import { Array as Arr, Config, Console, Effect } from 'effect';
+import { Command, Flag } from 'effect/cli';
 
-import { readJsonObject } from './lib/json.ts';
+import { isOnNpm, publishablePackages, repoRoot } from './lib/packages.ts';
+import { runInherit, runScript } from './lib/run.ts';
 
-const dryRun = process.argv.includes('--dry-run');
-// The workflow passes secrets.NPM_TOKEN as BUN_AUTH_TOKEN; until that secret
-// exists, skip instead of failing every push to main.
-const missingToken =
-  !dryRun &&
-  process.env.CI === 'true' &&
-  (process.env.BUN_AUTH_TOKEN ?? '') === '';
-if (missingToken) {
-  console.log('NPM_TOKEN secret is not configured; skipping publish.');
-}
-const root = join(import.meta.dirname, '..');
-// Dependency order: a package is published after the packages it depends on.
-const order = missingToken
-  ? []
-  : [
-      'typescript-config',
-      'oxlint-plugins',
-      'oxlint-config',
-      'oxfmt-config',
-      'knip-config',
-      'cli',
-    ];
+const release = Command.make(
+  'release',
+  {
+    dryRun: Flag.Boolean('dry-run').pipe(
+      Flag.withDescription('Pack and list each tarball; publish nothing'),
+      Flag.withDefault(false),
+    ),
+  },
+  Effect.fnUntraced(function* ({ dryRun }) {
+    // The workflow passes secrets.NPM_TOKEN as BUN_AUTH_TOKEN; until that
+    // secret exists, skip instead of failing every push to main.
+    const ci = yield* Config.Boolean('CI').pipe(Config.withDefault(false));
+    const token = yield* Config.String('BUN_AUTH_TOKEN').pipe(
+      Config.withDefault(''),
+    );
+    if (!dryRun && ci && token === '') {
+      return yield* Console.log(
+        'NPM_TOKEN secret is not configured; skipping publish.',
+      );
+    }
+    const packages = yield* publishablePackages;
+    const pending = yield* Effect.filter(packages, (pkg) =>
+      Effect.map(isOnNpm(pkg), (published) => !published),
+    );
+    if (pending.length === 0) return yield* Console.log('Nothing to publish.');
 
-const published: Array<string> = [];
-for (const dir of order) {
-  const cwd = join(root, 'packages', dir);
-  const manifest = await readJsonObject(join(cwd, 'package.json'));
-  const name = String(manifest.name);
-  const version = String(manifest.version);
-  if (manifest.private === true) continue;
-  const onNpm = await $`npm view ${name}@${version} version`.quiet().nothrow();
-  if (onNpm.exitCode === 0 && Str.trim(onNpm.stdout.toString()) === version) {
-    console.log(`skip ${name}@${version} (already on npm)`);
-    continue;
-  }
-  const scripts = Predicate.isObject(manifest.scripts) ? manifest.scripts : {};
-  if (scripts.build !== undefined) await $`bun run build`.cwd(cwd);
-  // `bun publish --dry-run` still demands npm auth; packing runs the same
-  // prepack/postpack swap and shows the exact tarball contents.
-  await (dryRun
-    ? $`bun pm pack --dry-run`.cwd(cwd)
-    : $`bun publish --access public`.cwd(cwd));
-  published.push(`${name}@${version}`);
-}
+    const root = yield* repoRoot;
+    yield* runInherit('bunx', ['turbo', 'run', 'release:publish'], {
+      cwd: root,
+      env: dryRun ? { SHOE_BOX_RELEASE_DRY_RUN: 'true' } : {},
+    });
+    if (!dryRun) yield* runInherit('bunx', ['changeset', 'tag'], { cwd: root });
+    const names = Arr.join(
+      Arr.map(pending, (pkg) => `${pkg.name}@${pkg.version}`),
+      ', ',
+    );
+    yield* Console.log(`${dryRun ? 'Would publish' : 'Published'}: ${names}`);
+  }),
+).pipe(Command.withDescription('Publish packages that are not on npm yet'));
 
-if (published.length > 0 && !dryRun) await $`bunx changeset tag`.cwd(root);
-console.log(
-  published.length === 0
-    ? 'Nothing to publish.'
-    : `${dryRun ? 'Would publish' : 'Published'}: ${Arr.join(published, ', ')}`,
-);
+runScript(Command.run(release, { version: '0.0.0' }));

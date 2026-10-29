@@ -1,5 +1,5 @@
 {
-  "name": "@shoe-box-tools/typescript-config",
+  "name": "shoe-box-typescript-config",
   "version": "0.1.0",
   "description": "Shared strict tsconfig base for Effect + bun monorepos",
   "license": "MIT",
@@ -15,6 +15,9 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "release:publish": "bun ../../scripts/publish-package.ts"
   },
   "dependencies": {
     "@effect/language-service": "catalog:"

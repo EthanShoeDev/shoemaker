@@ -65,7 +65,7 @@ describe('oxlintrc-to-ts', () => {
         const config = file('oxlint.config.ts') ?? '';
         assert.include(
           config,
-          "import { defineShoeboxConfig } from '@shoe-box-tools/oxlint-config';",
+          "import { defineShoeboxConfig } from 'shoe-box-oxlint-config';",
         );
         assert.include(config, "scope: 'demo',");
         assert.include(config, 'react: true,');
@@ -118,12 +118,9 @@ describe('oxlintrc-to-ts', () => {
           root.scripts['oxlint:check'],
           'oxlint -c oxlint.config.ts .',
         );
+        assert.strictEqual(root.catalog['shoe-box-oxlint-config'], '^0.1.0');
         assert.strictEqual(
-          root.catalog['@shoe-box-tools/oxlint-config'],
-          '^0.1.0',
-        );
-        assert.strictEqual(
-          root.devDependencies['@shoe-box-tools/oxlint-config'],
+          root.devDependencies['shoe-box-oxlint-config'],
           'catalog:',
         );
         assert.strictEqual(
@@ -214,7 +211,7 @@ describe('oxlint-flags-to-options', () => {
       "options: {\n    typeCheck: true,\n    reportUnusedDisableDirectives: 'error',\n    typeAware: true,",
     );
     const sharedConfig =
-      "import { defineShoeboxConfig } from '@shoe-box-tools/oxlint-config';\n";
+      "import { defineShoeboxConfig } from 'shoe-box-oxlint-config';\n";
     assert.strictEqual(addOptions(sharedConfig), sharedConfig);
   });
 

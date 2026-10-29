@@ -59,7 +59,7 @@ export const runSync = Effect.fnUntraced(function* (options: SyncOptions) {
   }
   if (options.check === true && Arr.some(plan.files, isWrite)) {
     return yield* fail(
-      'repo has drifted from shoebox.config.ts; run `shoebox sync`',
+      'repo has drifted from shoebox.config.ts; run `shoe-box sync`',
     );
   }
   return plan;

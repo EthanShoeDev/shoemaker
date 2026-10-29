@@ -1,5 +1,5 @@
-import { defineShoeboxFormat } from '@shoe-box-tools/oxfmt-config';
 import { defineConfig } from 'oxfmt';
+import { defineShoeboxFormat } from 'shoe-box-oxfmt-config';
 
 export default defineConfig(
   defineShoeboxFormat({

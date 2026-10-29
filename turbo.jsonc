@@ -1,5 +1,5 @@
 {
-  "$schema": "https://turborepo.dev/schema.json",
+  "$schema": "./node_modules/turbo/schema.json",
   "ui": "tui",
   // TMPDIR: tests that write fixtures to os.tmpdir() must see the same temp
   // dir as outside turbo (nix shells and sandboxes set it).
@@ -16,47 +16,57 @@
     // Tests and typecheck read workspace sources, not build output, so they
     // depend on this no-op instead of `^build`.
     "transit": {
-      "dependsOn": ["^transit"],
+      "dependsOn": ["^transit"]
     },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     "typecheck": {
       "dependsOn": ["^transit"],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     "test": {
       "dependsOn": ["^transit"],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     "clean": {
+      "cache": false
+    },
+    // Publishes a package after its dependencies (scripts/publish-package.ts).
+    "release:publish": {
+      "dependsOn": ["build", "^release:publish"],
       "cache": false,
+      "passThroughEnv": [
+        "BUN_AUTH_TOKEN",
+        "NPM_CONFIG_TOKEN",
+        "SHOE_BOX_RELEASE_DRY_RUN"
+      ]
     },
     "oxlint:check": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "!**/*.md",
-        "$TURBO_ROOT$/oxlint.config.ts",
+        "$TURBO_ROOT$/oxlint.config.ts"
       ],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     "oxlint:fix": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "!**/*.md",
-        "$TURBO_ROOT$/oxlint.config.ts",
+        "$TURBO_ROOT$/oxlint.config.ts"
       ],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     "lint:check": {
       "with": ["oxlint:check", "typecheck", "//#lint:check:root"],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     "lint": {
       "with": ["oxlint:fix", "typecheck", "//#lint:root"],
-      "outputLogs": "new-only",
+      "outputLogs": "new-only"
     },
     // === Root-only tasks (bodies live in root package.json scripts) ===
     "//#lint:check:root": {
@@ -68,8 +78,8 @@
         "//#knip:check",
         "//#catalog:check",
         "//#effect-versions:check",
-        "//#nix:fmt:check",
-      ],
+        "//#nix:fmt:check"
+      ]
     },
     "//#lint:root": {
       "with": [
@@ -79,43 +89,43 @@
         "//#jscpd:check",
         "//#knip:fix:danger",
         "//#catalog:fix",
-        "//#nix:fmt:fix",
-      ],
+        "//#nix:fmt:fix"
+      ]
     },
     "//#typecheck": {
-      "inputs": ["*.ts", "scripts/**", "tsconfig.json"],
+      "inputs": ["*.ts", "scripts/**", "tsconfig.json"]
     },
     "//#oxlint:check": {
-      "inputs": ["*.ts", "scripts/**"],
+      "inputs": ["*.ts", "scripts/**"]
     },
     "//#oxlint:fix": {
-      "inputs": ["*.ts", "scripts/**"],
+      "inputs": ["*.ts", "scripts/**"]
     },
     "//#oxfmt:check": {},
     "//#oxfmt:fix": {
-      "cache": false,
+      "cache": false
     },
     "//#jscpd:check": {},
     // knip:fix:danger deletes what knip believes is dead; a missing entry in
     // knip.ts makes it delete live code, so review its diff like a codemod.
     "//#knip:check": {},
     "//#knip:fix:danger": {
-      "cache": false,
+      "cache": false
     },
     "//#catalog:check": {
-      "inputs": ["package.json", "packages/*/package.json"],
+      "inputs": ["package.json", "packages/*/package.json"]
     },
     "//#catalog:fix": {
-      "cache": false,
+      "cache": false
     },
     "//#effect-versions:check": {
-      "inputs": ["bun.lock"],
+      "inputs": ["bun.lock"]
     },
     "//#nix:fmt:check": {
-      "inputs": ["flake.nix", "flake.lock"],
+      "inputs": ["flake.nix", "flake.lock"]
     },
     "//#nix:fmt:fix": {
-      "cache": false,
-    },
-  },
+      "cache": false
+    }
+  }
 }

@@ -47,7 +47,7 @@ const scriptGenerate =
     aggregate: emptyAggregate,
   });
 
-const handWritten = `import { defineConfig } from '@shoe-box-tools/cli/config';
+const handWritten = `import { defineConfig } from 'shoe-box/config';
 
 // Why we picked turbo: see ADR-7
 const DESC = 'from a const';

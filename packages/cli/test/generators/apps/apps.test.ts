@@ -235,7 +235,7 @@ describe('kind specifics', () => {
     assert.strictEqual(tsconfig.extends, 'expo/tsconfig.base');
     assert.notProperty(
       record(manifest.devDependencies),
-      '@shoe-box-tools/typescript-config',
+      'shoe-box-typescript-config',
     );
     // ESM config in a CommonJS package: `.mts`, and typechecked.
     assert.include(

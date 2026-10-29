@@ -203,9 +203,9 @@ const runPatches = Effect.fnUntraced(function* (repo: Repo) {
   };
 });
 
-export const patchesCheck: RepoCheck = {
+export const patchesCheck = {
   name: 'patches',
   description:
     'Every bun patch (patchedDependencies) still matches the installed name@version and is applied',
   run: runPatches,
-};
+} satisfies RepoCheck;

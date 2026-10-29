@@ -120,9 +120,9 @@ const runEffectVersions = Effect.fnUntraced(function* (repo: Repo) {
       };
 });
 
-export const effectVersionsCheck: RepoCheck = {
+export const effectVersionsCheck = {
   name: 'effect-versions',
   description:
     'Every effect / @effect/* package in bun.lock resolves to the same version as effect',
   run: runEffectVersions,
-};
+} satisfies RepoCheck;

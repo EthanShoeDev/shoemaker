@@ -25,8 +25,8 @@ import type { DoctorCheck, Finding } from './types.ts';
 
 const OXLINT_TS = 'oxlint.config.ts';
 const OXFMT_TS = 'oxfmt.config.ts';
-const SHARED_OXLINT = '@shoe-box-tools/oxlint-config';
-const SHARED_OXFMT = '@shoe-box-tools/oxfmt-config';
+const SHARED_OXLINT = 'shoe-box-oxlint-config';
+const SHARED_OXFMT = 'shoe-box-oxfmt-config';
 const CATEGORIES = [
   'correctness',
   'perf',

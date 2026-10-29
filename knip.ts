@@ -1,4 +1,4 @@
-import { defineKnipConfig } from '@shoe-box-tools/knip-config';
+import { defineKnipConfig } from 'shoe-box-knip-config';
 
 export default defineKnipConfig({
   ignore: [

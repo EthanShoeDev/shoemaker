@@ -1,9 +1,9 @@
-import { defineShoeboxConfig } from '@shoe-box-tools/oxlint-config';
 import { defineConfig } from 'oxlint';
+import { defineShoeboxConfig } from 'shoe-box-oxlint-config';
 
 export default defineConfig(
   defineShoeboxConfig({
-    scope: 'shoe-box-tools',
+    scope: 'shoe-box',
     ignorePatterns: [
       // Reference clones of the repos shoebox standardizes; read-only.
       '.external/**',

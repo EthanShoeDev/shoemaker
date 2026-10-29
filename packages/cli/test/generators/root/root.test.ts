@@ -35,7 +35,6 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
       ['vitest.config.ts', 'owned'],
       ['flake.nix', 'managed'],
       ['.envrc', 'owned'],
-      ['scripts/lint/nix-fmt.sh', 'owned'],
       ['.gitignore', 'managed'],
       ['README.md', 'seed'],
       ['AGENTS.md', 'managed'],
@@ -47,7 +46,6 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     for (const [path, strategy] of expected) {
       assert.strictEqual(file(path).strategy, strategy, path);
     }
-    assert.isTrue(file('scripts/lint/nix-fmt.sh').executable);
   });
 
   it('emits optional files only when their feature is chosen', () => {

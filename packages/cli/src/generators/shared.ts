@@ -74,7 +74,7 @@ export interface WorkspacePackage {
   // Expo apps are not ESM packages.
   readonly module?: boolean;
   // False when the package's tsconfig extends something other than
-  // @shoe-box-tools/typescript-config (Expo extends expo/tsconfig.base).
+  // shoe-box-typescript-config (Expo extends expo/tsconfig.base).
   readonly sharedTsconfig?: boolean;
   readonly extra?: Readonly<Record<string, unknown>>;
 }
@@ -107,9 +107,7 @@ export const workspacePackageJson = (
       ...catalogDeps(pkg.dependencies ?? []),
     },
     devDependencies: catalogDeps([
-      ...(pkg.sharedTsconfig === false
-        ? []
-        : ['@shoe-box-tools/typescript-config']),
+      ...(pkg.sharedTsconfig === false ? [] : ['shoe-box-typescript-config']),
       ...(pkg.devDependencies ?? []),
     ]),
     ...pkg.extra,
@@ -128,7 +126,7 @@ export const packageTsconfig = (
   owned(
     `${dir}/tsconfig.json`,
     json({
-      extends: `@shoe-box-tools/typescript-config/${
+      extends: `shoe-box-typescript-config/${
         options.react === true ? 'tsconfig.react.json' : 'tsconfig.base.json'
       }`,
       ...(options.compilerOptions === undefined

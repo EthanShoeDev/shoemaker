@@ -1,48 +1,68 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, expect, it } from 'vitest';
+import * as BunChildProcessSpawner from '@effect/platform-bun/BunChildProcessSpawner';
+import * as BunFileSystem from '@effect/platform-bun/BunFileSystem';
+import * as BunPath from '@effect/platform-bun/BunPath';
+import { expect, layer } from '@effect/vitest';
+import { Effect, FileSystem, Layer, Path, Stream } from 'effect';
+import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
 const entry = fileURLToPath(new URL('../src/index.ts', import.meta.url));
-const oxfmtBin = path.join(
-  path.dirname(fileURLToPath(import.meta.resolve('oxfmt/package.json'))),
-  'bin',
-  'oxfmt',
+const config =
+  `import { defineShoeboxFormat } from ${JSON.stringify(entry)};\n` +
+  'export default defineShoeboxFormat();\n';
+const oxfmtBin = fileURLToPath(
+  new URL('bin/oxfmt', import.meta.resolve('oxfmt/package.json')),
 );
-const dir = mkdtempSync(path.join(tmpdir(), 'shoebox-oxfmt-config-'));
 
-afterAll(() => {
-  rmSync(dir, { recursive: true, force: true });
-});
+// The Bun layers re-export @effect/platform-node-shared, so they run under
+// vitest's node host too.
+const services = BunChildProcessSpawner.layer.pipe(
+  Layer.provideMerge(Layer.mergeAll(BunFileSystem.layer, BunPath.layer)),
+);
 
-// oxlint's sort-imports is off on the promise that the formatter sorts; this
-// runs the real oxfmt to prove the shared options keep that promise.
-it('formats with the shared options and sorts imports', () => {
-  writeFileSync(
-    path.join(dir, 'oxfmt.config.ts'),
-    `import { defineShoeboxFormat } from ${JSON.stringify(entry)};\n` +
-      'export default defineShoeboxFormat();\n',
-  );
-  writeFileSync(
-    path.join(dir, 'probe.ts'),
-    'import { z } from "zeta";\nimport { a } from "alpha";\nexport const v = [a, z]\n',
-  );
-  writeFileSync(path.join(dir, 'notes.md'), '* untouched\n');
+layer(services)((it) => {
+  // oxlint's sort-imports is off on the promise that the formatter sorts; this
+  // runs the real oxfmt to prove the shared options keep that promise.
+  it.effect('formats with the shared options and sorts imports', () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const dir = yield* fs.makeTempDirectoryScoped({
+        prefix: 'shoebox-oxfmt-config-',
+      });
 
-  const result = spawnSync(
-    process.execPath,
-    [oxfmtBin, '-c', 'oxfmt.config.ts', '--write', '.'],
-    { cwd: dir, encoding: 'utf-8' },
-  );
+      yield* fs.writeFileString(path.join(dir, 'oxfmt.config.ts'), config);
+      yield* fs.writeFileString(
+        path.join(dir, 'probe.ts'),
+        'import { z } from "zeta";\nimport { a } from "alpha";\nexport const v = [a, z]\n',
+      );
+      yield* fs.writeFileString(path.join(dir, 'notes.md'), '* untouched\n');
 
-  expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
-  expect(readFileSync(path.join(dir, 'probe.ts'), 'utf-8')).toBe(
-    "import { a } from 'alpha';\nimport { z } from 'zeta';\nexport const v = [a, z];\n",
-  );
-  expect(readFileSync(path.join(dir, 'notes.md'), 'utf-8')).toBe(
-    '* untouched\n',
+      const handle = yield* spawner.spawn(
+        ChildProcess.make(
+          process.execPath,
+          [oxfmtBin, '-c', 'oxfmt.config.ts', '--write', '.'],
+          { cwd: dir },
+        ),
+      );
+      const [stdout, stderr, status] = yield* Effect.all(
+        [
+          handle.stdout.pipe(Stream.decodeText, Stream.mkString),
+          handle.stderr.pipe(Stream.decodeText, Stream.mkString),
+          handle.exitCode,
+        ],
+        { concurrency: 3 },
+      );
+
+      expect(Number(status), `${stdout}${stderr}`).toBe(0);
+      expect(yield* fs.readFileString(path.join(dir, 'probe.ts'))).toBe(
+        "import { a } from 'alpha';\nimport { z } from 'zeta';\nexport const v = [a, z];\n",
+      );
+      expect(yield* fs.readFileString(path.join(dir, 'notes.md'))).toBe(
+        '* untouched\n',
+      );
+    }),
   );
 });

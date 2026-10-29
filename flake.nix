@@ -1,5 +1,5 @@
 {
-  description = "shoe-box-tools: shared tooling and the shoebox repo scaffolder";
+  description = "shoe-box: shared tooling and the shoe-box repo scaffolder";
 
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 

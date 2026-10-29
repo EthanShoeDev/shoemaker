@@ -2,12 +2,23 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
   "changelog": [
     "@changesets/changelog-github",
-    { "repo": "EthanShoeDev/shoe-box-tools" }
+    {
+      "repo": "EthanShoeDev/shoe-box"
+    }
   ],
   "commit": false,
-  "fixed": [["@shoe-box-tools/*"]],
+  "fixed": [
+    [
+      "shoe-box",
+      "shoe-box-oxlint-config",
+      "shoe-box-oxlint-plugins",
+      "shoe-box-oxfmt-config",
+      "shoe-box-typescript-config",
+      "shoe-box-knip-config"
+    ]
+  ],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@shoe-box-tools/spanoptic", "@shoe-box-tools/utils"]
+  "ignore": ["shoe-box-utils"]
 }
