@@ -38,7 +38,8 @@ const release = Command.make(
       cwd: root,
       env: dryRun ? { SHOEMAKER_RELEASE_DRY_RUN: 'true' } : {},
     });
-    if (!dryRun) yield* runInherit('bunx', ['changeset', 'tag'], { cwd: root });
+    if (!dryRun)
+      yield* runInherit('bunx', ['changeset', 'git-tag'], { cwd: root });
     const names = Arr.join(
       Arr.map(pending, (pkg) => `${pkg.name}@${pkg.version}`),
       ', ',
