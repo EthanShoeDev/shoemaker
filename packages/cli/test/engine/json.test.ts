@@ -5,6 +5,8 @@ import {
   canonicalJson,
   mergeJson,
   ownedPointers,
+  keepRaisedVersions,
+  maskVersions,
   ownedProjection,
   parseJsonObject,
   shapeOf,
@@ -57,6 +59,41 @@ describe('json-merge', () => {
       files: ['a'],
       type: null,
     });
+  });
+
+  it('keeps dependency versions a repo has raised', () => {
+    const owned = {
+      version: '0.0.0',
+      dependencies: { a: '^1.2.0', b: '^1.2.0', c: 'catalog:', d: '1.0.0' },
+      workspaces: { catalog: { e: '2.0.0-beta.84' } },
+    };
+    const existing = {
+      version: '9.9.9',
+      dependencies: { a: '^1.3.0', b: '^1.1.0', c: '^5.0.0', d: '~1.0.1' },
+      workspaces: { catalog: { e: '2.0.0-beta.100' } },
+    };
+    assert.deepStrictEqual(keepRaisedVersions(owned, existing), {
+      // Outside a dependency map a version is an ordinary value.
+      version: '0.0.0',
+      // Raised specs stay; lower ones and non-version specs take shoemaker's.
+      dependencies: { a: '^1.3.0', b: '^1.2.0', c: 'catalog:', d: '~1.0.1' },
+      workspaces: { catalog: { e: '2.0.0-beta.100' } },
+    });
+  });
+
+  it('masks only version specs inside dependency maps', () => {
+    assert.deepStrictEqual(
+      maskVersions({
+        version: '1.0.0',
+        devDependencies: { a: '^1.0.0', b: 'catalog:' },
+        catalogs: { react: { react: '19.3.0' } },
+      }),
+      {
+        version: '1.0.0',
+        devDependencies: { a: '<version>', b: 'catalog:' },
+        catalogs: { react: { react: '<version>' } },
+      },
+    );
   });
 
   it('canonical JSON ignores key order', () => {

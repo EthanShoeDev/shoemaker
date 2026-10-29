@@ -41,7 +41,7 @@ export const publishablePackages = Effect.gen(function* () {
 });
 
 // The registry answers 404 for a name or version it has never seen.
-const onNpm = Effect.fnUntraced(function* (path: string) {
+export const onNpm = Effect.fnUntraced(function* (path: string) {
   const response = yield* HttpClient.get(`https://registry.npmjs.org/${path}`);
   return response.status === 200;
 });

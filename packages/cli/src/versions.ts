@@ -5,7 +5,8 @@ import { cliVersion } from './engine/meta.ts';
 // Every dependency version a generated repo can receive. Generators ask for a
 // name through `GenContext.version`, which throws on a name missing here, so
 // nothing is ever emitted as `latest`. Families move together: bump a family
-// as one edit.
+// as one edit. `bun run update:generated-versions` moves every pin here to
+// npm's latest.
 
 const effect = '4.1.0';
 const oxlint = '1.90.0';

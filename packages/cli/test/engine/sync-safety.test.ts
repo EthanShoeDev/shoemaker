@@ -54,6 +54,80 @@ const sync = (
 const read = (disk: Readonly<Record<string, string>>, path: string) =>
   disk[path] ?? '';
 
+describe('dependency versions are a floor', () => {
+  const generated = (script: string, version: string) =>
+    file(
+      'package.json',
+      json({
+        scripts: { test: script },
+        workspaces: { catalog: { 'shoemaker-oxlint-config': version } },
+      }),
+      'json-merge',
+    );
+
+  it.effect('a raised version survives a sync that changes the file', () =>
+    Effect.gen(function* () {
+      const first = yield* sync({}, [generated('vitest', '^0.1.0')], undefined);
+      const raised = {
+        'package.json': Str.replace(
+          '^0.1.0',
+          '^0.2.1',
+        )(read(first.disk, 'package.json')),
+      };
+      const unchanged = yield* sync(
+        raised,
+        [generated('vitest', '^0.1.0')],
+        first.lock,
+      );
+      assert.strictEqual(
+        planned(unchanged.plan, 'package.json').action,
+        'unchanged',
+      );
+      const next = yield* sync(
+        raised,
+        [generated('vitest run', '^0.1.0')],
+        first.lock,
+      );
+      const { action, after } = planned(next.plan, 'package.json');
+      assert.strictEqual(action, 'update');
+      assert.include(after, '"test": "vitest run"');
+      assert.include(after, '"shoemaker-oxlint-config": "^0.2.1"');
+    }),
+  );
+
+  it.effect('a newer generated version replaces an older one', () =>
+    Effect.gen(function* () {
+      const first = yield* sync({}, [generated('vitest', '^0.2.1')], undefined);
+      const next = yield* sync(
+        first.disk,
+        [generated('vitest', '^0.3.0')],
+        first.lock,
+      );
+      const { action, after } = planned(next.plan, 'package.json');
+      assert.strictEqual(action, 'update');
+      assert.include(after, '"shoemaker-oxlint-config": "^0.3.0"');
+    }),
+  );
+
+  it.effect('turning a version into another kind of spec is a hand edit', () =>
+    Effect.gen(function* () {
+      const first = yield* sync({}, [generated('vitest', '^0.1.0')], undefined);
+      const edited = {
+        'package.json': Str.replace(
+          '^0.1.0',
+          'file:../oxlint-config',
+        )(read(first.disk, 'package.json')),
+      };
+      const next = yield* sync(
+        edited,
+        [generated('vitest run', '^0.1.0')],
+        first.lock,
+      );
+      assert.strictEqual(planned(next.plan, 'package.json').action, 'conflict');
+    }),
+  );
+});
+
 describe('owned key / region set changes between versions', () => {
   it.effect('json-merge: a newly owned key is an update, not a conflict', () =>
     Effect.gen(function* () {

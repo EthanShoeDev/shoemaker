@@ -1,0 +1,70 @@
+name: Update generated versions
+
+# Weekly: move packages/cli/src/versions.ts to npm's latest, prove it with lint
+# and the tests (e2e generates and builds every preset), and open a PR with a
+# patch changeset. A PR opened with GITHUB_TOKEN does not trigger CI, so the
+# checks run here and their result goes in the PR; a failing run opens a
+# draft.
+on:
+  schedule:
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: update-versions
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - id: update
+        run: |
+          bun run update:generated-versions --changeset | tee changes.txt
+          if git diff --quiet -- packages/cli/src/versions.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - id: verify
+        if: steps.update.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          bunx turbo run lint:check '//#lint:check:root' --continue=dependencies-successful
+          bun run test
+      - if: steps.update.outputs.changed == 'true'
+        id: body
+        run: |
+          {
+            echo 'text<<EOF'
+            if [ "${{ steps.verify.outcome }}" = success ]; then
+              echo 'Lint and tests (e2e included) pass on these versions.'
+            else
+              echo "Lint or tests fail on these versions: see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+            fi
+            echo
+            echo '```'
+            cat changes.txt
+            echo '```'
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          rm changes.txt
+      - if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: update-generated-versions
+          commit-message: Update generated dependency versions
+          title: Update generated dependency versions
+          body: ${{ steps.body.outputs.text }}
+          draft: ${{ steps.verify.outcome != 'success' }}
+          add-paths: |
+            packages/cli/src/versions.ts
+            .changeset/update-versions.md

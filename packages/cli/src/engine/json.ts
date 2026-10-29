@@ -134,6 +134,61 @@ export const ownedProjection = (
     }),
   );
 
+// Dependency versions are a floor, not a pin: a repo may run ahead of what
+// shoemaker writes. These keys hold `name: spec` maps (`catalogs` holds maps
+// of them), and only plain `1.2.3`, `^1.2.3` and `~1.2.3` specs count.
+const VERSION_MAPS = new Set([
+  'catalog',
+  'catalogs',
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+  'overrides',
+  'peerDependencies',
+  'resolutions',
+]);
+
+const VERSION_SPEC = /^[~^]?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/u;
+
+const floorOf = (value: unknown) =>
+  Predicate.isString(value) ? VERSION_SPEC.exec(value)?.[1] : undefined;
+
+// `owned` with each spec the existing file already raises kept as the file
+// has it, so a sync never moves a dependency back.
+export const keepRaisedVersions = (
+  owned: Record<string, unknown>,
+  existing: Record<string, unknown>,
+  inMap = false,
+): Record<string, unknown> =>
+  Rec.map(owned, (value, key) => {
+    const current = existing[key];
+    const nested = inMap || VERSION_MAPS.has(key);
+    if (isPlainObject(value)) {
+      return isPlainObject(current)
+        ? keepRaisedVersions(value, current, nested)
+        : value;
+    }
+    const mine = floorOf(value);
+    const theirs = floorOf(current);
+    return inMap &&
+      mine !== undefined &&
+      theirs !== undefined &&
+      Bun.semver.order(theirs, mine) > 0
+      ? current
+      : value;
+  });
+
+// `value` with every version spec in a dependency map blanked, so a hash of
+// it ignores version bumps but still sees a spec turned into `catalog:`.
+export const maskVersions = (value: unknown, inMap = false): unknown =>
+  isPlainObject(value)
+    ? Rec.map(value, (child, key) =>
+        maskVersions(child, inMap || VERSION_MAPS.has(key)),
+      )
+    : inMap && floorOf(value) !== undefined
+      ? '<version>'
+      : value;
+
 // Stable serialization (sorted keys) for hashing.
 export const canonicalJson = (value: unknown): string => {
   if (Arr.isArray(value)) {

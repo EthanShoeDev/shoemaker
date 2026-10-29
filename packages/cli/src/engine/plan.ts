@@ -11,6 +11,8 @@ import { matchesAny } from './glob.ts';
 import { sha256 } from './hash.ts';
 import {
   canonicalJson,
+  keepRaisedVersions,
+  maskVersions,
   mergeJson,
   ownedPointers,
   ownedProjection,
@@ -112,12 +114,14 @@ export type Scope =
 
 // What the lock records per strategy, so hand edits can be told apart from
 // shoemaker's own writes: the whole file for owned/seed, only the region bodies
-// for managed, only the owned keys for json-merge.
+// for managed, only the owned keys for json-merge, minus their dependency
+// versions (a repo may raise those; see keepRaisedVersions).
 export const fingerprint = (
   strategy: FileStrategy,
   path: string,
   content: string,
   scope: Scope,
+  versions: 'masked' | 'exact' = 'masked',
 ) => {
   const text = toLf(content);
   switch (strategy) {
@@ -142,10 +146,12 @@ export const fingerprint = (
         'owned' in scope
           ? shapeOf(scope.owned)
           : (parseJsonObject(scope.generated) ?? {});
+      if (existing === undefined) return sha256(text);
+      const projection = ownedProjection(existing, shape);
       return sha256(
-        existing === undefined
-          ? text
-          : canonicalJson(ownedProjection(existing, shape)),
+        canonicalJson(
+          versions === 'masked' ? maskVersions(projection) : projection,
+        ),
       );
     }
   }
@@ -242,7 +248,9 @@ const desired = Effect.fnUntraced(function* (
         after: withEol(
           yield* formatContent(
             file.path,
-            renderJson(mergeJson(existing, owned)),
+            renderJson(
+              mergeJson(existing, keepRaisedVersions(owned, existing)),
+            ),
           ),
           crlf,
         ),
@@ -252,10 +260,12 @@ const desired = Effect.fnUntraced(function* (
 });
 
 // Why a file that differs from the generated result cannot simply be updated.
+// `current` holds every fingerprint the disk content could match its baseline
+// by.
 const blocker = (
   problem: string | undefined,
   baseline: LockEntry | undefined,
-  current: string,
+  current: ReadonlyArray<string>,
 ) => {
   if (problem !== undefined) {
     return { action: 'conflict', reason: problem } as const;
@@ -266,7 +276,7 @@ const blocker = (
       reason: 'exists but shoemaker has no baseline for it',
     } as const;
   }
-  if (baseline.sha256 !== current) {
+  if (!current.includes(baseline.sha256)) {
     return {
       action: 'conflict',
       reason: 'edited since the last sync',
@@ -309,11 +319,14 @@ const classify = Effect.fnUntraced(function* (
   if (problem === undefined && after === disk) {
     return { ...base, after, action: 'unchanged' } satisfies PlannedFile;
   }
-  const blocked = blocker(
-    problem,
-    baseline,
-    fingerprint(file.strategy, file.path, disk, scopeOf(file, baseline)),
-  );
+  const scope = scopeOf(file, baseline);
+  const blocked = blocker(problem, baseline, [
+    fingerprint(file.strategy, file.path, disk, scope),
+    // Locks written before versions were masked hashed them exactly.
+    ...(file.strategy === 'json-merge'
+      ? [fingerprint(file.strategy, file.path, disk, scope, 'exact')]
+      : []),
+  ]);
   if (blocked === undefined) {
     return { ...base, after, action: 'update' } satisfies PlannedFile;
   }

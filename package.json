@@ -70,6 +70,7 @@
     "update:all:2": "nlx npm-check-updates --interactive --format group -ws --root",
     "update:all:3": "bun update -i",
     "update:nix-flake": "nix flake update",
+    "update:generated-versions": "bun scripts/update-versions.ts",
     "release": "bun scripts/release.ts",
     "release:dry-run": "bun scripts/release.ts --dry-run"
   },

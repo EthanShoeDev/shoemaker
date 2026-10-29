@@ -29,6 +29,8 @@ instead of a codemod.
   `-- reason`.
 - Generated output must be deterministic. Versions come from
   `packages/cli/src/versions.ts` only; never emit `latest`.
+  `bun run update:generated-versions` moves them to npm's latest (a weekly
+  workflow opens that PR).
 - Changesets are `patch` unless Ethan asks for `minor` or `major`.
 - Don't `git stash`, reset or commit without being asked.
 - Never run `infra:plan`/`deploy`/`destroy` in a generated sample: alchemy

@@ -39,7 +39,8 @@ bunx shoemaker sync
 
 Sync never clobbers your work. Files you edited by hand are reported as
 conflicts (`--force <glob>` takes the generated version), and it refuses to run
-on a dirty git tree, so git is always your undo.
+on a dirty git tree, so git is always your undo. Dependency versions are a
+floor: one you've raised past shoemaker's stays.
 
 ## Commands
 

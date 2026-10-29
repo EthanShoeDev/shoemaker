@@ -44,8 +44,12 @@ export default defineConfig(
       },
       {
         // Repo scripts drive the CLI's internals (renderJson, the config
-        // schema) before anything is published.
-        files: ['scripts/lib/**', 'scripts/publish-manifest.ts'],
+        // schema, versions.ts) before anything is published.
+        files: [
+          'scripts/lib/**',
+          'scripts/publish-manifest.ts',
+          'scripts/update-versions.ts',
+        ],
         rules: {
           // Reaching into packages/cli/src is the point: it uses unpublished code.
           'import-boundaries/no-cross-package-relative-imports': 'off',
