@@ -121,8 +121,28 @@ const mountProblem = (config: typeof ShoemakerConfigFields.Type) => {
   return undefined;
 };
 
+// Each effect-api app gets a `<api>-contract` package, so no other app or
+// package may take that name.
+const contractProblem = (config: typeof ShoemakerConfigFields.Type) => {
+  const taken = new Set([
+    ...Arr.map(config.apps, (app) => app.name),
+    ...Arr.map(config.packages, (pkg) => pkg.name),
+  ]);
+  const clash = Arr.findFirst(
+    config.apps,
+    (app) => app.kind === 'effect-api' && taken.has(`${app.name}-contract`),
+  );
+  return Option.match(clash, {
+    onNone: () => undefined,
+    onSome: (app) =>
+      `apps.${app.name}: ${app.name}-contract is reserved for its HttpApi contract package`,
+  });
+};
+
 export const ShoemakerConfig = ShoemakerConfigFields.check(
-  Schema.makeFilter((config) => mountProblem(config) ?? true),
+  Schema.makeFilter(
+    (config) => mountProblem(config) ?? contractProblem(config) ?? true,
+  ),
 );
 export type ShoemakerConfig = typeof ShoemakerConfig.Type;
 

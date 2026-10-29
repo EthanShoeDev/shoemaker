@@ -8,7 +8,7 @@ import type {
 } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
 import { pascalCase } from '../apps/common.ts';
-import { isServed } from '../apps/mount.ts';
+import { contractName, isServed } from '../apps/mount.ts';
 import type { EnvVar } from '../secrets/model.ts';
 import { catalogDeps, json, seed, withSecrets } from '../shared.ts';
 import type { TaskDef } from '../task-runner/model.ts';
@@ -233,11 +233,14 @@ const infraScripts = (config: ShoemakerConfig) => {
 };
 
 // The root typecheck and lint read alchemy.run.ts, which imports each
-// Worker's source, so those sources are part of their cache key.
+// Worker's source and, through it, the API's contract, so those sources are
+// part of their cache key.
 const rootInputs = (config: ShoemakerConfig) =>
   Arr.flatMap(workerApps(config), (app) => [
     `apps/${app.name}/package.json`,
     `apps/${app.name}/src/**`,
+    `packages/${contractName(app)}/package.json`,
+    `packages/${contractName(app)}/src/**`,
   ]);
 
 const rootTasks = (config: ShoemakerConfig): ReadonlyArray<TaskDef> => {

@@ -15,7 +15,8 @@ import { owned } from '../shared.ts';
 export type Unit = App | Package;
 
 export const appDir = (app: Unit) => `apps/${app.name}`;
-export const packageDir = (pkg: Unit) => `packages/${pkg.name}`;
+export const packageDir = (pkg: { readonly name: string }) =>
+  `packages/${pkg.name}`;
 
 // Every workspace package typechecks with TS 7 `tsc` and tests with vitest.
 // Under bun's isolated linker a package only sees what it declares, so the

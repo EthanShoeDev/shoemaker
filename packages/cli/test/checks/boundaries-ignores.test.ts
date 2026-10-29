@@ -44,6 +44,39 @@ describe('package-boundaries check', () => {
       );
     }),
   );
+
+  it.effect('lets a site depend on the API it mounts at /api', () =>
+    Effect.gen(function* () {
+      const result = yield* packageBoundariesCheck.run(
+        makeMemoryRepo({
+          ...files({
+            '@demo/api': 'workspace:*',
+            '@tanstack/react-start': 'catalog:',
+          }),
+          'apps/web/src/routes/api.$.ts': '',
+        }),
+      );
+      assert.isTrue(result.ok);
+      assert.include(
+        result.report,
+        'Allowed: apps/web mounts @demo/api (apps/api) at /api.',
+      );
+    }),
+  );
+
+  it.effect('still fails a site without an /api route', () =>
+    Effect.gen(function* () {
+      const result = yield* packageBoundariesCheck.run(
+        makeMemoryRepo(
+          files({
+            '@demo/api': 'workspace:*',
+            '@tanstack/react-start': 'catalog:',
+          }),
+        ),
+      );
+      assert.isFalse(result.ok);
+    }),
+  );
 });
 
 describe('lint-ignores check', () => {

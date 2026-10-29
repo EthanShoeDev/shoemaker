@@ -1,5 +1,12 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, Option, pipe, String as Str } from 'effect';
+import {
+  Array as Arr,
+  Effect,
+  Option,
+  pipe,
+  Record as Rec,
+  String as Str,
+} from 'effect';
 
 import type { App, ShoemakerConfig } from '../../../src/config/schema.ts';
 import type { FileStrategy } from '../../../src/engine/types.ts';
@@ -83,10 +90,14 @@ const cases: ReadonlyArray<{
       ['apps/api/tsconfig.json', 'owned'],
       ['apps/api/vitest.config.ts', 'owned'],
       ['apps/api/tsdown.config.ts', 'owned'],
-      ['apps/api/src/api.ts', 'seed'],
       ['apps/api/src/handlers.ts', 'seed'],
       ['apps/api/src/bin.ts', 'seed'],
       ['apps/api/test/api.test.ts', 'seed'],
+      ['packages/api-contract/package.json', 'json-merge'],
+      ['packages/api-contract/tsconfig.json', 'owned'],
+      ['packages/api-contract/vitest.config.ts', 'owned'],
+      ['packages/api-contract/src/index.ts', 'seed'],
+      ['packages/api-contract/test/index.test.ts', 'seed'],
     ],
   },
   {
@@ -110,9 +121,14 @@ describe.each(cases)('$app.kind app', ({ app, files: expected }) => {
 
   it('emits its files with their sync strategies', () => {
     assertStrategies(byPath, expected);
+    // An effect-api app also owns its contract package.
     assert.isTrue(
-      Arr.every(files, (file) =>
-        Str.startsWith(`apps/${app.name}/`)(file.path),
+      Arr.every(
+        files,
+        (file) =>
+          Str.startsWith(`apps/${app.name}/`)(file.path) ||
+          (app.kind === 'effect-api' &&
+            Str.startsWith(`packages/${app.name}-contract/`)(file.path)),
       ),
     );
   });
@@ -196,6 +212,28 @@ describe('kind specifics', () => {
     assert.include(file('apps/api/src/bin.ts').content, "Config.Port('PORT')");
     const manifest = parseJson(file('apps/api/package.json'));
     assert.isUndefined(record(manifest.dependencies)['@sample/env']);
+  });
+
+  it('effect-api keeps its HttpApi in a contract package clients share', () => {
+    const { file } = allApps(
+      sampleConfig({ apps: [{ name: 'api', kind: 'effect-api' }] }),
+    );
+    const contract = parseJson(file('packages/api-contract/package.json'));
+    assert.strictEqual(contract.name, '@sample/api-contract');
+    assert.deepStrictEqual(Rec.keys(record(contract.dependencies)), ['effect']);
+    assert.include(
+      file('packages/api-contract/src/index.ts').content,
+      "export class Api extends HttpApi.make('api')",
+    );
+    const api = parseJson(file('apps/api/package.json'));
+    assert.strictEqual(
+      record(api.dependencies)['@sample/api-contract'],
+      'workspace:*',
+    );
+    assert.include(
+      file('apps/api/src/handlers.ts').content,
+      "import { Api } from '@sample/api-contract';",
+    );
   });
 
   it('effect-api only ships a Worker entry when Cloudflare deploys it', () => {
@@ -327,7 +365,7 @@ describe('tanstack-start serving an effect-api app', () => {
       "'/api/$': typeof ApiSplatRoute",
     );
     assert.include(
-      served.file('apps/api/src/api.ts').content,
+      served.file('packages/api-contract/src/index.ts').content,
       ".prefix('/api')",
     );
   });
@@ -336,6 +374,7 @@ describe('tanstack-start serving an effect-api app', () => {
     const client = served.file('apps/web/src/api-client.ts').content;
     assert.include(client, 'createIsomorphicFn()');
     assert.include(client, "from './api.server.ts'");
+    assert.include(client, "import { Api } from '@sample/api-contract';");
     assert.include(
       served.file('apps/web/src/routes/index.tsx').content,
       'callApi(',
@@ -349,9 +388,13 @@ describe('tanstack-start serving an effect-api app', () => {
     );
   });
 
-  it('depends on the API package, which exports its handlers', () => {
+  it('depends on the contract, and on the API package for its handlers', () => {
     const web = parseJson(served.file('apps/web/package.json'));
     assert.strictEqual(record(web.dependencies)['@sample/api'], 'workspace:*');
+    assert.strictEqual(
+      record(web.dependencies)['@sample/api-contract'],
+      'workspace:*',
+    );
     const api = parseJson(served.file('apps/api/package.json'));
     assert.strictEqual(record(api.exports)['./handlers'], './src/handlers.ts');
   });
@@ -374,7 +417,10 @@ describe('tanstack-start serving an effect-api app', () => {
     );
     const paths = Arr.map(plain.files, (f) => f.path);
     assert.notInclude(paths, 'apps/web/src/api-client.ts');
-    assert.notInclude(plain.file('apps/api/src/api.ts').content, 'prefix');
+    assert.notInclude(
+      plain.file('packages/api-contract/src/index.ts').content,
+      'prefix',
+    );
     assert.notInclude(
       plain.file('apps/web/vite.config.ts').content,
       'importProtection',

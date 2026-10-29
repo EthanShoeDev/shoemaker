@@ -143,7 +143,12 @@ describe('deploy targets', () => {
       Arr.map(['typecheck', 'oxlint:check', 'oxlint:fix'], (name) => [
         name,
         true,
-        ['apps/api/package.json', 'apps/api/src/**'],
+        [
+          'apps/api/package.json',
+          'apps/api/src/**',
+          'packages/api-contract/package.json',
+          'packages/api-contract/src/**',
+        ],
       ]),
     );
   });

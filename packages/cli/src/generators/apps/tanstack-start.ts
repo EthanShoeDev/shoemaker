@@ -14,7 +14,7 @@ import {
   toolchainDevDependencies,
   vitestConfig,
 } from './common.ts';
-import { servedApi } from './mount.ts';
+import { contractName, servedApi } from './mount.ts';
 
 const baseDependencies = [
   '@tanstack/react-router',
@@ -214,13 +214,13 @@ export const Route = createFileRoute('/api/$')({
 // one implementation and drops the other's imports, so the in-process
 // transport never reaches the browser.
 const apiClientSource = (
-  apiPackage: string,
+  contract: string,
 ) => `import { createIsomorphicFn } from '@tanstack/react-start';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { FetchHttpClient } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
 
-import { Api } from '${apiPackage}/api';
+import { Api } from '${contract}';
 
 import { inProcessFetch, inProcessOrigin } from './api.server.ts';
 
@@ -473,7 +473,9 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
         },
         dependencies,
         devDependencies,
-        ...(api === undefined ? {} : { workspaceDependencies: [api.name] }),
+        ...(api === undefined
+          ? {}
+          : { workspaceDependencies: [api.name, contractName(api)] }),
         // varlock reads `.env.schema` from the cwd unless told otherwise; the
         // schema lives at the repo root.
         ...(varlock ? { extra: { varlock: { loadPath: '../../' } } } : {}),
@@ -502,7 +504,10 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
         : [
             seed(`${dir}/src/api.server.ts`, apiServerSource(apiPackage)),
             seed(`${dir}/src/routes/api.$.ts`, apiRouteSource),
-            seed(`${dir}/src/api-client.ts`, apiClientSource(apiPackage)),
+            seed(
+              `${dir}/src/api-client.ts`,
+              apiClientSource(ctx.pkg(contractName(api))),
+            ),
             seed(`${dir}/test/api-client.test.ts`, apiClientTestSource),
           ]),
       seed(`${dir}/src/components/welcome.tsx`, welcomeSource),

@@ -112,6 +112,14 @@ describe('shoemaker.config.ts', () => {
       ],
       'api is already served by another app',
     ],
+    [
+      "a name taken by an API's contract",
+      [
+        { name: 'api', kind: 'effect-api' },
+        { name: 'api-contract', kind: 'effect-cli' },
+      ],
+      'api-contract is reserved for its HttpApi contract package',
+    ],
   ] as const)('rejects %s', ([, apps, message]) =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(roundTrip({ ...full, apps }));

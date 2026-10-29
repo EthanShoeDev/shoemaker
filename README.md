@@ -16,8 +16,8 @@ they're the setup I use for my own repos.
 ## What you get
 
 - **Apps**: TanStack Start, Foldkit, Expo, Effect API and Effect CLI, plus
-  library packages. A TanStack Start app can serve the Effect API at `/api`
-  and deploy it.
+  library packages. The Effect API's contract is its own package, so any app
+  can call it. A TanStack Start app can serve the API at `/api` and deploy it.
 - **Tooling**: Effect 4, strict TypeScript, oxlint with every rule at error,
   oxfmt, knip and jscpd
 - **Task runner**: turbo or nx

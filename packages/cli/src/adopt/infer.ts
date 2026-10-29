@@ -2,6 +2,7 @@ import {
   Array as Arr,
   Effect,
   Option,
+  pipe,
   Record as Rec,
   String as Str,
 } from 'effect';
@@ -26,6 +27,7 @@ import {
 import { SECRETS_FILES } from '../doctor/security.ts';
 import { globAll } from '../doctor/shared.ts';
 import type { Repo } from '../engine/repo.ts';
+import { contractName } from '../generators/apps/mount.ts';
 
 // Reads an existing repo and guesses the shoemaker.config.ts that describes it,
 // so `shoemaker adopt` can start from the repo's real shape.
@@ -218,6 +220,15 @@ export const inferConfig = (
       }
     }
 
+    // An effect-api app's contract package is generated with the app.
+    const contracts = new Set(
+      pipe(
+        found,
+        Arr.filter(({ app }) => app.kind === 'effect-api'),
+        Arr.map(({ app }) => contractName(app)),
+      ),
+    );
+
     const apps = yield* Effect.forEach(found, ({ app, manifest }) =>
       app.kind === 'tanstack-start'
         ? Effect.map(servedApiOf(repo, manifest, found), (api) =>
@@ -245,7 +256,9 @@ export const inferConfig = (
       scope: workspace.packages.length > 0 ? scopeFor(workspace) : name,
       description: workspace.root.pkg.description ?? '',
       apps: uniqueBy(apps),
-      packages: uniqueBy(packages),
+      packages: uniqueBy(
+        Arr.filter(packages, (pkg) => !contracts.has(pkg.name)),
+      ),
       taskRunner,
       secrets,
       infra: yield* inferInfra(repo),

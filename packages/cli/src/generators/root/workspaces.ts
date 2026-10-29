@@ -1,7 +1,8 @@
-import { Array as Arr } from 'effect';
+import { Array as Arr, pipe } from 'effect';
 
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { GenContext } from '../../engine/types.ts';
+import { contractName } from '../apps/mount.ts';
 
 export interface Workspace {
   readonly dir: string;
@@ -22,4 +23,14 @@ export const workspaces = (ctx: GenContext): ReadonlyArray<Workspace> => [
     name: ctx.pkg(pkg.name),
     kind: pkg.kind,
   })),
+  // Each effect-api app's contract is a library package of its own.
+  ...pipe(
+    ctx.config.apps,
+    Arr.filter((app) => app.kind === 'effect-api'),
+    Arr.map((app) => ({
+      dir: `packages/${contractName(app)}`,
+      name: ctx.pkg(contractName(app)),
+      kind: 'library' as const,
+    })),
+  ),
 ];

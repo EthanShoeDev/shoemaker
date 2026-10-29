@@ -187,6 +187,38 @@ describe('inferConfig', () => {
     }),
   );
 
+  it.effect("takes an API's contract package as part of the API", () =>
+    Effect.gen(function* () {
+      const config = yield* inferConfig(
+        makeMemoryRepo({
+          'package.json': json({
+            name: 'shop',
+            workspaces: ['apps/*', 'packages/*'],
+          }),
+          'apps/api/package.json': json({
+            name: '@shop/api',
+            dependencies: {
+              '@effect/platform-bun': 'catalog:',
+              '@shop/api-contract': 'workspace:*',
+              effect: 'catalog:',
+            },
+          }),
+          'apps/api/src/handlers.ts': 'HttpApiBuilder.group(Api)',
+          'packages/api-contract/package.json': json({
+            name: '@shop/api-contract',
+            exports: { '.': './src/index.ts' },
+          }),
+          'packages/api-contract/src/index.ts': 'HttpApi.make("api")',
+        }),
+      );
+      yield* decodeConfig(config);
+      assert.deepStrictEqual(config.apps, [
+        { name: 'api', kind: 'effect-api' },
+      ]);
+      assert.deepStrictEqual(config.packages, []);
+    }),
+  );
+
   it.effect('falls back to the directory name without a package.json', () =>
     Effect.gen(function* () {
       const config = yield* inferConfig(makeMemoryRepo({}, '/x/Some Repo'));

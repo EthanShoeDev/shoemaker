@@ -6,8 +6,12 @@ scaffolds new repos and keeps existing ones on Ethan's current preferences.
 README.md is the only prose doc; keep it current when behavior changes. The
 preferences live in code, so a preference change usually touches two places:
 the shared package (or generator) that encodes it, and the doctor check that
-detects drift from it. Nothing is published yet, so there are no migrations:
-change the generator and its output directly.
+detects drift from it.
+
+Repos made by an older shoemaker only pick up what `sync` rewrites; it never
+touches seed files. When a change can't reach them that way, its changeset
+carries numbered steps a coding agent can follow in the existing repo,
+instead of a codemod.
 
 ## Rules
 
@@ -25,6 +29,7 @@ change the generator and its output directly.
   `-- reason`.
 - Generated output must be deterministic. Versions come from
   `packages/cli/src/versions.ts` only; never emit `latest`.
+- Changesets are `patch` unless Ethan asks for `minor` or `major`.
 - Don't `git stash`, reset or commit without being asked.
 - Never run `infra:plan`/`deploy`/`destroy` in a generated sample: alchemy
   creates its state bucket even on a plan, and this machine has real cloud
