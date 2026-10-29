@@ -106,7 +106,7 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     for (const name of effectFamily) {
       assert.strictEqual(overrides[name], versions.effect, name);
     }
-    assert.strictEqual(overrides.effect, '4.0.6');
+    assert.strictEqual(overrides.effect, '4.1.0');
   });
 
   it('balances every managed region', () => {

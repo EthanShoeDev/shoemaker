@@ -2,23 +2,18 @@
 // sample repos can install them before they exist on npm. `bun pm pack`
 // resolves catalog:/workspace: specs but does NOT apply publishConfig.exports,
 // so each package swaps its exports in prepack/postpack.
-//
-//   bun scripts/e2e/pack-local.ts <outDir>   -> prints {name: "file:<tgz>"} JSON
 import {
   Array as Arr,
-  Console,
   Effect,
   FileSystem,
   Path,
   Record as Rec,
   String as Str,
 } from 'effect';
-import { Argument, Command } from 'effect/cli';
 
-import { renderJson } from '../../packages/cli/src/engine/json.ts';
-import { readJsonObject, stringRecord, writeJson } from '../lib/json.ts';
-import { publishablePackages, repoRoot } from '../lib/packages.ts';
-import { run, runScript } from '../lib/run.ts';
+import { readJsonObject, stringRecord, writeJson } from './json.ts';
+import { publishablePackages, repoRoot } from './packages.ts';
+import { run } from './run.ts';
 
 export const packLocal = Effect.fnUntraced(function* (outDir: string) {
   const fs = yield* FileSystem.FileSystem;
@@ -69,16 +64,3 @@ export const pinTarballs = Effect.fnUntraced(function* (
   );
   yield* writeJson(manifestPath, manifest);
 });
-
-const packLocalCommand = Command.make(
-  'pack-local',
-  { outDir: Argument.String('outDir') },
-  Effect.fnUntraced(function* ({ outDir }) {
-    const overrides = yield* packLocal(outDir);
-    yield* Console.log(Str.trimEnd(renderJson(overrides)));
-  }),
-).pipe(Command.withDescription('Pack every publishable package locally'));
-
-if (import.meta.main) {
-  runScript(Command.run(packLocalCommand, { version: '0.0.0' }));
-}

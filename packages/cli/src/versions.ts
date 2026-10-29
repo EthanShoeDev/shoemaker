@@ -5,7 +5,7 @@ import { Record as Rec } from 'effect';
 // nothing is ever emitted as `latest`. Families move together: bump a family
 // as one edit.
 
-const effect = '4.0.6';
+const effect = '4.1.0';
 const oxlint = '1.90.0';
 const alchemy = '2.0.0-beta.84';
 const tanstackRouter = '^1.170.46';
@@ -13,7 +13,7 @@ const expoSdk = '~58.0.21';
 const shoemaker = '^0.1.0';
 
 // Every runtime package Effect-TS/effect-smol publishes in lockstep with
-// `effect` (all exist at 4.0.6). Dependencies such as alchemy pull these with
+// `effect` (all exist at 4.1.0). Dependencies such as alchemy pull these with
 // caret ranges that drift past the exact effect pin, so the root package.json
 // overrides every one of them to `effect`'s version.
 export const effectFamily = [

@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // test/e2e.test.ts packs and installs every package, so a change to any
+    // of them must rerun it. Shallow extend: the root definition is copied.
+    "test": {
+      "dependsOn": ["^transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/packages/*/*.ts",
+        "$TURBO_ROOT$/scripts/lib/**"
+      ],
+      "outputLogs": "new-only"
+    }
+  }
+}

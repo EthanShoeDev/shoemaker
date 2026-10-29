@@ -7,6 +7,15 @@
 // Turbo runs each package's `release:publish` (scripts/publish-package.ts)
 // after its build and its dependencies' publishes, so no order is kept here.
 //
+// CI authenticates with npm trusted publishing, which cannot create a
+// package, so CI skips a name npm has never seen. Publish a new package once
+// by hand, then trust this repo's release.yml for it, and let CI publish
+// within 2 days or the trust expires:
+//
+//   bun run npm login && bun run release
+//   bun run npm trust github <name> --repo EthanShoeDev/shoemaker \
+//     --file release.yml --allow-publish
+//
 //   bun scripts/release.ts [--dry-run]
 import { Array as Arr, Console, Effect } from 'effect';
 import { Command, Flag } from 'effect/cli';

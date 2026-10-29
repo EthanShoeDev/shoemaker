@@ -16,5 +16,11 @@ export default defineKnipConfig({
       // publishing; knip does not see binaries run from child processes.
       ignoreDependencies: ['npm'],
     },
+    // Not imported: pinned so installs of the published package resolve
+    // @effect/platform-bun's `^` range to the same version as `effect`.
+    'packages/cli': { ignoreDependencies: ['@effect/platform-node-shared'] },
+    'packages/spanoptic': {
+      ignoreDependencies: ['@effect/platform-node-shared'],
+    },
   },
 });

@@ -186,7 +186,7 @@ type LogEntry = {
 
 ## Requirements
 
-- Effect 4 (`effect` and `@effect/opentelemetry` 4.0.6)
+- Effect 4 (`effect` and `@effect/opentelemetry` 4.1.0)
 - Bun (`@opentui/core` loads its native renderer through `bun:ffi`)
 
 ## License

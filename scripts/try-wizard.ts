@@ -6,8 +6,8 @@
 import { Array as Arr, Console, Effect, FileSystem, Path } from 'effect';
 import { Argument, Command } from 'effect/cli';
 
-import { packLocal, pinTarballs } from './e2e/pack-local.ts';
 import { writeJson } from './lib/json.ts';
+import { packLocal, pinTarballs } from './lib/pack-local.ts';
 import { repoRoot } from './lib/packages.ts';
 import { runInherit, runScript } from './lib/run.ts';
 

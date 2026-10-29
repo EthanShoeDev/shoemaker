@@ -49,7 +49,7 @@ const onNpm = Effect.fnUntraced(function* (path: string) {
 // CI publishes through npm trusted publishing (OIDC), which can only publish
 // to a package that already exists and names this repo as a trusted
 // publisher. A name npm has never seen is `unclaimed` there: its first
-// version goes out by hand (README, Release).
+// version goes out by hand (scripts/release.ts).
 export const publishStatus = Effect.fnUntraced(function* (pkg: {
   readonly name: string;
   readonly version: string;

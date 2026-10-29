@@ -41,6 +41,7 @@
   "dependencies": {
     "@effect/opentelemetry": "catalog:",
     "@effect/platform-bun": "catalog:",
+    "@effect/platform-node-shared": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",

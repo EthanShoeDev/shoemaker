@@ -5,6 +5,10 @@ import { managed, region } from '../shared.ts';
 import { allEnvVars } from './env-vars.ts';
 import type { EnvVar } from './model.ts';
 
+// App code reads env through `ENV` from varlock/env (client and server).
+// https://varlock.dev/integrations/javascript/
+// https://varlock.dev/env-spec/reference/
+//
 // env-spec attaches every comment line directly above an item to it, and a
 // line counts as decorators only when it starts with `@`. Region markers are
 // kept apart from items by blank lines so they never become descriptions.

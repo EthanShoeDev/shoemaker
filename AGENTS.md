@@ -16,7 +16,7 @@ change the generator and its output directly.
 - Verify before a PR, not after every edit:
   `bunx turbo run lint:check --filter=<pkg>` and `bunx turbo run test`.
   `lint` mutates; `lint:check` does not.
-- Effect 4.0.6 everywhere. `effect/cli` for CLIs, `Effect.fn` for effectful
+- Effect 4.1.0 everywhere. `effect/cli` for CLIs, `Effect.fn` for effectful
   functions, tagged errors, `Clock` instead of `Date.now`, `Effect.log` instead
   of `console`.
 - Inferred return types. Comments only for a non-obvious *why*.
@@ -32,10 +32,11 @@ change the generator and its output directly.
 
 ## Proving generator changes
 
-`bun scripts/e2e/generate-sample.ts <minimal|web|full> <dir>` packs the local
-packages, generates a sample repo and installs it. Then run
-`bunx turbo run lint:check '//#lint:check:root'`, `typecheck`, `test` and
-`build` inside it.
+`packages/cli/test/e2e.test.ts` (part of `bun run test`) packs the local
+packages, generates each preset in `packages/cli/test/presets.ts` through
+`shoemaker sync`, installs it, runs every check the sample defines and expects
+`sync --check` to report no drift. The samples stay in `.e2e/<preset>`.
+`bun run wizard:local` runs the interactive `init` against the same tarballs.
 
 ## Reference repos
 

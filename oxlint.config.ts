@@ -43,20 +43,20 @@ export default defineConfig(
         },
       },
       {
-        // The e2e harness is a linear Bun shell script that drives the CLI's
-        // internals (generate, renderConfigFile) before anything is published.
-        files: [
-          'scripts/e2e/**',
-          'scripts/lib/**',
-          'scripts/publish-manifest.ts',
-        ],
+        // Repo scripts drive the CLI's internals (renderJson, the config
+        // schema) before anything is published.
+        files: ['scripts/lib/**', 'scripts/publish-manifest.ts'],
         rules: {
-          // Reaching into packages/cli/src is the point: it tests unpublished code.
+          // Reaching into packages/cli/src is the point: it uses unpublished code.
           'import-boundaries/no-cross-package-relative-imports': 'off',
-          // Sequential shell steps; an Effect runtime adds nothing here.
-          'effecttsgo/async-function': 'off',
-          // The exit code is the harness's whole output contract for CI.
-          'unicorn/no-process-exit': 'off',
+        },
+      },
+      {
+        // The e2e test packs every package with the repo scripts that publish
+        // them, so it reuses scripts/lib instead of a copy.
+        files: ['packages/cli/test/e2e.test.ts'],
+        rules: {
+          'import-boundaries/no-cross-package-relative-imports': 'off',
         },
       },
     ],

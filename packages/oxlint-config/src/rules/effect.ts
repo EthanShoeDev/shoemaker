@@ -42,6 +42,7 @@ export const custom = (scope: string, varlock: boolean): OxlintRules => ({
   'dynamic-import/no-unexplained-dynamic-import': 'error',
   // With varlock, process.env / import.meta.env go through its `ENV` (client
   // and server); the repo's own `@<scope>/env` package may read them.
+  // https://varlock.dev/integrations/javascript/
   'env-access/no-raw-env-access': varlock
     ? [
         'error',

@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, Path, Stream } from 'effect';
-import { ChildProcess, ChildProcessSpawner } from 'effect/process';
+import { ChildProcess, ChildProcessSpawner, CommandLine } from 'effect/process';
 
 type StandardOptions = ChildProcess.StandardCommand['options'];
 
@@ -32,7 +32,7 @@ const flatten = (
 export const describeCommand = (command: ChildProcess.Command) =>
   Arr.join(
     Arr.map(flatten(command), (part) =>
-      Arr.join([part.command, ...part.args], ' '),
+      CommandLine.display([part.command, ...part.args]),
     ),
     ' | ',
   );

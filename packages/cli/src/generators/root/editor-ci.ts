@@ -120,7 +120,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Affected detection diffs against the base commit.
           fetch-depth: 0
@@ -136,7 +136,7 @@ ${lintSteps(config)}
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun run test
 `;

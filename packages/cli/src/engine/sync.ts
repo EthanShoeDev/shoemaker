@@ -25,7 +25,7 @@ const Overrides = Schema.fromJsonString(
 );
 
 // `SHOEMAKER_VERSION_OVERRIDES=<file>`: JSON {name: spec}, e.g. the output of
-// scripts/e2e/pack-local.ts, to install local tarballs before publishing.
+// scripts/lib/pack-local.ts, to install local tarballs before publishing.
 export const versionOverrides = Effect.gen(function* () {
   const file = yield* Config.option(
     Config.String('SHOEMAKER_VERSION_OVERRIDES'),

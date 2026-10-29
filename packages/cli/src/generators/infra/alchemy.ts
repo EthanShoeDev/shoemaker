@@ -11,6 +11,8 @@ import { deployTarget } from './target.ts';
 // One Stack at the workspace root deploys every app (alchemy's single-stack
 // monorepo layout): alchemy.run.ts names the Stack, picks providers and the
 // state store, and yields each app's resource.
+// https://alchemy.run/project-structure/monorepo-single-stack/
+// https://alchemy.run/infrastructure-as-code/stack/
 
 const providerModules = {
   cloudflare: { name: 'Cloudflare', pkg: '@alchemy.run/cloudflare' },
@@ -21,6 +23,10 @@ type Cloud = keyof typeof providerModules;
 
 // A Vite site declared in the Stack itself, its rootDir anchored to
 // alchemy.run.ts so it resolves the same wherever alchemy runs.
+// https://alchemy.run/cloudflare/frontend/vite/
+// https://alchemy.run/cloudflare/frontend/foldkit/
+// https://alchemy.run/aws/frontend/tanstack-start/
+// https://alchemy.run/aws/frontend/foldkit/
 type Website = (id: string, dir: string) => string;
 
 const website =
@@ -43,6 +49,7 @@ const websites: Readonly<Record<Cloud, Partial<Record<App['kind'], Website>>>> =
 // The Effect API declares its own Worker (apps/<name>/src/worker.ts), which
 // the Stack imports by path: a root dependency on a workspace package would be
 // a cycle, as every package already depends on the root.
+// https://alchemy.run/cloudflare/compute/workers/
 const workerApps = (config: ShoemakerConfig) =>
   deployTarget(config) === 'cloudflare'
     ? Arr.filter(config.apps, (app) => app.kind === 'effect-api')
@@ -73,6 +80,8 @@ const deployed = (config: ShoemakerConfig): ReadonlyArray<Deployed> => {
 
 const camelCase = (name: string) => Str.uncapitalize(pascalCase(name));
 
+// Remote stores are created on first use, even by a plan.
+// https://alchemy.run/state-store/
 const stateExpression = (state: StateStore) =>
   state === 'local'
     ? 'Alchemy.localState()'
@@ -142,6 +151,9 @@ export default Alchemy.Stack(
 `;
 };
 
+// Credentials come from alchemy profiles, so no provider credential vars.
+// https://alchemy.run/environments/stages/
+// https://alchemy.run/environments/profiles/
 const env: ReadonlyArray<EnvVar> = [
   {
     key: 'ALCHEMY_STAGE',
@@ -164,6 +176,12 @@ const env: ReadonlyArray<EnvVar> = [
 // knip reads commands after `varlock run --` but not after `secretspec run
 // --`, so under secretspec the alchemy CLI goes through a plain `alchemy`
 // script, which keeps the root alchemy (and its Bun peer) visibly used.
+// Varlock wraps non-wrangler deploy tools like alchemy in `varlock run`:
+// https://varlock.dev/integrations/cloudflare/#non-wrangler-deploy-tools-alchemysstpulumi
+// `infra:dev` runs the Stack locally (AWS needs Docker):
+// https://alchemy.run/cli/dev/
+// https://alchemy.run/cloudflare/local-development/
+// https://alchemy.run/aws/local-development/
 const infraScripts = (config: ShoemakerConfig) => {
   const indirect = config.secrets === 'secretspec';
   const alchemyCommand = (verb: string) =>

@@ -39,6 +39,8 @@ const baseDevDependencies = [
 
 // Alchemy's Cloudflare.Website.Vite injects its own Cloudflare plugin and
 // bindings, so varlock's Vite plugin is only wired for other targets.
+// https://varlock.dev/integrations/vite/
+// https://varlock.dev/integrations/cloudflare/
 const usesVarlockPlugin = (ctx: GenContext) =>
   ctx.config.secrets === 'varlock' && deployTarget(ctx.config) !== 'cloudflare';
 
