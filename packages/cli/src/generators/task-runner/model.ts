@@ -18,9 +18,9 @@ export interface TaskDef {
   // `//#name` = root task. Turbo syntax is the lingua franca; the nx renderer
   // translates it.
   readonly dependsOn?: ReadonlyArray<string>;
-  // Tasks started alongside this one (turbo `with`). Aggregates like `lint`
-  // and `lint:check` have no script of their own and only fan out.
-  readonly with?: ReadonlyArray<string>;
+  // Aggregates like `lint` and `lint:check` have no script or command of
+  // their own: they only fan out through `dependsOn`.
+  readonly aggregate?: boolean;
   readonly inputs?: ReadonlyArray<string>;
   readonly outputs?: ReadonlyArray<string>;
   readonly cache?: boolean;

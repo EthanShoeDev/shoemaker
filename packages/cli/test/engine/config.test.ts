@@ -15,13 +15,18 @@ const full: ShoemakerConfig = {
   scope: 'listen',
   description: 'Ethan\'s "listening" app \\ with escapes',
   apps: [
-    { name: 'web', kind: 'tanstack-start' },
+    { name: 'web', kind: 'tanstack-start', api: 'api' },
     { name: 'api', kind: 'effect-api' },
   ],
   packages: [{ name: 'domain', kind: 'library' }],
   taskRunner: 'nx',
   secrets: 'secretspec',
-  infra: { kind: 'alchemy', deploy: 'aws', state: 'local' },
+  infra: {
+    kind: 'alchemy',
+    deploy: 'aws',
+    state: 'local',
+    providers: ['aws', 'github'],
+  },
   features: { changesets: true, agents: true, vscode: false },
   nixPackages: [
     'postgresql_17',
@@ -81,6 +86,36 @@ describe('shoemaker.config.ts', () => {
         roundTrip({ ...full, name: 'Not Kebab' }),
       );
       assert.strictEqual(error._tag, 'ConfigError');
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect.each([
+    [
+      'a missing API',
+      [{ name: 'web', kind: 'tanstack-start', api: 'nope' }],
+      'nope is not an effect-api app',
+    ],
+    [
+      'a host that is not a site',
+      [
+        { name: 'cli', kind: 'effect-cli', api: 'api' },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      'only a tanstack-start app can serve an API',
+    ],
+    [
+      'an API served twice',
+      [
+        { name: 'web', kind: 'tanstack-start', api: 'api' },
+        { name: 'docs', kind: 'tanstack-start', api: 'api' },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      'api is already served by another app',
+    ],
+  ] as const)('rejects %s', ([, apps, message]) =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(roundTrip({ ...full, apps }));
+      assert.include(error.message, message);
     }).pipe(Effect.provide(BunServices.layer)),
   );
 });

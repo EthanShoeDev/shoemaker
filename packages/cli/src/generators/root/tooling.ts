@@ -227,7 +227,7 @@ const jscpdIgnore = [
   '**/.claude/**',
   '**/.github/**',
   '**/.changeset/**',
-  '**/docs/cloned-repos-as-docs/**',
+  '**/.external/**',
   '**/README.md',
   '**/AGENTS.md',
   '**/CLAUDE.md',
@@ -284,8 +284,9 @@ export const vitestConfig: Renderer = (ctx) => {
       'vitest.config.ts',
       `import { defineConfig } from 'vitest/config';
 
-// \`bun run test\` at the root runs every package as one Vitest Projects run;
-// CI's per-package \`test\` tasks run the same projects one at a time.
+// \`bun run test\` at the root runs every package as one Vitest Projects run.
+// The task runner's per-package \`test\` tasks, which CI
+// runs, run the same projects one package at a time, cached.
 export default defineConfig({
   test: {
 ${tsArray('projects', projects, 2)}

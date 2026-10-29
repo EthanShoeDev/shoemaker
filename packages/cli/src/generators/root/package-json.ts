@@ -5,7 +5,8 @@ import type { Generator, Renderer } from '../../engine/types.ts';
 import { effectFamily } from '../../versions.ts';
 import { catalogDeps, json } from '../shared.ts';
 
-export const PACKAGE_MANAGER = 'bun@1.4.4';
+const BUN_VERSION = '1.4.4';
+export const PACKAGE_MANAGER = `bun@${BUN_VERSION}`;
 
 // What the root itself runs: linters, formatters, checkers and the configs
 // root-level *.ts files import. The root depends on no internal workspace
@@ -27,6 +28,8 @@ export const rootDevDependencies = (config: ShoemakerConfig) => [
   config.taskRunner,
   'typescript',
   'vitest',
+  // vitest's required peer; listed so its version comes from the catalog.
+  'vite',
   ...(config.secrets === 'varlock' ? ['varlock'] : []),
   ...(config.features.changesets
     ? ['@changesets/changelog-github', '@changesets/cli']
@@ -98,6 +101,11 @@ export const rootPackageJson: Generator = (ctx) => ({
           ),
         ),
         engines: { node: '^22.18.0 || ^24.0.0 || >=26.0.0' },
+        // Turbo reads `devEngines` and will drop the top-level field in a
+        // future major; tools that only know `packageManager` still read it.
+        devEngines: {
+          packageManager: { name: 'bun', version: BUN_VERSION },
+        },
         packageManager: PACKAGE_MANAGER,
       }),
     },

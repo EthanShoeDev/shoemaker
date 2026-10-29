@@ -9,13 +9,12 @@ import {
 } from '../shared.ts';
 import {
   appDir,
-  buildTask,
   catalogOf,
-  devTask,
   forApps,
   toolchainDevDependencies,
   vitestConfig,
 } from './common.ts';
+import { servedApi } from './mount.ts';
 
 const baseDependencies = [
   '@tanstack/react-router',
@@ -44,7 +43,20 @@ const baseDevDependencies = [
 const usesVarlockPlugin = (ctx: GenContext) =>
   ctx.config.secrets === 'varlock' && deployTarget(ctx.config) !== 'cloudflare';
 
-const viteConfig = (ctx: GenContext) => {
+// Import protection keeps \`*.server.*\` files out of the browser bundle, but
+// a served API's handlers come from another package, so they are denied by
+// name: a build that would ship them to the browser fails.
+// https://tanstack.com/start/latest/docs/framework/react/guide/import-protection
+const tanstackStartPlugin = (apiPackage: string | undefined) =>
+  apiPackage === undefined
+    ? 'tanstackStart()'
+    : `tanstackStart({
+      importProtection: {
+        client: { specifiers: ['${apiPackage}/handlers'] },
+      },
+    })`;
+
+const viteConfig = (ctx: GenContext, apiPackage: string | undefined) => {
   const varlock = usesVarlockPlugin(ctx);
   return `import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
@@ -55,7 +67,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 ${varlock ? '  // oxlint-disable-next-line typescript/no-unsafe-assignment -- @varlock/vite-integration types its plugin as `any`\n' : ''}  plugins: [
 ${varlock ? '    varlockVitePlugin(),\n' : ''}    tailwindcss(),
-    tanstackStart(),
+    ${tanstackStartPlugin(apiPackage)},
     react(),
     babel({ presets: [reactCompilerPreset()] }),
   ],
@@ -117,16 +129,146 @@ const indexRouteSource = `import { createFileRoute } from '@tanstack/react-route
 
 import { Welcome } from '../components/welcome.tsx';
 
-const Home = () => <Welcome name='world' />;
+const Home = () => <Welcome message='Hello, world!' />;
 
 export const Route = createFileRoute('/')({ component: Home });
 `;
 
-const welcomeSource = `export const Welcome = ({ name }: { readonly name: string }) => (
+// With an API served, the page's greeting comes from it: in-process while the
+// server renders, over fetch to /api when the browser navigates.
+const servedIndexRouteSource = `import { createFileRoute } from '@tanstack/react-router';
+
+import { callApi } from '../api-client.ts';
+import { Welcome } from '../components/welcome.tsx';
+
+const Home = () => <Welcome message={Route.useLoaderData().message} />;
+
+export const Route = createFileRoute('/')({
+  loader: ({ abortController }) =>
+    callApi((api) => api.greetings.greet({ params: { name: 'world' } }), {
+      signal: abortController.signal,
+    }),
+  component: Home,
+});
+`;
+
+const welcomeSource = `export const Welcome = ({ message }: { readonly message: string }) => (
   <main className='flex min-h-screen items-center justify-center'>
-    <h1 className='text-4xl font-bold'>Hello, {name}!</h1>
+    <h1 className='text-4xl font-bold'>{message}</h1>
   </main>
 );
+`;
+
+// Server-only (\`.server.ts\`, which import protection keeps out of the
+// browser): the API's routes as one fetch handler, which the /api route serves
+// and server rendering calls in-process.
+const apiServerSource = (
+  apiPackage: string,
+) => `import { getRequestHeaders } from '@tanstack/react-start/server';
+import { Layer } from 'effect';
+import { HttpRouter, HttpServer } from 'effect/http';
+
+import { ApiLive } from '${apiPackage}/handlers';
+
+export const { handler: apiHandler } = HttpRouter.toWebHandler(
+  ApiLive.pipe(Layer.provide(HttpServer.layerServices)),
+);
+
+// The handler routes by path, so the origin is a placeholder.
+export const inProcessOrigin = 'http://in-process';
+
+// Outside a page request (tests, prerendering) there is no cookie to forward.
+const pageCookie = () => {
+  try {
+    return getRequestHeaders().get('cookie');
+  } catch {
+    return null;
+  }
+};
+
+// Server rendering calls the API in this process: no network hop, and no need
+// to know the page's own origin. The page request's cookie goes along, so the
+// API sees the same session as the browser's own requests.
+export const inProcessFetch: typeof fetch = (input, init) => {
+  const request = new Request(input, init);
+  const cookie = pageCookie();
+  if (cookie !== null) request.headers.set('cookie', cookie);
+  return apiHandler(request);
+};
+`;
+
+// TanStack Start reads a route's options statically, so they stay inline here
+// rather than imported from the handler's module.
+const apiRouteSource = `import { createFileRoute } from '@tanstack/react-router';
+
+import { apiHandler } from '../api.server.ts';
+
+export const Route = createFileRoute('/api/$')({
+  server: {
+    handlers: { ANY: ({ request }) => apiHandler(request) },
+  },
+});
+`;
+
+// createIsomorphicFn is the compiler's environment boundary: each build keeps
+// one implementation and drops the other's imports, so the in-process
+// transport never reaches the browser.
+const apiClientSource = (
+  apiPackage: string,
+) => `import { createIsomorphicFn } from '@tanstack/react-start';
+import { Effect, Layer, ManagedRuntime } from 'effect';
+import { FetchHttpClient } from 'effect/http';
+import { HttpApiClient } from 'effect/http-api';
+
+import { Api } from '${apiPackage}/api';
+
+import { inProcessFetch, inProcessOrigin } from './api.server.ts';
+
+// In-process while the server renders; same-origin fetch to /api in the
+// browser.
+const transport = createIsomorphicFn()
+  .server(() => ({
+    baseUrl: inProcessOrigin,
+    layer: FetchHttpClient.layer.pipe(
+      Layer.provide(Layer.succeed(FetchHttpClient.Fetch, inProcessFetch)),
+    ),
+  }))
+  .client(() => ({
+    baseUrl: globalThis.location.origin,
+    layer: FetchHttpClient.layer,
+  }));
+
+const { baseUrl, layer } = transport();
+
+// Loaders and event handlers are where Effect meets React, so this runtime is
+// their entry point: it holds the HTTP client that reaches the API.
+const apiRuntime = ManagedRuntime.make(layer);
+
+const makeClient = HttpApiClient.make(Api, { baseUrl });
+
+// Runs one typed call, the same way on the server and in the browser. A
+// failure rejects the promise.
+export const callApi = <A, E>(
+  call: (api: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>,
+  options?: { readonly signal?: AbortSignal },
+) => apiRuntime.runPromise(Effect.flatMap(makeClient, call), options);
+`;
+
+const apiClientTestSource = `import { assert, describe, it } from '@effect/vitest';
+import { Effect } from 'effect';
+
+import { callApi } from '../src/api-client.ts';
+
+describe('callApi', () => {
+  it.effect('reaches the API in-process outside the browser', () =>
+    Effect.gen(function* () {
+      const greeting = yield* Effect.promise(() =>
+        callApi((api) => api.greetings.greet({ params: { name: 'Ada' } })),
+      );
+      assert.strictEqual(greeting.message, 'Hello, Ada!');
+    }),
+  );
+});
 `;
 
 const welcomeTestSource = `import { renderToString } from 'react-dom/server';
@@ -135,8 +277,10 @@ import { describe, expect, it } from 'vitest';
 import { Welcome } from '../src/components/welcome.tsx';
 
 describe('Welcome', () => {
-  it('greets by name', () => {
-    expect(renderToString(<Welcome name='Ada' />)).toContain('Ada');
+  it('shows the message', () => {
+    expect(renderToString(<Welcome message='Hello, Ada!' />)).toContain(
+      'Hello, Ada!',
+    );
   });
 });
 `;
@@ -213,12 +357,107 @@ declare module '@tanstack/react-start' {
 }
 `;
 
+// The same, with the /api splat route.
+const servedRouteTreeSource = `/* eslint-disable */
+
+// @ts-nocheck
+
+// noinspection JSUnusedGlobalSymbols
+
+// This file was automatically generated by TanStack Router.
+// You should NOT make any changes in this file as it will be overwritten.
+// Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
+
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSplatRouteImport } from './routes/api.$'
+
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSplatRoute = ApiSplatRouteImport.update({
+  id: '/api/$',
+  path: '/api/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
+  '/api/$': typeof ApiSplatRoute
+}
+export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/api/$': typeof ApiSplatRoute
+}
+export interface FileRoutesById {
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/api/$': typeof ApiSplatRoute
+}
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths: '/' | '/api/$'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/api/$'
+  id: '__root__' | '/' | '/api/$'
+  fileRoutesById: FileRoutesById
+}
+export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
+  ApiSplatRoute: typeof ApiSplatRoute
+}
+
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/$': {
+      id: '/api/$'
+      path: '/api/$'
+      fullPath: '/api/$'
+      preLoaderRoute: typeof ApiSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+  }
+}
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  ApiSplatRoute: ApiSplatRoute,
+}
+export const routeTree = rootRouteImport
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
+`;
+
 export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);
   const varlock = usesVarlockPlugin(ctx);
-  const dependencies = baseDependencies;
+  const api = servedApi(ctx.config, app);
+  const apiPackage = api === undefined ? '' : ctx.pkg(api.name);
+  const dependencies = [
+    ...baseDependencies,
+    ...(api === undefined ? [] : ['effect']),
+  ];
   const devDependencies = [
     ...baseDevDependencies,
+    ...(api === undefined ? [] : ['@effect/vitest']),
     ...(varlock ? ['@varlock/vite-integration', 'varlock'] : []),
   ];
   return {
@@ -234,6 +473,7 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
         },
         dependencies,
         devDependencies,
+        ...(api === undefined ? {} : { workspaceDependencies: [api.name] }),
         // varlock reads `.env.schema` from the cwd unless told otherwise; the
         // schema lives at the repo root.
         ...(varlock ? { extra: { varlock: { loadPath: '../../' } } } : {}),
@@ -242,23 +482,42 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
         react: true,
         compilerOptions: { types: ['node', 'vite/client'] },
       }),
-      vitestConfig(dir, app.name),
-      owned(`${dir}/vite.config.ts`, viteConfig(ctx)),
+      vitestConfig(dir, { mergeViteConfig: true }),
+      owned(
+        `${dir}/vite.config.ts`,
+        viteConfig(ctx, api === undefined ? undefined : apiPackage),
+      ),
       seed(`${dir}/src/router.tsx`, routerSource),
-      seed(`${dir}/src/routeTree.gen.ts`, routeTreeSource),
+      seed(
+        `${dir}/src/routeTree.gen.ts`,
+        api === undefined ? routeTreeSource : servedRouteTreeSource,
+      ),
       seed(`${dir}/src/routes/__root.tsx`, rootRouteSource(app)),
-      seed(`${dir}/src/routes/index.tsx`, indexRouteSource),
+      seed(
+        `${dir}/src/routes/index.tsx`,
+        api === undefined ? indexRouteSource : servedIndexRouteSource,
+      ),
+      ...(api === undefined
+        ? []
+        : [
+            seed(`${dir}/src/api.server.ts`, apiServerSource(apiPackage)),
+            seed(`${dir}/src/routes/api.$.ts`, apiRouteSource),
+            seed(`${dir}/src/api-client.ts`, apiClientSource(apiPackage)),
+            seed(`${dir}/test/api-client.test.ts`, apiClientTestSource),
+          ]),
       seed(`${dir}/src/components/welcome.tsx`, welcomeSource),
       seed(`${dir}/src/styles.css`, "@import 'tailwindcss';\n"),
       seed(`${dir}/test/welcome.test.tsx`, welcomeTestSource),
       seed(
         `${dir}/README.md`,
-        `# ${ctx.pkg(app.name)}\n\nTanStack Start app. \`bun run dev\` to develop, \`bun run build && bun run start\` to preview the production build.\n`,
+        `# ${ctx.pkg(app.name)}\n\nTanStack Start app. \`bun run dev\` to develop, \`bun run build && bun run start\` to preview the production build.\n${
+          api === undefined
+            ? ''
+            : `\nIt serves \`${apiPackage}\` at \`/api\` (\`src/routes/api.$.ts\`) and deploys it. Loaders and components call it through \`callApi\` (\`src/api-client.ts\`): in-process while the server renders, over \`fetch\` in the browser.\n`
+        }`,
       ),
     ],
     tasks: [
-      devTask(ctx, app),
-      buildTask(ctx, app, ['dist/**']),
       {
         name: 'start',
         package: ctx.pkg(app.name),
@@ -268,9 +527,10 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
       },
     ],
     catalog: catalogOf(dependencies, devDependencies),
-    // Tailwind skips gitignored paths; without dist/ the SSR pass scans the
-    // client output and hashes a different stylesheet than the one shipped.
-    gitignore: ['dist/', '.tanstack/'],
+    // The base .gitignore's `dist` matters here too: Tailwind skips gitignored
+    // paths, and without it the SSR pass scans the client output and hashes a
+    // different stylesheet than the one shipped.
+    gitignore: ['.tanstack/'],
     ignore: [`${dir}/src/routeTree.gen.ts`],
   };
 };

@@ -25,7 +25,7 @@ const vscodeSettings = (config: ShoemakerConfig) => ({
     '**/.output/**': true,
     '**/coverage/**': true,
     '**/result': true,
-    '**/docs/cloned-repos-as-docs/**': true,
+    '**/.external/**': true,
   },
   ...(hasApp(config, 'tanstack-start')
     ? {
@@ -89,14 +89,35 @@ runs:
         exit 1
 `;
 
+const NX_AFFECTED_ENV = `        env:
+          NX_BASE: \${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+          NX_HEAD: \${{ github.sha }}`;
+
+// The task runner's local cache, carried between runs so unchanged tasks
+// replay instead of re-running. Each job keeps its own entry.
+const cacheStep = (config: ShoemakerConfig, job: string) => {
+  const key = `${config.taskRunner}-${job}-\${{ runner.os }}-`;
+  return `      - uses: actions/cache@v6
+        with:
+          path: ${config.taskRunner === 'nx' ? '.nx/cache' : '.turbo/cache'}
+          key: ${key}\${{ github.sha }}
+          restore-keys: ${key}`;
+};
+
 const lintSteps = (config: ShoemakerConfig) =>
   config.taskRunner === 'nx'
     ? `      - run: bunx nx affected -t lint:check
-        env:
-          NX_BASE: \${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
-          NX_HEAD: \${{ github.sha }}
+${NX_AFFECTED_ENV}
       - run: bunx nx run ${config.name}:lint:check:root`
     : `      - run: bunx turbo run lint:check '//#lint:check:root' --affected --continue=dependencies-successful`;
+
+// Per-package tests through the task runner (cached, affected only), plus
+// the builds, which nothing else exercises.
+const testSteps = (config: ShoemakerConfig) =>
+  config.taskRunner === 'nx'
+    ? `      - run: bunx nx affected -t test build
+${NX_AFFECTED_ENV}`
+    : `      - run: bunx turbo run test build --affected --continue=dependencies-successful`;
 
 const ciWorkflow = (config: ShoemakerConfig) => `name: CI
 
@@ -125,6 +146,7 @@ jobs:
           # Affected detection diffs against the base commit.
           fetch-depth: 0
       - uses: ./.github/actions/setup
+${cacheStep(config, 'lint')}
       # Fails when generated tooling files were hand-edited or the repo is
       # behind shoemaker.config.ts; fix with \`shoemaker sync\`.
       - run: bunx shoemaker sync --check --allow-dirty
@@ -137,8 +159,11 @@ ${lintSteps(config)}
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
-      - run: bun run test
+${cacheStep(config, 'test')}
+${testSteps(config)}
 `;
 
 export const ci: Generator = (ctx) =>

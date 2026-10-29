@@ -16,12 +16,14 @@ they're the setup I use for my own repos.
 ## What you get
 
 - **Apps**: TanStack Start, Foldkit, Expo, Effect API and Effect CLI, plus
-  library packages
+  library packages. A TanStack Start app can serve the Effect API at `/api`
+  and deploy it.
 - **Tooling**: Effect 4, strict TypeScript, oxlint with every rule at error,
   oxfmt, knip and jscpd
 - **Task runner**: turbo or nx
 - **Secrets**: varlock or secretspec
-- **Infra**: alchemy, deploying to Cloudflare or AWS
+- **Infra**: alchemy, deploying to Cloudflare or AWS, plus GitHub for repos
+  and Actions secrets
 - **Environment**: a Nix dev shell, GitHub Actions CI, and an AGENTS.md for
   coding agents
 

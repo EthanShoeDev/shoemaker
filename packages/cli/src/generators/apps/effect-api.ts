@@ -9,14 +9,13 @@ import {
 } from '../shared.ts';
 import {
   appDir,
-  buildTask,
   catalogOf,
-  devTask,
   effectTestDevDependencies,
   forApps,
   pascalCase,
   vitestConfig,
 } from './common.ts';
+import { isServed } from './mount.ts';
 
 const dependencies = ['@effect/platform-bun', 'effect'];
 const workerDependencies = ['@alchemy.run/cloudflare', 'alchemy'];
@@ -25,8 +24,12 @@ const devDependencies = [...effectTestDevDependencies, 'tsdown'];
 const portKey = 'PORT';
 
 // The contract lives apart from the handlers so a client (web app, tests) can
-// import it without pulling in server code.
-const apiSource = (app: App) => `import { Schema } from 'effect';
+// import it without pulling in server code. A site that serves the API mounts
+// it at /api, so its paths carry that prefix.
+const apiSource = (
+  app: App,
+  served: boolean,
+) => `import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 
 export const Health = Schema.Struct({ status: Schema.Literal('ok') });
@@ -46,7 +49,7 @@ export class GreetingsGroup extends HttpApiGroup.make('greetings').add(
 
 export class Api extends HttpApi.make('${app.name}')
   .add(HealthGroup)
-  .add(GreetingsGroup) {}
+  .add(GreetingsGroup)${served ? "\n  .prefix('/api')" : ''} {}
 `;
 
 const handlersSource = `import { Effect, Layer } from 'effect';
@@ -162,7 +165,9 @@ export default defineConfig({
 
 export const effectApi = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);
-  const worker = deployTarget(ctx.config) === 'cloudflare';
+  const served = isServed(ctx.config, app);
+  // A served API deploys inside its site, not as a Worker of its own.
+  const worker = deployTarget(ctx.config) === 'cloudflare' && !served;
   return {
     files: [
       workspacePackageJson(ctx, {
@@ -170,6 +175,8 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
         name: app.name,
         exports: {
           './api': './src/api.ts',
+          // Server-only: the site that serves the API mounts these.
+          ...(served ? { './handlers': './src/handlers.ts' } : {}),
           ...(worker ? { './worker': './src/worker.ts' } : {}),
         },
         scripts: {
@@ -183,21 +190,21 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
         devDependencies,
       }),
       packageTsconfig(dir),
-      vitestConfig(dir, app.name),
+      vitestConfig(dir),
       owned(`${dir}/tsdown.config.ts`, tsdownConfig),
-      seed(`${dir}/src/api.ts`, apiSource(app)),
+      seed(`${dir}/src/api.ts`, apiSource(app, served)),
       seed(`${dir}/src/handlers.ts`, handlersSource),
       seed(`${dir}/src/bin.ts`, binSource),
       ...(worker ? [seed(`${dir}/src/worker.ts`, workerSource(app))] : []),
       seed(`${dir}/test/api.test.ts`, testSource),
       seed(
         `${dir}/README.md`,
-        `# ${ctx.pkg(app.name)}\n\nEffect HttpApi server. \`bun run dev\` serves it on \`$PORT\` (default 3000); try \`/health\` and \`/greetings/Ada\`.\n`,
+        served
+          ? `# ${ctx.pkg(app.name)}\n\nEffect HttpApi, served at \`/api\` by the site that mounts it and deployed with it. \`bun run dev\` also serves it alone on \`$PORT\` (default 3000); try \`/api/health\` and \`/api/greetings/Ada\`.\n`
+          : `# ${ctx.pkg(app.name)}\n\nEffect HttpApi server. \`bun run dev\` serves it on \`$PORT\` (default 3000); try \`/health\` and \`/greetings/Ada\`.\n`,
       ),
     ],
     tasks: [
-      devTask(ctx, app),
-      buildTask(ctx, app, ['dist/**']),
       {
         name: 'start',
         package: ctx.pkg(app.name),

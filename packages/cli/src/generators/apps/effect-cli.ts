@@ -8,9 +8,7 @@ import {
 } from '../shared.ts';
 import {
   appDir,
-  buildTask,
   catalogOf,
-  devTask,
   effectTestDevDependencies,
   forApps,
   vitestConfig,
@@ -99,7 +97,7 @@ export const effectCli = (ctx: GenContext, app: App): Contribution => {
         extra: { bin: { [app.name]: './src/bin.ts' } },
       }),
       packageTsconfig(dir),
-      vitestConfig(dir, app.name),
+      vitestConfig(dir),
       owned(`${dir}/tsdown.config.ts`, tsdownConfig),
       seed(`${dir}/src/cli.ts`, cliSource(app)),
       seed(`${dir}/src/bin.ts`, binSource),
@@ -109,7 +107,6 @@ export const effectCli = (ctx: GenContext, app: App): Contribution => {
         `# ${ctx.pkg(app.name)}\n\nRun it with \`bun run dev -- greet Ada\`.\n`,
       ),
     ],
-    tasks: [devTask(ctx, app), buildTask(ctx, app, ['dist/**'])],
     catalog: catalogOf(dependencies, devDependencies),
   };
 };

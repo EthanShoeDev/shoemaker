@@ -8,9 +8,7 @@ import {
 } from '../shared.ts';
 import {
   appDir,
-  buildTask,
   catalogOf,
-  devTask,
   forApps,
   toolchainDevDependencies,
   vitestConfig,
@@ -227,7 +225,7 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
       }),
       // As in the template: tests sit next to the code and run in happy-dom,
       // with foldkit inlined so vitest transforms its ESM source.
-      vitestConfig(dir, app.name, {
+      vitestConfig(dir, {
         include: ['src/**/*.test.ts'],
         extra: [
           "environment: 'happy-dom'",
@@ -251,7 +249,6 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
         `# ${ctx.pkg(app.name)}\n\n[Foldkit](https://foldkit.dev) single-page app. \`bun run dev\` to develop.\n`,
       ),
     ],
-    tasks: [devTask(ctx, app), buildTask(ctx, app, ['dist/**'])],
     catalog: catalogOf(dependencies, devDependencies),
   };
 };

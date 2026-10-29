@@ -14,16 +14,18 @@ const schemaFrom = (dir: string) =>
 
 const HEADER = `Task-inheritance pattern:
   "^task"        -> run \`task\` in all DEPENDENCY packages first
-  "with": [...]  -> run these tasks in parallel for the SAME package
+  "task"         -> run \`task\` in the SAME package first
   "//#task"      -> a root-only task (defined in root package.json)
+  "pkg#task"     -> \`task\` in one named package
 Leaf commands every package shares are task \`command\`s (argv, no shell),
 defined here once instead of copied into each package.json. A package script
 of the same name overrides one; \`"command": null\` in a package's turbo.jsonc
 opts the package out. Other leaf commands are package scripts. Aggregates
-(\`lint\`, \`lint:check\`) have neither: they only fan out, so turbo is never
-called from a script.
-Turbo uses shallow extend: a package overriding a task must copy the whole
-definition, it is not merged with the root one.
+(\`lint\`, \`lint:check\`) have neither: they only fan out through \`dependsOn\`,
+so turbo is never called from a script.
+A package turbo.jsonc inherits each root task: scalar fields carry over, and
+an array field it sets replaces the root's array.
+@see https://turborepo.dev/docs/reference/package-configurations#inheritance-behavior
 The root depends on no internal package: turbo hashes the source of every
 internal package the root depends on into the global hash, so one such
 dependency misses cache for every task in the repo.
@@ -49,7 +51,6 @@ const turboTask = (task: TaskDef): Jsonc => {
     command:
       task.command === undefined ? undefined : turboCommand(task.command),
     dependsOn: task.dependsOn,
-    with: task.with,
     inputs: task.inputs,
     outputs: task.outputs,
     env: task.env,
@@ -76,32 +77,49 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
     ...Arr.filter(shared, (task) => task.root !== true),
     ...Arr.filter(shared, (task) => task.root === true),
   ];
-  // Apps and declared env vars read the environment, so it keys the cache.
+  // Apps and declared env vars read the environment, so APP_ENV (which picks
+  // the env file every package loads) keys the cache.
   const readsEnv = ctx.config.apps.length > 0 || aggregate.env.length > 0;
-  const plainEnv = pipe(
+  const declaredEnv = pipe(
     aggregate.env,
-    Arr.filter((v) => !v.sensitive),
     Arr.map((v) => v.key),
+    Arr.filter((key) => key !== 'APP_ENV'),
   );
-  const secretEnv = pipe(
-    aggregate.env,
-    Arr.filter((v) => v.sensitive),
-    Arr.map((v) => v.key),
-  );
+  const commands = Arr.some(tasks, (task) => task.command !== undefined);
+  const github = ctx.config.ci === 'github';
 
   const root = owned(
     'turbo.jsonc',
     jsonc({
       $schema: schemaFrom('.'),
       ui: 'tui',
-      futureFlags: Arr.some(tasks, (task) => task.command !== undefined)
-        ? commented(
-            'Task `command` is experimental; it lets every package share one\ndefinition of a leaf command instead of a copied script.',
-            { experimentalTaskCommand: true },
-          )
-        : undefined,
-      globalPassThroughEnv: ['NIX_*', 'TMPDIR', ...secretEnv],
-      globalEnv: readsEnv ? ['APP_ENV', ...plainEnv] : undefined,
+      futureFlags: {
+        experimentalTaskCommand: commands
+          ? commented(
+              'Task `command` is experimental; it lets every package share one\ndefinition of a leaf command instead of a copied script.',
+              true,
+            )
+          : undefined,
+        affectedUsingTaskInputs: commented(
+          '`--affected` selects only the tasks whose `inputs` match the diff,\nnot every task in a changed package.',
+          true,
+        ),
+        githubActionsRemoteBaseRefFallback: github
+          ? commented(
+              'actions/checkout leaves the PR base only as `origin/<base>`; without\nthis `--affected` cannot resolve it and runs every task.',
+              true,
+            )
+          : undefined,
+      },
+      cacheMaxSize: commented(
+        'Bounds the local cache, which CI also restores between runs.',
+        '2GB',
+      ),
+      globalPassThroughEnv: commented(
+        "Declared vars are read at run time (ports, deploy stages, secrets), not\nbaked into outputs, so they reach tasks without keying the cache. Vite's\nbuild-time VITE_* vars are hashed by turbo's framework inference. NIX_*\npasses through by default.",
+        ['TMPDIR', ...declaredEnv],
+      ),
+      globalEnv: readsEnv ? ['APP_ENV'] : undefined,
       globalDependencies: [
         ...(hasApp(ctx.config, 'expo') ? ['bunfig.toml'] : []),
         'patches/**',

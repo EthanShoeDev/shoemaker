@@ -13,6 +13,7 @@ import {
   monorepoLayout,
   nixDevShell,
   scriptNames,
+  turboFixUncached,
   turboJsonc,
   turboTaskCommands,
   typescript7,
@@ -25,6 +26,7 @@ const rootWith = (extra: Record<string, unknown>) =>
     name: 'demo',
     type: 'module',
     packageManager: 'bun@1.4.4',
+    devEngines: { packageManager: { name: 'bun', version: '1.4.4' } },
     workspaces: { packages: ['apps/*', 'packages/*'] },
     ...extra,
   });
@@ -219,6 +221,44 @@ describe('tooling doctor checks', () => {
         Arr.map(found, (f) => f.path),
         ['package.json', 'flake.nix'],
       );
+    }),
+  );
+
+  it.effect('bun-version: devEngines.packageManager is required', () =>
+    Effect.gen(function* () {
+      const found = yield* failures(bunVersion, {
+        'package.json': rootWith({ devEngines: undefined }),
+      });
+      assert.deepStrictEqual(
+        Arr.map(found, (f) => f.message),
+        ['devEngines.packageManager is not bun 1.4.4'],
+      );
+    }),
+  );
+
+  it.effect('turbo-fix-uncached: every fix task sets cache: false', () =>
+    Effect.gen(function* () {
+      const found = yield* failures(turboFixUncached, {
+        'turbo.jsonc': json({
+          tasks: {
+            'oxlint:fix': {},
+            '//#oxfmt:fix': { cache: false },
+            '//#knip:fix:danger': { cache: true },
+            'oxlint:check': {},
+            prefix: {},
+          },
+        }),
+        'apps/web/turbo.jsonc': json({ tasks: { 'lint:fix': {} } }),
+      });
+      assert.lengthOf(found, 1);
+      for (const task of [
+        'turbo.jsonc#oxlint:fix',
+        'turbo.jsonc#//#knip:fix:danger',
+        'apps/web/turbo.jsonc#lint:fix',
+      ]) {
+        assert.include(found[0]?.message, task);
+      }
+      assert.notInclude(found[0]?.message, 'oxfmt');
     }),
   );
 

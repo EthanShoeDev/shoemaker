@@ -20,8 +20,8 @@ export const sharedIgnorePatterns = [
   '**/.output/**',
   '**/.nitro/**',
   '**/.alchemy/**',
-  // Dependency docs cloned for agents to read.
-  'docs/cloned-repos-as-docs/**',
+  // Reference repos cloned for agents to read (gitignored).
+  '.external/**',
   // Agent skill bundles are not project code.
   '.agents/**',
   '.claude/**',

@@ -7,7 +7,6 @@ import type {
   Generator,
 } from '../../engine/types.ts';
 import { owned } from '../shared.ts';
-import type { TaskDef } from '../task-runner/model.ts';
 
 // Building blocks the app and library generators share. Each kind module
 // exports a `(ctx, unit) => Contribution` builder; `forApps` / `forPackages`
@@ -86,6 +85,8 @@ export interface VitestOptions {
   // `mts` in packages that are not `"type": "module"` (Expo), so Vite loads
   // the config as ESM.
   readonly extension?: 'ts' | 'mts';
+  // Merge the package's vite.config.ts, which a vitest.config replaces.
+  readonly mergeViteConfig?: boolean;
 }
 
 const list = (items: ReadonlyArray<string>) =>
@@ -95,51 +96,44 @@ const list = (items: ReadonlyArray<string>) =>
     Arr.join(', '),
   )}]`;
 
-// Unique project name so the root vitest `projects` list can hold every app.
-export const vitestConfig = (
-  dir: string,
-  name: string,
-  options: VitestOptions = {},
-) =>
-  owned(
-    `${dir}/vitest.config.${options.extension ?? 'ts'}`,
-    `import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
+const testBlock = (options: VitestOptions, indent: string) =>
+  `${indent}test: {
 ${pipe(
   [
-    `name: '${name}-unit'`,
     `include: ${list(options.include ?? ['test/**/*.test.{ts,tsx}'])}`,
     ...(options.extra ?? []),
   ],
-  Arr.map((entry) => `    ${entry},`),
+  Arr.map((entry) => `${indent}  ${entry},`),
   Arr.join('\n'),
 )}
-  },
+${indent}},`;
+
+// A project config, so the root vitest `projects` list can hold every
+// package; Vitest names each project after its package.json name.
+export const vitestConfig = (dir: string, options: VitestOptions = {}) =>
+  owned(
+    `${dir}/vitest.config.${options.extension ?? 'ts'}`,
+    options.mergeViteConfig === true
+      ? `import { defineProject, mergeConfig } from 'vitest/config';
+
+import viteConfig from './vite.config.ts';
+
+// A vitest.config replaces vite.config, so merge it: tests run with the same
+// plugins as the build.
+export default mergeConfig(
+  viteConfig,
+  defineProject({
+${testBlock(options, '    ')}
+  }),
+);
+`
+      : `import { defineProject } from 'vitest/config';
+
+export default defineProject({
+${testBlock(options, '  ')}
 });
 `,
   );
-
-// Long-running dev servers are never cached and never finish.
-export const devTask = (ctx: GenContext, unit: Unit): TaskDef => ({
-  name: 'dev',
-  package: ctx.pkg(unit.name),
-  persistent: true,
-  cache: false,
-  comment: 'Dev server: long-running, never cached.',
-});
-
-export const buildTask = (
-  ctx: GenContext,
-  unit: Unit,
-  outputs: ReadonlyArray<string>,
-): TaskDef => ({
-  name: 'build',
-  package: ctx.pkg(unit.name),
-  dependsOn: ['^build'],
-  outputs,
-});
 
 export const pascalCase = (name: string) =>
   pipe(name, Str.split('-'), Arr.map(Str.capitalize), Arr.join(''));

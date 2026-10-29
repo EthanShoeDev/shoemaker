@@ -9,6 +9,7 @@ import {
 import { type ParseError, parse } from 'jsonc-parser';
 
 import type { ShoemakerConfig } from '../../../src/config/schema.ts';
+import { isFixTask } from '../../../src/doctor/tooling.ts';
 import type { GeneratedFile } from '../../../src/engine/types.ts';
 import { parseRef } from '../../../src/generators/task-runner/refs.ts';
 import { packageCommands } from '../../../src/generators/task-runner/tasks.ts';
@@ -61,6 +62,14 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
     ),
   );
 
+  const packageNames = pipe(
+    files,
+    Arr.filter((f) =>
+      /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(f.path),
+    ),
+    Arr.map((f) => String(record(parseJson(f)).name)),
+  );
+
   const defined = (ref: string) => {
     const parsed = parseRef(ref);
     if (parsed.kind === 'root') return `//#${parsed.task}` in tasks;
@@ -76,7 +85,13 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
   it('parses and has the shared settings', () => {
     const turbo = parseJsonc(file('turbo.jsonc').content);
     assert.strictEqual(turbo.ui, 'tui');
-    assert.include(strings(turbo.globalPassThroughEnv), 'NIX_*');
+    // turbo passes NIX_* through by default; declared vars never key the
+    // cache, only APP_ENV does.
+    assert.notInclude(strings(turbo.globalPassThroughEnv), 'NIX_*');
+    assert.include(strings(turbo.globalPassThroughEnv), 'TMPDIR');
+    assert.isTrue(
+      Arr.every(strings(turbo.globalEnv), (key) => key === 'APP_ENV'),
+    );
     assert.include(file('turbo.jsonc').content, '// Task-inheritance pattern:');
     assert.isFalse(byPath.has('nx.json'));
   });
@@ -90,10 +105,7 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
     ];
     const dangling = pipe(
       all,
-      Arr.flatMap((task) => [
-        ...strings(record(task).dependsOn),
-        ...strings(record(task).with),
-      ]),
+      Arr.flatMap((task) => strings(record(task).dependsOn)),
       Arr.filter((ref) => !defined(ref)),
     );
     assert.deepStrictEqual(dangling, []);
@@ -101,10 +113,10 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
 
   it('fans lint:check out to the root checkers', () => {
     assert.include(
-      strings(record(tasks['lint:check']).with),
+      strings(record(tasks['lint:check']).dependsOn),
       '//#lint:check:root',
     );
-    const rootChecks = strings(record(tasks['//#lint:check:root']).with);
+    const rootChecks = strings(record(tasks['//#lint:check:root']).dependsOn);
     for (const check of [
       '//#oxfmt:check',
       '//#knip:check',
@@ -123,9 +135,14 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
 
   it('defines shared leaf commands once, run through bun', () => {
     const turbo = parseJsonc(file('turbo.jsonc').content);
-    assert.deepStrictEqual(record(turbo.futureFlags), {
+    assert.deepInclude(record(turbo.futureFlags), {
       experimentalTaskCommand: true,
+      affectedUsingTaskInputs: true,
     });
+    assert.strictEqual(
+      record(turbo.futureFlags).githubActionsRemoteBaseRefFallback,
+      base.ci === 'github' ? true : undefined,
+    );
     for (const [name, argv] of Rec.toEntries(packageCommands)) {
       assert.deepStrictEqual(
         strings(record(tasks[name]).command),
@@ -140,6 +157,23 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
         assert.notStrictEqual(scripts[name], Arr.join(argv, ' '), path);
       }
     }
+  });
+
+  it('never caches a fixer and runs fixers of the same files in order', () => {
+    const fixers = Arr.filter(Rec.keys(tasks), isFixTask);
+    for (const key of fixers) {
+      assert.strictEqual(record(tasks[key]).cache, false, key);
+    }
+    const oxfmt = strings(record(tasks['//#oxfmt:fix']).dependsOn);
+    assert.include(oxfmt, '//#oxlint:fix');
+    assert.include(oxfmt, '//#catalog:fix');
+    for (const pkg of packageNames) {
+      assert.include(oxfmt, `${pkg}#oxlint:fix`);
+    }
+    assert.deepStrictEqual(
+      strings(record(tasks['//#knip:fix:danger']).dependsOn),
+      ['//#oxfmt:fix'],
+    );
   });
 
   it('extends the root config from package overrides', () => {
@@ -162,6 +196,19 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
       const project = parseJson(f);
       return [String(project.name), record(project.targets)] as const;
     }),
+  );
+
+  const scriptsOf = new Map(
+    pipe(
+      files,
+      Arr.filter((f) =>
+        /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(f.path),
+      ),
+      Arr.map((f) => {
+        const manifest = record(parseJson(f));
+        return [String(manifest.name), record(manifest.scripts)] as const;
+      }),
+    ),
   );
 
   it('parses and is shaped like nx 24 config', () => {
@@ -201,10 +248,14 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
         if (entry.dependencies === true) {
           assert.isTrue(name in defaults, `^${name}`);
         } else {
+          // nx infers a target from every package.json script too.
           for (const project of strings(entry.projects)) {
             const targets = projects.get(project);
             assert.isDefined(targets, project);
-            assert.isTrue(name in (targets ?? {}), `${project}:${name}`);
+            assert.isTrue(
+              name in (targets ?? {}) || name in (scriptsOf.get(project) ?? {}),
+              `${project}:${name}`,
+            );
           }
         }
       }

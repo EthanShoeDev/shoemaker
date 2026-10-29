@@ -137,6 +137,56 @@ describe('inferConfig', () => {
     }),
   );
 
+  it.effect('lists the GitHub provider, which deploys nothing', () =>
+    Effect.gen(function* () {
+      const config = yield* inferConfig(
+        makeMemoryRepo({
+          'package.json': json({ name: 'gh-only' }),
+          'alchemy.run.ts':
+            "import * as GitHub from '@alchemy.run/github';\nexport default Alchemy.Stack('x', { providers: GitHub.providers() });\n",
+        }),
+      );
+      yield* decodeConfig(config);
+      assert.deepStrictEqual(config.infra, {
+        kind: 'alchemy',
+        deploy: 'none',
+        state: 'local',
+        providers: ['github'],
+      });
+    }),
+  );
+
+  it.effect('sees a site that serves an effect-api app at /api', () =>
+    Effect.gen(function* () {
+      const config = yield* inferConfig(
+        makeMemoryRepo({
+          'package.json': json({ name: 'shop', workspaces: ['apps/*'] }),
+          'apps/web/package.json': json({
+            name: '@shop/web',
+            dependencies: {
+              '@shop/api': 'workspace:*',
+              '@tanstack/react-start': 'catalog:',
+            },
+          }),
+          'apps/web/src/routes/api.$.ts': '',
+          'apps/api/package.json': json({
+            name: '@shop/api',
+            dependencies: {
+              '@effect/platform-bun': 'catalog:',
+              effect: 'catalog:',
+            },
+          }),
+          'apps/api/src/handlers.ts': 'HttpApiBuilder.group(Api)',
+        }),
+      );
+      yield* decodeConfig(config);
+      assert.deepStrictEqual(config.apps, [
+        { name: 'api', kind: 'effect-api' },
+        { name: 'web', kind: 'tanstack-start', api: 'api' },
+      ]);
+    }),
+  );
+
   it.effect('falls back to the directory name without a package.json', () =>
     Effect.gen(function* () {
       const config = yield* inferConfig(makeMemoryRepo({}, '/x/Some Repo'));

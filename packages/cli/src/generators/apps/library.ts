@@ -57,7 +57,7 @@ export const library = (ctx: GenContext, pkg: Package): Contribution => {
         devDependencies,
       }),
       packageTsconfig(dir),
-      vitestConfig(dir, pkg.name),
+      vitestConfig(dir),
       seed(`${dir}/src/index.ts`, indexSource(ctx, pkg)),
       seed(`${dir}/test/index.test.ts`, testSource(pkg)),
       seed(

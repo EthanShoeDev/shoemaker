@@ -77,6 +77,7 @@ const configLines = (config: ShoemakerConfig): ReadonlyArray<Line> => [
     Arr.map(config.apps, (app) => [
       prop('name', app.name),
       prop('kind', app.kind),
+      ...(app.api === undefined ? [] : [prop('api', app.api)]),
     ]),
   ),
   objects(
@@ -95,6 +96,9 @@ const configLines = (config: ShoemakerConfig): ReadonlyArray<Line> => [
           prop('kind', config.infra.kind),
           prop('deploy', config.infra.deploy),
           prop('state', config.infra.state),
+          ...(config.infra.providers === undefined
+            ? []
+            : [strings('providers', config.infra.providers)]),
         ]
       : [prop('kind', config.infra.kind)],
   ),

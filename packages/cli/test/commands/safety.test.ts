@@ -83,9 +83,11 @@ describe('add', () => {
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const dir = yield* scratch();
-          yield* run(['init', '--yes', '--no-install', '--git', dir], []);
-          yield* git(dir, 'add', '-A');
-          yield* git(dir, 'commit', '-qm', 'init');
+          yield* run(['init', '--yes', '--git', dir], []);
+          const log = yield* git(dir, 'log', '--format=%s');
+          assert.strictEqual(log.stdout, 'init via shoemaker\n');
+          const status = yield* git(dir, 'status', '--porcelain');
+          assert.strictEqual(status.stdout, '');
 
           const out: Array<string> = [];
           yield* run(['add', 'app', 'effect-api', '--cwd', dir], out);
@@ -99,15 +101,7 @@ describe('add', () => {
           // Upgraded and fresh repos are byte-identical.
           const fresh = yield* scratch();
           yield* run(
-            [
-              'init',
-              '--yes',
-              '--no-install',
-              '--no-git',
-              '--apps',
-              'effect-api',
-              fresh,
-            ],
+            ['init', '--yes', '--no-git', '--apps', 'effect-api', fresh],
             [],
           );
           // Seeds are written once and never updated, so they may differ.

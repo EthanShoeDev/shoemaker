@@ -1,7 +1,8 @@
 import { Array as Arr, pipe } from 'effect';
 
 import type { Generator, Renderer } from '../../engine/types.ts';
-import { managed, owned } from '../shared.ts';
+import { nixpkgsLock } from '../../versions.ts';
+import { managed, owned, seed } from '../shared.ts';
 
 // Prebuilt bun release archives for the version in `packageManager`
 // (package-json.ts) and the CI setup action. nixpkgs lags bun releases, so
@@ -122,7 +123,38 @@ ${nixRegion('shell-hook', '          export TZ=UTC', '          ')}
   return [managed('flake.nix', content)];
 };
 
+// What `nix flake lock` writes for the flake's one input, pinned so a new repo
+// is locked (and committed) before any nix command runs. Seeded: `nix flake
+// update` owns it from then on.
+const flakeLock = `${JSON.stringify(
+  {
+    nodes: {
+      nixpkgs: {
+        locked: {
+          lastModified: nixpkgsLock.lastModified,
+          narHash: nixpkgsLock.narHash,
+          owner: 'nixos',
+          repo: 'nixpkgs',
+          rev: nixpkgsLock.rev,
+          type: 'github',
+        },
+        original: {
+          owner: 'nixos',
+          ref: 'nixpkgs-unstable',
+          repo: 'nixpkgs',
+          type: 'github',
+        },
+      },
+      root: { inputs: { nixpkgs: 'nixpkgs' } },
+    },
+    root: 'root',
+    version: 7,
+  },
+  null,
+  2,
+)}\n`;
+
 export const nixFiles: Generator = () => ({
-  files: [owned('.envrc', 'use flake\n')],
+  files: [owned('.envrc', 'use flake\n'), seed('flake.lock', flakeLock)],
   gitignore: ['.direnv', 'result', 'result-*'],
 });

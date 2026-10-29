@@ -6,7 +6,6 @@ import { json, owned, seed, workspacePackageJson } from '../shared.ts';
 import {
   appDir,
   catalogOf,
-  devTask,
   forApps,
   toolchainDevDependencies,
   vitestConfig,
@@ -146,7 +145,7 @@ export const expoApp = (ctx: GenContext, app: App): Contribution => {
         extra: { main: 'expo-router/entry' },
       }),
       tsconfig(dir),
-      vitestConfig(dir, app.name, { extension: 'mts' }),
+      vitestConfig(dir, { extension: 'mts' }),
       owned(`${dir}/metro.config.ts`, metroConfig),
       seed(`${dir}/app.config.ts`, appConfig(app)),
       seed(`${dir}/app/_layout.tsx`, layoutSource),
@@ -158,15 +157,12 @@ export const expoApp = (ctx: GenContext, app: App): Contribution => {
         `# ${ctx.pkg(app.name)}\n\nExpo Router app. \`bun run dev\` starts Metro; \`bun run ios\` / \`bun run android\` open a simulator.\n`,
       ),
     ],
-    tasks: [
-      devTask(ctx, app),
-      ...Arr.map(['ios', 'android'], (name) => ({
-        name,
-        package: ctx.pkg(app.name),
-        persistent: true,
-        cache: false,
-      })),
-    ],
+    tasks: Arr.map(['ios', 'android'], (name) => ({
+      name,
+      package: ctx.pkg(app.name),
+      persistent: true,
+      cache: false,
+    })),
     catalog: catalogOf(dependencies, devDependencies),
     gitignore: ['.expo/', 'expo-env.d.ts'],
   };

@@ -53,6 +53,7 @@ export const PackageJson = Schema.Struct({
   description: Schema.optional(Schema.String),
   type: Schema.optional(Schema.String),
   packageManager: Schema.optional(Schema.String),
+  devEngines: Schema.optional(Schema.Unknown),
   bin: Schema.optional(Schema.Union([Schema.String, StringRecord])),
   exports: Schema.optional(Schema.Unknown),
   main: Schema.optional(Schema.String),

@@ -19,6 +19,7 @@ import {
 import { CONFIG_PATH } from '../config/load.ts';
 import { renderConfigFile } from '../config/render.ts';
 import {
+  type AlchemyProvider,
   type App,
   type AppKind,
   type Features,
@@ -36,6 +37,7 @@ import { runInherit } from '../engine/process.ts';
 import { makeRepo } from '../engine/repo-live.ts';
 import { renderSummary } from '../engine/report.ts';
 import { renderFiles } from '../engine/sync.ts';
+import { PROVIDERS } from '../generators/infra/target.ts';
 import { fail, style } from './shared.ts';
 
 const APP_KINDS: ReadonlyArray<AppKind> = [
@@ -77,6 +79,8 @@ const isDeployTarget = (value: string): value is DeployTarget =>
   Arr.some(DEPLOY_TARGETS, (target) => target === value);
 const isStateStore = (value: string): value is StateStore =>
   Arr.some(STATE_STORES, (store) => store === value);
+const isProvider = (value: string): value is AlchemyProvider =>
+  Arr.some(PROVIDERS, (provider) => provider === value);
 
 const invalid = (option: string, value: string, expected: string) =>
   CliError.InvalidValue.make({ option, value, expected, kind: 'flag' });
@@ -113,6 +117,25 @@ export const nameApps = (
   });
 };
 
+// The first TanStack Start app serves the first effect-api app at /api: one
+// origin and one deployment, so that is the default whenever both exist.
+const firstSiteAndApi = (apps: ReadonlyArray<App>) => {
+  const site = Arr.findFirst(apps, (app) => app.kind === 'tanstack-start');
+  const api = Arr.findFirst(apps, (app) => app.kind === 'effect-api');
+  return Option.isSome(site) && Option.isSome(api)
+    ? { site: site.value, api: api.value }
+    : undefined;
+};
+
+const serveApi = (apps: ReadonlyArray<App>, serve: boolean) => {
+  const pair = firstSiteAndApi(apps);
+  return Arr.map(apps, ({ api: _served, ...app }): App =>
+    serve && pair !== undefined && app.name === pair.site.name
+      ? { ...app, api: pair.api.name }
+      : app,
+  );
+};
+
 const kebab = (label: string, allowBlank: boolean) => (value: string) =>
   (allowBlank && value === '') || KEBAB.test(value)
     ? Effect.succeed(value)
@@ -131,7 +154,7 @@ const parseApps = (value: string) =>
             `<kind>[:<name>], kind one of ${Arr.join(APP_KINDS, ', ')}`,
           ),
         );
-  }).pipe(Effect.map((requested) => nameApps(requested)));
+  }).pipe(Effect.map((requested) => serveApi(nameApps(requested), true)));
 
 const toPackages = (names: ReadonlyArray<string>): ReadonlyArray<Package> =>
   Arr.map(names, (name) => ({ name, kind: 'library' }));
@@ -166,6 +189,26 @@ const parseInfra = (value: string) => {
     : Effect.fail(invalid('infra', value, INFRA_SYNTAX));
 };
 
+// `--alchemy-providers github` or `cloudflare,github`; `none` for an empty list.
+const parseProviders = (value: string) => {
+  const names = Arr.filter(splitList(value), (name) => name !== 'none');
+  return Option.match(
+    Arr.findFirst(names, (name) => !isProvider(name)),
+    {
+      onNone: () =>
+        Effect.succeed(Arr.filter(PROVIDERS, (p) => names.includes(p))),
+      onSome: (bad) =>
+        Effect.fail(
+          invalid(
+            'alchemy-providers',
+            bad,
+            `${Arr.join(PROVIDERS, ', ')} or none`,
+          ),
+        ),
+    },
+  );
+};
+
 const toFeatures = (extras: ReadonlyArray<string>): Features => ({
   changesets: extras.includes('changesets'),
   agents: extras.includes('agents'),
@@ -184,6 +227,17 @@ const parseExtras = (value: string) => {
         ),
     },
   );
+};
+
+// Asked only when there is a site and an API to pair.
+const servePrompt = (apps: ReadonlyArray<App>) => {
+  const pair = firstSiteAndApi(apps);
+  return pair === undefined
+    ? Prompt.succeed(apps)
+    : Prompt.Confirm({
+        message: `Serve the ${pair.api.name} API from the ${pair.site.name} app at /api? (one origin, one deployment)`,
+        initial: true,
+      }).pipe(Prompt.map((serve) => serveApi(apps, serve)));
 };
 
 const appsPrompt = Prompt.MultiSelect({
@@ -205,7 +259,7 @@ const appsPrompt = Prompt.MultiSelect({
               validate: kebab('App name', false),
             }).pipe(Prompt.map((name): App => ({ kind: app.kind, name }))),
           ),
-        ),
+        ).pipe(Prompt.flatMap(servePrompt)),
   ),
 );
 
@@ -219,48 +273,84 @@ const infraPrompt = Prompt.Select({
   Prompt.flatMap((kind) =>
     kind === 'none'
       ? Prompt.succeed<Infra>({ kind: 'none' })
-      : Prompt.all([
-          Prompt.Select({
-            message: 'Deploy apps to',
-            choices: [
-              { title: 'Cloudflare', value: 'cloudflare' as const },
-              { title: 'AWS', value: 'aws' as const },
-              {
-                title: 'nowhere yet',
-                value: 'none' as const,
-                description: 'add resources to alchemy.run.ts by hand',
-              },
-            ],
-          }),
-          Prompt.Select({
-            message: 'Alchemy state store',
-            choices: [
-              {
-                title: 'local',
-                value: 'local' as const,
-                description: '.alchemy/, gitignored; nothing created remotely',
-              },
-              {
-                title: 'Cloudflare',
-                value: 'cloudflare' as const,
-                description: 'shared; a state Worker is created on first use',
-              },
-              {
-                title: 'AWS',
-                value: 'aws' as const,
-                description: 'shared; an S3 bucket is created on first use',
-              },
-            ],
-          }),
-        ]).pipe(
-          Prompt.map(([deploy, state]): Infra => ({
-            kind: 'alchemy',
-            deploy,
-            state,
-          })),
-        ),
+      : Prompt.MultiSelect({
+          message: 'Alchemy providers (none is fine)',
+          choices: [
+            {
+              title: 'Cloudflare',
+              value: 'cloudflare' as const,
+              description: 'Workers, sites, R2, D1, ...',
+            },
+            {
+              title: 'AWS',
+              value: 'aws' as const,
+              description: 'Lambda, S3, sites, ...',
+            },
+            {
+              title: 'GitHub',
+              value: 'github' as const,
+              description: 'repos, Actions secrets and variables',
+            },
+          ],
+        }).pipe(Prompt.flatMap(alchemyPrompt)),
   ),
 );
+
+const DEPLOY_CHOICES = [
+  { title: 'Cloudflare', value: 'cloudflare' as const },
+  { title: 'AWS', value: 'aws' as const },
+];
+
+// Apps deploy to one of the chosen clouds, so the question only comes up
+// when there is one.
+const alchemyPrompt = (picked: ReadonlyArray<AlchemyProvider>) => {
+  const providers = Arr.filter(PROVIDERS, (p) => picked.includes(p));
+  const clouds = Arr.filter(DEPLOY_CHOICES, (choice) =>
+    providers.includes(choice.value),
+  );
+  return Prompt.all([
+    clouds.length === 0
+      ? Prompt.succeed<DeployTarget>('none')
+      : Prompt.Select<DeployTarget>({
+          message: 'Deploy apps to',
+          choices: [
+            ...clouds,
+            {
+              title: 'nowhere yet',
+              value: 'none',
+              description: 'add resources to alchemy.run.ts by hand',
+            },
+          ],
+        }),
+    Prompt.Select({
+      message: 'Alchemy state store',
+      choices: [
+        {
+          title: 'local',
+          value: 'local' as const,
+          description: '.alchemy/, gitignored; nothing created remotely',
+        },
+        {
+          title: 'Cloudflare',
+          value: 'cloudflare' as const,
+          description: 'shared; a state Worker is created on first use',
+        },
+        {
+          title: 'AWS',
+          value: 'aws' as const,
+          description: 'shared; an S3 bucket is created on first use',
+        },
+      ],
+    }),
+  ]).pipe(
+    Prompt.map(([deploy, state]): Infra => ({
+      kind: 'alchemy',
+      deploy,
+      state,
+      providers,
+    })),
+  );
+};
 
 // effect 4.0.6's withFallbackPrompt prompts even without a TTY, so gate it on
 // TerminalCapabilities (which `--yes` switches off): failing with
@@ -371,6 +461,13 @@ const config = {
     fallback('infra', infraPrompt),
     Flag.optional,
   ),
+  alchemyProviders: Flag.String('alchemy-providers').pipe(
+    Flag.withDescription(
+      `Comma list of extra alchemy providers (${Arr.join(PROVIDERS, ', ')}), or none; the deploy target's is always included`,
+    ),
+    Flag.mapEffect(parseProviders),
+    Flag.optional,
+  ),
   ci: Flag.Literals('ci', ['github', 'none']).pipe(
     Flag.withDescription('CI provider (default: github)'),
     fallback(
@@ -424,12 +521,16 @@ const config = {
     Flag.withDescription('Write into a non-empty directory, overwriting files'),
     Flag.withDefault(false),
   ),
-  git: Flag.Boolean('git').pipe(
-    Flag.withDescription('Run git init (--no-git to skip)'),
+  serveApi: Flag.Boolean('serve-api').pipe(
+    Flag.withDescription(
+      'Serve the first effect-api app from the first tanstack-start app at /api (--no-serve-api to keep them apart)',
+    ),
     Flag.withDefault(true),
   ),
-  install: Flag.Boolean('install').pipe(
-    Flag.withDescription('Run bun install (--no-install to skip)'),
+  git: Flag.Boolean('git').pipe(
+    Flag.withDescription(
+      'Run git init and commit the generated files as "init via shoemaker" (--no-git to skip)',
+    ),
     Flag.withDefault(true),
   ),
 } as const;
@@ -444,6 +545,26 @@ const toKebab = (value: string) =>
     /^[^a-z]+|-+$/gu,
     '',
   )(Str.replaceAll(/[^a-z0-9-]+/gu, '-')(Str.toLowerCase(value)));
+
+// `--alchemy-providers` adds to whatever `--infra` or the prompt chose.
+const withProviders = (
+  infra: Infra,
+  extra: Option.Option<ReadonlyArray<AlchemyProvider>>,
+) =>
+  Option.match(extra, {
+    onNone: () => Effect.succeed(infra),
+    onSome: (providers) =>
+      infra.kind === 'alchemy'
+        ? Effect.succeed<Infra>({
+            ...infra,
+            providers: Arr.filter(
+              PROVIDERS,
+              (p) =>
+                providers.includes(p) || (infra.providers ?? []).includes(p),
+            ),
+          })
+        : fail('--alchemy-providers needs --infra alchemy'),
+  });
 
 export const runInit = Effect.fnUntraced(function* (input: InitInput) {
   const fs = yield* FileSystem.FileSystem;
@@ -473,11 +594,19 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
       input.description,
       () => defaults.description,
     ),
-    apps: Option.getOrElse(input.apps, () => defaults.apps),
+    apps: input.serveApi
+      ? Option.getOrElse(input.apps, () => defaults.apps)
+      : serveApi(
+          Option.getOrElse(input.apps, () => defaults.apps),
+          false,
+        ),
     packages: Option.getOrElse(input.libraries, () => defaults.packages),
     taskRunner: Option.getOrElse(input.taskRunner, () => defaults.taskRunner),
     secrets: Option.getOrElse(input.secrets, () => defaults.secrets),
-    infra: Option.getOrElse(input.infra, () => defaults.infra),
+    infra: yield* withProviders(
+      Option.getOrElse(input.infra, () => defaults.infra),
+      input.alchemyProviders,
+    ),
     ci: Option.getOrElse(input.ci, () => defaults.ci),
     features: Option.getOrElse(input.extras, () => defaults.features),
     nixPackages: Option.getOrElse(
@@ -505,13 +634,23 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
   if (input.git && !(yield* fs.exists(path.join(root, '.git')))) {
     const code = yield* runInherit('git', ['init', '-q'], root);
     if (code !== 0) yield* Console.error(s.yellow('git init failed; skipped'));
-    // Nix flakes only see git-tracked files, so stage everything (no commit)
-    // or `nix develop` / `nix fmt` fail on the untracked flake.nix.
-    else yield* runInherit('git', ['add', '-A'], root);
-  }
-  if (input.install) {
-    const code = yield* runInherit('bun', ['install'], root);
-    if (code !== 0) return yield* fail('bun install failed');
+    else {
+      // One commit of exactly what shoemaker generated, so later diffs show
+      // what changed since. Nix flakes also only see git-tracked files.
+      yield* runInherit('git', ['add', '-A'], root);
+      const committed = yield* runInherit(
+        'git',
+        ['commit', '-q', '-m', 'init via shoemaker'],
+        root,
+      );
+      if (committed !== 0) {
+        yield* Console.error(
+          s.yellow(
+            'git commit failed (are user.name and user.email set?); the files are staged',
+          ),
+        );
+      }
+    }
   }
 
   const relative = path.relative(process.cwd(), root);
@@ -522,7 +661,8 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
         '',
         s.bold('Next steps'),
         ...(cd === '' ? [] : [`  cd ${cd}`]),
-        ...(input.install ? [] : ['  bun install']),
+        // Installing is left to the user: it touches the network and caches.
+        '  bun install',
         // lint:check is a task-runner aggregate, not a package script.
         shoemakerConfig.taskRunner === 'nx'
           ? `  bunx nx run-many -t lint:check && bunx nx run ${shoemakerConfig.name}:lint:check:root`

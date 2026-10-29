@@ -123,25 +123,29 @@ describe.each(cases)('$app.kind app', ({ app, files: expected }) => {
     }
   });
 
-  it('names its vitest project after the app', () => {
+  it('configures vitest as a project named by its package.json', () => {
     const vitest =
       byPath.get(`apps/${app.name}/vitest.config.ts`) ??
       byPath.get(`apps/${app.name}/vitest.config.mts`);
-    assert.include(vitest?.content, `name: '${app.name}-unit'`);
+    assert.include(vitest?.content, 'defineProject(');
+    assert.notInclude(vitest?.content, 'name:');
+    // A vitest.config replaces vite.config; only Start merges it back in
+    // (foldkit follows its upstream template, which does not).
+    assert.strictEqual(
+      Str.includes("import viteConfig from './vite.config.ts'")(
+        vitest?.content ?? '',
+      ),
+      app.kind === 'tanstack-start',
+    );
   });
 
-  it('registers a persistent, uncached dev task', () => {
-    const dev = pipe(
+  it('leaves dev and build to the root task definitions', () => {
+    const overridden = pipe(
       contributions,
       Arr.flatMap(({ contribution }) => contribution.tasks ?? []),
-      Arr.findFirst((task) => task.name === 'dev'),
-      Option.getOrUndefined,
+      Arr.filter((task) => task.name === 'dev' || task.name === 'build'),
     );
-    assert.deepInclude(dev, {
-      package: `@sample/${app.name}`,
-      persistent: true,
-      cache: false,
-    });
+    assert.deepStrictEqual(overridden, []);
   });
 
   it.effect('emits TypeScript that parses', () => assertSourcesParse(files));
@@ -291,5 +295,93 @@ describe('kind specifics', () => {
       });
       return assertSourcesParse(allApps(config).files);
     }),
+  );
+});
+
+describe('tanstack-start serving an effect-api app', () => {
+  const apps: ReadonlyArray<App> = [
+    { name: 'web', kind: 'tanstack-start', api: 'api' },
+    { name: 'api', kind: 'effect-api' },
+  ];
+  const served = allApps(
+    sampleConfig({
+      apps,
+      infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
+    }),
+  );
+
+  it('mounts the API at /api and calls it through one client', () => {
+    const paths = Arr.map(served.files, (f) => f.path);
+    assert.includeMembers(paths, [
+      'apps/web/src/api.server.ts',
+      'apps/web/src/api-client.ts',
+      'apps/web/src/routes/api.$.ts',
+      'apps/web/test/api-client.test.ts',
+    ]);
+    assert.include(
+      served.file('apps/web/src/routes/api.$.ts').content,
+      "createFileRoute('/api/$')",
+    );
+    assert.include(
+      served.file('apps/web/src/routeTree.gen.ts').content,
+      "'/api/$': typeof ApiSplatRoute",
+    );
+    assert.include(
+      served.file('apps/api/src/api.ts').content,
+      ".prefix('/api')",
+    );
+  });
+
+  it('picks the transport at the compiler boundary', () => {
+    const client = served.file('apps/web/src/api-client.ts').content;
+    assert.include(client, 'createIsomorphicFn()');
+    assert.include(client, "from './api.server.ts'");
+    assert.include(
+      served.file('apps/web/src/routes/index.tsx').content,
+      'callApi(',
+    );
+  });
+
+  it("denies the API's handlers in the browser bundle", () => {
+    assert.include(
+      served.file('apps/web/vite.config.ts').content,
+      "client: { specifiers: ['@sample/api/handlers'] }",
+    );
+  });
+
+  it('depends on the API package, which exports its handlers', () => {
+    const web = parseJson(served.file('apps/web/package.json'));
+    assert.strictEqual(record(web.dependencies)['@sample/api'], 'workspace:*');
+    const api = parseJson(served.file('apps/api/package.json'));
+    assert.strictEqual(record(api.exports)['./handlers'], './src/handlers.ts');
+  });
+
+  it('deploys the API inside the site, with no Worker of its own', () => {
+    const paths = Arr.map(served.files, (f) => f.path);
+    assert.notInclude(paths, 'apps/api/src/worker.ts');
+    const api = parseJson(served.file('apps/api/package.json'));
+    assert.notProperty(record(api.dependencies), '@alchemy.run/cloudflare');
+  });
+
+  it('leaves a site without `api` unchanged', () => {
+    const plain = allApps(
+      sampleConfig({
+        apps: [
+          { name: 'web', kind: 'tanstack-start' },
+          { name: 'api', kind: 'effect-api' },
+        ],
+      }),
+    );
+    const paths = Arr.map(plain.files, (f) => f.path);
+    assert.notInclude(paths, 'apps/web/src/api-client.ts');
+    assert.notInclude(plain.file('apps/api/src/api.ts').content, 'prefix');
+    assert.notInclude(
+      plain.file('apps/web/vite.config.ts').content,
+      'importProtection',
+    );
+  });
+
+  it.effect('emits TypeScript that parses', () =>
+    assertSourcesParse(served.files),
   );
 });

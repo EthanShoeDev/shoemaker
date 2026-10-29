@@ -88,8 +88,6 @@ export const versions = {
   nx: '^24.0.2',
   tsdown: '^0.23.3',
   vitest: '^5.0.5',
-  '@vitest/browser-playwright': '^5.0.5',
-  playwright: '^1.64.1',
   'happy-dom': '^21.0.4',
   '@types/node': '^26.6.6',
   'bun-types': '^1.4.4',
@@ -107,6 +105,7 @@ export const versions = {
   alchemy,
   '@alchemy.run/cloudflare': alchemy,
   '@alchemy.run/aws': alchemy,
+  '@alchemy.run/github': alchemy,
   '@alchemy.run/frontend-frameworks': alchemy,
 
   // React / web
@@ -160,3 +159,12 @@ export const versionOf = (name: string): string => {
   }
   return versions[name];
 };
+
+// The nixpkgs revision a new repo's flake.lock starts on, so its first
+// `nix fmt` or `nix develop` doesn't write one (an uncommitted file right
+// after init). `bun run update:nix-flake` moves a repo past it.
+export const nixpkgsLock = {
+  rev: '58deea654ec5dd0644f31c840a07c29fa0592528',
+  narHash: 'sha256-lNZLwWf5tYNKjothaoFq/VZYvzaclmLafjgMdUlpJPQ=',
+  lastModified: 1793195608,
+} as const;

@@ -2,6 +2,7 @@ import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, String as Str } from 'effect';
 
 import type {
+  AlchemyProvider,
   App,
   DeployTarget,
   StateStore,
@@ -181,6 +182,87 @@ describe('state stores', () => {
     assert.include(mixed, "import * as AWS from '@alchemy.run/aws';");
     assert.include(mixed, 'providers: Cloudflare.providers()');
     assert.include(run('none', 'aws'), 'providers: Layer.empty');
+  });
+});
+
+describe('providers', () => {
+  const withProviders = (
+    deploy: DeployTarget,
+    providers: ReadonlyArray<AlchemyProvider>,
+  ) =>
+    contribute(
+      alchemyInfra,
+      sampleConfig({
+        apps,
+        infra: { kind: 'alchemy', deploy, state: 'local', providers },
+      }),
+    );
+
+  it('registers GitHub alone, with no cloud', () => {
+    const { file } = withProviders('none', ['github']);
+    const source = file('alchemy.run.ts').content;
+    assert.include(source, "import * as GitHub from '@alchemy.run/github';");
+    assert.include(source, 'providers: GitHub.providers()');
+    assert.include(source, 'Effect.succeed({})');
+    assert.notInclude(source, 'Layer');
+    const devDependencies = record(
+      parseJson(file('package.json')).devDependencies,
+    );
+    assert.property(devDependencies, '@alchemy.run/github');
+    assert.notProperty(devDependencies, '@alchemy.run/cloudflare');
+  });
+
+  it('registers none at all', () => {
+    const source = withProviders('none', []).file('alchemy.run.ts').content;
+    assert.include(source, 'providers: Layer.empty');
+    assert.notInclude(source, '@alchemy.run/');
+  });
+
+  it("always includes the deploy target's provider", () => {
+    const source = withProviders('cloudflare', ['github']).file(
+      'alchemy.run.ts',
+    ).content;
+    assert.include(
+      source,
+      'providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers())',
+    );
+    assert.include(source, "import { Effect, Layer, Path } from 'effect';");
+  });
+
+  it('breaks a long provider list the way oxfmt does', () => {
+    const source = withProviders('aws', ['cloudflare', 'github']).file(
+      'alchemy.run.ts',
+    ).content;
+    assert.include(
+      source,
+      '    providers: Layer.mergeAll(\n      AWS.providers(),\n      Cloudflare.providers(),\n      GitHub.providers(),\n    ),',
+    );
+    const imports = Arr.filter(Str.split(source, '\n'), (line) =>
+      Str.startsWith('import * as')(line),
+    );
+    assert.deepStrictEqual(imports, [
+      "import * as AWS from '@alchemy.run/aws';",
+      "import * as Cloudflare from '@alchemy.run/cloudflare';",
+      "import * as GitHub from '@alchemy.run/github';",
+      "import * as Alchemy from 'alchemy';",
+    ]);
+  });
+});
+
+describe('a served API', () => {
+  it('deploys inside its site, not as its own Worker', () => {
+    const source = contribute(
+      alchemyInfra,
+      sampleConfig({
+        apps: [
+          { name: 'web', kind: 'tanstack-start', api: 'api' },
+          { name: 'api', kind: 'effect-api' },
+        ],
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
+      }),
+    ).file('alchemy.run.ts').content;
+    assert.include(source, "Cloudflare.Website.Vite('Web'");
+    assert.notInclude(source, 'worker.ts');
   });
 });
 

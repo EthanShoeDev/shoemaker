@@ -70,6 +70,26 @@ export const appKindOf = Effect.fnUntraced(function* (
   return undefined;
 });
 
+// A site serves an effect-api app when it depends on the API's package and
+// has an /api splat route.
+const servedApiOf = Effect.fnUntraced(function* (
+  repo: Repo,
+  site: Manifest,
+  found: ReadonlyArray<{ readonly app: App; readonly manifest: Manifest }>,
+) {
+  if (!(yield* repo.exists(`${site.dir}/src/routes/api.$.ts`)))
+    return undefined;
+  return Option.getOrUndefined(
+    Arr.findFirst(
+      found,
+      ({ app, manifest }) =>
+        app.kind === 'effect-api' &&
+        manifest.pkg.name !== undefined &&
+        hasDep(site.pkg, manifest.pkg.name),
+    ).pipe(Option.map(({ app }) => app.name)),
+  );
+});
+
 // A package under packages/ that ships a binary or a framework app is not a
 // library even if it exports code (HttpApi contracts are libraries).
 const isAppShaped = (manifest: Manifest) =>
@@ -116,6 +136,9 @@ const PROVIDERS: ReadonlyArray<readonly ['cloudflare' | 'aws', RegExp]> = [
   ],
 ];
 
+const GITHUB_PROVIDER =
+  /from ['"](?:alchemy(?:-effect)?\/(?:GitHub|github)|@alchemy\.run\/github)[\w/'"-]*/u;
+
 const STATE_STORES: ReadonlyArray<readonly [StateStore, RegExp]> = [
   ['cloudflare', /\bCloudflare\.state\(/u],
   ['aws', /\bAWS\.state\(/u],
@@ -143,11 +166,15 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
     Arr.findFirst(table, ([, pattern]) =>
       Arr.some(sources, (source) => pattern.test(source)),
     ).pipe(Option.map(([value]) => value));
+  // Cloudflare hosts every app kind shoemaker scaffolds, so it wins a tie.
+  const deploy = Option.getOrElse(first(PROVIDERS), (): DeployTarget => 'none');
+  const github = Arr.some(sources, (source) => GITHUB_PROVIDER.test(source));
   return {
     kind: 'alchemy' as const,
-    // Cloudflare hosts every app kind shoemaker scaffolds, so it wins a tie.
-    deploy: Option.getOrElse(first(PROVIDERS), (): DeployTarget => 'none'),
+    deploy,
     state: Option.getOrElse(first(STATE_STORES), (): StateStore => 'local'),
+    // The deploy target's provider is implied; only GitHub needs listing.
+    ...(github ? { providers: ['github' as const] } : {}),
   };
 });
 
@@ -174,13 +201,14 @@ export const inferConfig = (
     const base = defaultConfig(name);
     if (workspace === undefined) return base;
 
-    const apps: Array<App> = [];
+    const found: Array<{ readonly app: App; readonly manifest: Manifest }> = [];
     const packages: Array<Package> = [];
     for (const manifest of workspace.packages) {
       const dirName = kebab(Arr.lastNonEmpty(Str.split(manifest.dir, '/')));
       if (Str.startsWith('apps/')(manifest.dir)) {
         const kind = yield* appKindOf(repo, manifest);
-        if (kind !== undefined) apps.push({ name: dirName, kind });
+        if (kind !== undefined)
+          found.push({ app: { name: dirName, kind }, manifest });
       } else if (
         Str.startsWith('packages/')(manifest.dir) &&
         !isAppShaped(manifest) &&
@@ -189,6 +217,14 @@ export const inferConfig = (
         packages.push({ name: dirName, kind: 'library' });
       }
     }
+
+    const apps = yield* Effect.forEach(found, ({ app, manifest }) =>
+      app.kind === 'tanstack-start'
+        ? Effect.map(servedApiOf(repo, manifest, found), (api) =>
+            api === undefined ? app : { ...app, api },
+          )
+        : Effect.succeed(app),
+    );
 
     const taskRunner =
       (yield* repo.exists('nx.json')) &&

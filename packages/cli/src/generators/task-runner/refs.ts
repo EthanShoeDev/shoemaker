@@ -2,7 +2,7 @@ import { Option, pipe, String as Str } from 'effect';
 
 import type { TaskDef } from './model.ts';
 
-// A `dependsOn` / `with` entry in turbo syntax, parsed so the nx renderer and
+// A `dependsOn` entry in turbo syntax, parsed so the nx renderer and
 // the tests can reason about it.
 export type TaskRef =
   | { readonly kind: 'dependencies'; readonly task: string }
@@ -57,7 +57,6 @@ export const mergeTasks = (tasks: ReadonlyArray<TaskDef>) => {
       continue;
     }
     const dependsOn = union(prev.dependsOn, task.dependsOn);
-    const withTasks = union(prev.with, task.with);
     const inputs = union(prev.inputs, task.inputs);
     const outputs = union(prev.outputs, task.outputs);
     const env = union(prev.env, task.env);
@@ -65,7 +64,6 @@ export const mergeTasks = (tasks: ReadonlyArray<TaskDef>) => {
       ...prev,
       ...task,
       ...(dependsOn === undefined ? {} : { dependsOn }),
-      ...(withTasks === undefined ? {} : { with: withTasks }),
       ...(inputs === undefined ? {} : { inputs }),
       ...(outputs === undefined ? {} : { outputs }),
       ...(env === undefined ? {} : { env }),
@@ -75,6 +73,5 @@ export const mergeTasks = (tasks: ReadonlyArray<TaskDef>) => {
 };
 
 // Aggregates (`lint`, `lint:check`, `//#lint:root`) have no script: they
-// only fan out through `with`.
-export const isAggregate = (task: TaskDef) =>
-  task.with !== undefined && task.with.length > 0;
+// only fan out through `dependsOn`.
+export const isAggregate = (task: TaskDef) => task.aggregate === true;

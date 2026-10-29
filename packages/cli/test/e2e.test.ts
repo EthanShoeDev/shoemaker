@@ -1,5 +1,5 @@
 import { BunServices } from '@effect/platform-bun';
-import { beforeAll, describe, it } from '@effect/vitest';
+import { assert, beforeAll, describe, it } from '@effect/vitest';
 import {
   Array as Arr,
   Config,
@@ -122,6 +122,15 @@ const checkPreset = Effect.fnUntraced(function* (name: string) {
     cwd: dir,
     env,
   });
+  // A fresh repo passes its checks as generated: none of them may write a
+  // file (as `nix fmt` once did with an unlocked flake).
+  const changed = yield* run('git', ['diff', '--name-only'], { cwd: dir });
+  const added = yield* run(
+    'git',
+    ['ls-files', '--others', '--exclude-standard'],
+    { cwd: dir },
+  );
+  assert.strictEqual(`${changed}${added}`, '');
 });
 
 // `full` builds a foldkit site, and foldkit (0.169.0, @foldkit/vite-plugin

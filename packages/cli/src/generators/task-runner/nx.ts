@@ -9,8 +9,7 @@ import { isAggregate, mergeTasks, parseRef } from './refs.ts';
 
 // Translates the turbo-syntax TaskDef graph to nx:
 // - `^x` -> `{ dependencies: true, target: x }`, `//#x` -> the root project.
-// - `with` has no nx equivalent; aggregates become `nx:noop` targets whose
-//   `dependsOn` is the fan-out.
+// - Aggregates become `nx:noop` targets whose `dependsOn` is the fan-out.
 // - `transit` exists only to pull dependency hashes into turbo; nx gets the
 //   same effect from the `^default` input, so the target is dropped.
 // - nx targetDefaults never create a target, so every project gets
@@ -59,11 +58,7 @@ const mapInput = (input: string, inRoot: boolean) => {
 const nxTarget = (task: TaskDef, rootProject: string) => {
   const inRoot = task.root === true;
   const readsDependencies = (task.dependsOn ?? []).includes(`^${TRANSIT}`);
-  const dependsOn = mapDependsOn(
-    [...(task.dependsOn ?? []), ...(task.with ?? [])],
-    rootProject,
-    inRoot,
-  );
+  const dependsOn = mapDependsOn(task.dependsOn ?? [], rootProject, inRoot);
   // Root tasks are whole-repo checkers, so their default input is every file,
   // not just the files no package owns.
   const declared =

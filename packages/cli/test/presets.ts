@@ -7,19 +7,30 @@ export const presets: Readonly<Record<string, ShoemakerConfig>> = {
     ...defaultConfig('sample-minimal'),
     packages: [{ name: 'core', kind: 'library' }],
     secrets: 'none',
-    // A Stack with no cloud: resources added by hand, state in .alchemy/.
-    infra: { kind: 'alchemy', deploy: 'none', state: 'local' },
+    // A Stack with only the GitHub provider: resources added by hand, state
+    // in .alchemy/.
+    infra: {
+      kind: 'alchemy',
+      deploy: 'none',
+      state: 'local',
+      providers: ['github'],
+    },
     ci: 'none',
   },
   web: {
     ...defaultConfig('sample-web'),
     apps: [
-      { name: 'web', kind: 'tanstack-start' },
+      { name: 'web', kind: 'tanstack-start', api: 'api' },
       { name: 'api', kind: 'effect-api' },
     ],
     packages: [{ name: 'core', kind: 'library' }],
     secrets: 'varlock',
-    infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'cloudflare' },
+    infra: {
+      kind: 'alchemy',
+      deploy: 'cloudflare',
+      state: 'cloudflare',
+      providers: ['cloudflare', 'github'],
+    },
   },
   full: {
     ...defaultConfig('sample-full'),

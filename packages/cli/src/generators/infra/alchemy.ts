@@ -1,12 +1,18 @@
 import { Array as Arr, String as Str } from 'effect';
 
-import type { App, ShoemakerConfig, StateStore } from '../../config/schema.ts';
+import type {
+  AlchemyProvider,
+  App,
+  ShoemakerConfig,
+  StateStore,
+} from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
 import { pascalCase } from '../apps/common.ts';
+import { isServed } from '../apps/mount.ts';
 import type { EnvVar } from '../secrets/model.ts';
 import { catalogDeps, json, seed, withSecrets } from '../shared.ts';
 import type { TaskDef } from '../task-runner/model.ts';
-import { deployTarget } from './target.ts';
+import { alchemyProviders, deployTarget, PROVIDERS } from './target.ts';
 
 // One Stack at the workspace root deploys every app (alchemy's single-stack
 // monorepo layout): alchemy.run.ts names the Stack, picks providers and the
@@ -14,12 +20,46 @@ import { deployTarget } from './target.ts';
 // https://alchemy.run/project-structure/monorepo-single-stack/
 // https://alchemy.run/infrastructure-as-code/stack/
 
+// GitHub manages repos and Actions secrets and variables; it hosts no apps.
+// https://alchemy.run/github/setup/
 const providerModules = {
-  cloudflare: { name: 'Cloudflare', pkg: '@alchemy.run/cloudflare' },
   aws: { name: 'AWS', pkg: '@alchemy.run/aws' },
+  cloudflare: { name: 'Cloudflare', pkg: '@alchemy.run/cloudflare' },
+  github: { name: 'GitHub', pkg: '@alchemy.run/github' },
 } as const;
 
-type Cloud = keyof typeof providerModules;
+type Cloud = 'cloudflare' | 'aws';
+
+// Every registered provider plus the state store's cloud, in package order
+// (oxfmt sorts imports).
+const providerImports = (config: ShoemakerConfig, state: StateStore) => {
+  const providers = alchemyProviders(config);
+  return Arr.filter(
+    PROVIDERS,
+    (provider) => providers.includes(provider) || provider === state,
+  );
+};
+
+const PRINT_WIDTH = 80;
+
+// The Stack's `providers` value, laid out the way oxfmt prints it.
+const providersExpression = (providers: ReadonlyArray<AlchemyProvider>) => {
+  const calls = Arr.map(
+    providers,
+    (provider) => `${providerModules[provider].name}.providers()`,
+  );
+  const [only] = calls;
+  // No provider yet: add one here with the first resource that needs it.
+  if (only === undefined) return 'Layer.empty';
+  if (calls.length === 1) return only;
+  const inline = `Layer.mergeAll(${Arr.join(calls, ', ')})`;
+  return `    providers: ${inline},`.length <= PRINT_WIDTH
+    ? inline
+    : `Layer.mergeAll(\n${Arr.join(
+        Arr.map(calls, (call) => `      ${call},`),
+        '\n',
+      )}\n    )`;
+};
 
 // A Vite site declared in the Stack itself, its rootDir anchored to
 // alchemy.run.ts so it resolves the same wherever alchemy runs.
@@ -52,7 +92,10 @@ const websites: Readonly<Record<Cloud, Partial<Record<App['kind'], Website>>>> =
 // https://alchemy.run/cloudflare/compute/workers/
 const workerApps = (config: ShoemakerConfig) =>
   deployTarget(config) === 'cloudflare'
-    ? Arr.filter(config.apps, (app) => app.kind === 'effect-api')
+    ? Arr.filter(
+        config.apps,
+        (app) => app.kind === 'effect-api' && !isServed(config, app),
+      )
     : [];
 
 type Deployed =
@@ -88,23 +131,19 @@ const stateExpression = (state: StateStore) =>
     : `${providerModules[state].name}.state()`;
 
 const runSource = (config: ShoemakerConfig, state: StateStore) => {
-  const target = deployTarget(config);
   const list = deployed(config);
   const hasWebsite = Arr.some(list, (entry) => entry.kind === 'website');
-  const clouds = new Set<Cloud>([
-    ...(target === 'none' ? [] : [target]),
-    ...(state === 'local' ? [] : [state]),
-  ]);
+  const providers = alchemyProviders(config);
   const effectImports = [
     'Effect',
-    ...(target === 'none' ? ['Layer'] : []),
+    ...(providers.length === 1 ? [] : ['Layer']),
     ...(hasWebsite ? ['Path'] : []),
   ];
   const imports = [
     ...Arr.map(
-      [...clouds],
-      (cloud) =>
-        `import * as ${providerModules[cloud].name} from '${providerModules[cloud].pkg}';`,
+      providerImports(config, state),
+      (provider) =>
+        `import * as ${providerModules[provider].name} from '${providerModules[provider].pkg}';`,
     ),
     "import * as Alchemy from 'alchemy';",
     `import { ${Arr.join(effectImports, ', ')} } from 'effect';`,
@@ -130,11 +169,6 @@ const runSource = (config: ShoemakerConfig, state: StateStore) => {
     list.length === 0
       ? 'Effect.succeed({})'
       : `Effect.gen(function* () {\n${Arr.join(statements, '\n')}\n    return {\n${Arr.join(outputs, '\n')}\n    };\n  })`;
-  const providers =
-    target === 'none'
-      ? // No resources yet: add a provider here with the first one.
-        'Layer.empty'
-      : `${providerModules[target].name}.providers()`;
   return `${Arr.join(imports, '\n')}
 
 // The repo's one Stack. \`infra:dev\` runs it locally, \`infra:deploy\` deploys
@@ -143,7 +177,7 @@ const runSource = (config: ShoemakerConfig, state: StateStore) => {
 export default Alchemy.Stack(
   '${config.name}',
   {
-    providers: ${providers},
+    providers: ${providersExpression(providers)},
     state: ${stateExpression(state)},
   },
   ${program},
@@ -221,13 +255,6 @@ export const alchemyInfra = (ctx: GenContext): Contribution => {
   const { config } = ctx;
   if (config.infra.kind !== 'alchemy') return {};
   const { state } = config.infra;
-  const target = deployTarget(config);
-  const clouds = [
-    ...new Set([
-      ...(target === 'none' ? [] : [target]),
-      ...(state === 'local' ? [] : [state]),
-    ]),
-  ];
   const hasWebsite = Arr.some(
     deployed(config),
     (entry) => entry.kind === 'website',
@@ -238,7 +265,10 @@ export const alchemyInfra = (ctx: GenContext): Contribution => {
     '@effect/platform-bun',
     'alchemy',
     'effect',
-    ...Arr.map(clouds, (cloud) => providerModules[cloud].pkg),
+    ...Arr.map(
+      providerImports(config, state),
+      (provider) => providerModules[provider].pkg,
+    ),
     // Optional alchemy peer that builds framework sites (Vite, TanStack Start,
     // Foldkit) for deployment.
     ...(hasWebsite ? ['@alchemy.run/frontend-frameworks'] : []),

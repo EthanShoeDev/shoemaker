@@ -1,7 +1,7 @@
 import { Effect, Stream } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
-// Runs a command with the terminal attached (git init, bun install).
+// Runs a command with the terminal attached (git init, git commit).
 export const runInherit = Effect.fnUntraced(function* (
   command: string,
   args: ReadonlyArray<string>,

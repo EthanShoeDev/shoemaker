@@ -3,6 +3,7 @@ import {
   Effect,
   Option,
   pipe,
+  Predicate,
   Record as Rec,
   Schema,
   String as Str,
@@ -14,6 +15,7 @@ import {
   decodeJsonc,
   hasDep,
   invokes,
+  isRecord,
   kebab,
   majorOf,
   readWorkspace,
@@ -50,6 +52,44 @@ export const turboJsonc: DoctorCheck = {
         fix: 'shoemaker adopt, then shoemaker sync renders turbo.jsonc',
       }),
     ];
+  }),
+};
+
+const TurboTasks = Schema.Struct({
+  tasks: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+});
+
+// `oxlint:fix`, `//#oxfmt:fix`, `knip:fix:danger`: any `fix` segment.
+export const isFixTask = (key: string) =>
+  pipe(
+    Str.split(key, '#'),
+    Arr.last,
+    Option.exists((name) => Arr.contains(Str.split(name, ':'), 'fix')),
+  );
+
+export const turboFixUncached: DoctorCheck = {
+  id: 'turbo-fix-uncached',
+  description:
+    'turbo never caches a fix task: a hit on the pre-fix hash replays the old run and leaves files unfixed',
+  run: Effect.fnUntraced(function* (repo) {
+    const paths = yield* repo.glob('**/turbo.json{,c}');
+    const cached: Array<string> = [];
+    for (const path of paths) {
+      const turbo = decodeJsonc(TurboTasks, yield* repo.read(path));
+      if (Option.isNone(turbo)) continue;
+      for (const [key, task] of Rec.toEntries(turbo.value.tasks ?? {})) {
+        if (isFixTask(key) && !(isRecord(task) && task.cache === false)) {
+          cached.push(`${path}#${key}`);
+        }
+      }
+    }
+    return cached.length === 0
+      ? [pass('no fix task is cached')]
+      : [
+          fail(`cached fix task(s): ${listSome(cached)}`, {
+            fix: 'set "cache": false on every fix task',
+          }),
+        ];
   }),
 };
 
@@ -270,9 +310,18 @@ const pinnedBun = (flake: string) =>
   /bun-v(\d+\.\d+\.\d+)/u.exec(flake)?.[1] ??
   /bun[\s\S]{0,400}?version\s*=\s*"(\d+\.\d+\.\d+)"/u.exec(flake)?.[1];
 
+const devEnginesBun = (devEngines: unknown) => {
+  const manager = isRecord(devEngines) ? devEngines.packageManager : undefined;
+  return isRecord(manager) &&
+    manager.name === 'bun' &&
+    Predicate.isString(manager.version)
+    ? manager.version
+    : undefined;
+};
+
 export const bunVersion: DoctorCheck = {
   id: 'bun-version',
-  description: `packageManager is bun@${CURRENT_BUN} and matches the flake (and Dockerfiles)`,
+  description: `packageManager and devEngines.packageManager are bun@${CURRENT_BUN} and match the flake (and Dockerfiles)`,
   run: Effect.fnUntraced(function* (repo) {
     const [root] = yield* manifestsOf(repo);
     if (root === undefined) return [fail('no root package.json')];
@@ -291,6 +340,15 @@ export const bunVersion: DoctorCheck = {
             fix: `set "packageManager": "bun@${CURRENT_BUN}" and repin bun in flake.nix to match`,
           },
         ),
+      );
+    }
+    // Turbo will stop reading the top-level field in a future major.
+    if (devEnginesBun(root.pkg.devEngines) !== CURRENT_BUN) {
+      findings.push(
+        fail(`devEngines.packageManager is not bun ${CURRENT_BUN}`, {
+          path: 'package.json',
+          fix: `set "devEngines": { "packageManager": { "name": "bun", "version": "${CURRENT_BUN}" } }`,
+        }),
       );
     }
     if (root.pkg.type !== 'module') {
@@ -678,6 +736,7 @@ export const toolingChecks = [
   monorepoLayout,
   turboJsonc,
   turboTaskCommands,
+  turboFixUncached,
   scriptNames,
   bunTest,
   effectTsgo,

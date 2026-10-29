@@ -77,7 +77,6 @@ describe('init + sync', () => {
           [
             'init',
             '--yes',
-            '--no-install',
             '--no-git',
             '--apps',
             'effect-api,effect-api:worker',
@@ -119,6 +118,74 @@ describe('init + sync', () => {
     ),
   );
 
+  it.effect('adds alchemy providers and leaves installing to the user', () =>
+    provide(
+      Effect.gen(function* () {
+        const dir = yield* scratch();
+        const out: Array<string> = [];
+        yield* run(
+          [
+            'init',
+            '--yes',
+            '--no-git',
+            '--infra',
+            'alchemy:none',
+            '--alchemy-providers',
+            'github',
+            dir,
+          ],
+          out,
+        );
+        const config = yield* loadConfig(dir);
+        assert.deepStrictEqual(config.infra, {
+          kind: 'alchemy',
+          deploy: 'none',
+          state: 'local',
+          providers: ['github'],
+        });
+        assert.include(Arr.join(out, '\n'), '  bun install');
+
+        const error = yield* Effect.flip(
+          run(
+            [
+              'init',
+              '--yes',
+              '--alchemy-providers',
+              'github',
+              yield* scratch(),
+            ],
+            [],
+          ),
+        );
+        assert.strictEqual(error._tag, 'CommandFailed');
+      }),
+    ),
+  );
+
+  it.effect('serves the API from the site unless told not to', () =>
+    provide(
+      Effect.gen(function* () {
+        const apps = ['--apps', 'tanstack-start,effect-api'];
+        const served = yield* scratch();
+        yield* run(['init', '--yes', '--no-git', ...apps, served], []);
+        assert.deepStrictEqual((yield* loadConfig(served)).apps, [
+          { kind: 'tanstack-start', name: 'web', api: 'api' },
+          { kind: 'effect-api', name: 'api' },
+        ]);
+
+        const apart = yield* scratch();
+        yield* run(
+          ['init', '--yes', '--no-git', '--no-serve-api', ...apps, apart],
+          [],
+        );
+        assert.deepStrictEqual((yield* loadConfig(apart)).apps, [
+          { kind: 'tanstack-start', name: 'web' },
+          { kind: 'effect-api', name: 'api' },
+        ]);
+      }),
+    ),
+  );
+
   it.effect('refuses a non-empty directory without --force', () =>
     provide(
       Effect.gen(function* () {
@@ -128,7 +195,7 @@ describe('init + sync', () => {
         yield* fs.makeDirectory(dir, { recursive: true });
         yield* fs.writeFileString(path.join(dir, 'existing.txt'), 'x');
         const error = yield* Effect.flip(
-          run(['init', '--yes', '--no-install', '--no-git', dir], []),
+          run(['init', '--yes', '--no-git', dir], []),
         );
         assert.strictEqual(error._tag, 'CommandFailed');
       }),
@@ -143,7 +210,7 @@ describe('init + sync', () => {
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const dir = yield* scratch();
-          yield* run(['init', '--yes', '--no-install', '--no-git', dir], []);
+          yield* run(['init', '--yes', '--no-git', dir], []);
           const target = path.join(dir, 'src/index.ts');
           yield* fs.writeFileString(
             target,
@@ -180,7 +247,7 @@ describe('init + sync', () => {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const dir = yield* scratch();
-        yield* run(['init', '--yes', '--no-install', '--no-git', dir], []);
+        yield* run(['init', '--yes', '--no-git', dir], []);
         const agents = path.join(dir, 'AGENTS.md');
         const original = yield* fs.readFileString(agents);
         yield* fs.writeFileString(agents, `${original}\n## My notes\n`);

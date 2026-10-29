@@ -41,7 +41,7 @@ const tryWizard = Command.make(
 
     yield* runInherit(
       'bun',
-      [path.join(root, 'packages/cli/src/bin.ts'), 'init', out, '--no-install'],
+      [path.join(root, 'packages/cli/src/bin.ts'), 'init', out],
       { cwd: root, env: { SHOEMAKER_VERSION_OVERRIDES: overridesFile } },
     );
     // Not installed, but pinned so a later `bun install` resolves the

@@ -47,6 +47,10 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     }
   });
 
+  it('gitignores the reference repos cloned into .external/', () => {
+    assert.include(file('.gitignore').content, '\n.external/\n');
+  });
+
   it('emits optional files only when their feature is chosen', () => {
     assert.strictEqual(
       byPath.has('.github/workflows/ci.yml'),
@@ -91,6 +95,10 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     const root = parseJson(file('package.json'));
     assert.strictEqual(Rec.keys(root)[0], 'name');
     assert.strictEqual(root.packageManager, 'bun@1.4.4');
+    assert.deepStrictEqual(record(root.devEngines).packageManager, {
+      name: 'bun',
+      version: '1.4.4',
+    });
     const internal = Arr.flatMap(dependencyFields, (field) =>
       Arr.filter(
         Rec.toEntries(record(root[field])),
@@ -143,6 +151,19 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     assert.deepStrictEqual(known, generatedDirs);
     const vitest = file('vitest.config.ts').content;
     for (const dir of known) assert.include(vitest, `'${dir}'`);
+  });
+
+  it('tests and builds through the task runner in CI, cached', () => {
+    if (!byPath.has('.github/workflows/ci.yml')) return;
+    const ci = file('.github/workflows/ci.yml').content;
+    assert.notInclude(ci, 'bun run test');
+    assert.include(
+      ci,
+      config.taskRunner === 'nx'
+        ? 'bunx nx affected -t test build'
+        : 'bunx turbo run test build --affected',
+    );
+    assert.include(ci, 'actions/cache@');
   });
 
   it('puts every contributed nix package in the dev shell', () => {
