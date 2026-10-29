@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-knip-config",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "defineKnipConfig(): knip.ts with the shared ignores",
   "license": "MIT",
   "repository": {
