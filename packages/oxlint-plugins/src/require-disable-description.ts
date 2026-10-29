@@ -1,83 +1,63 @@
-// Requires eslint-disable/oxlint-disable/@ts-ignore/@ts-expect-error comments to include a description
+// Requires eslint-disable/oxlint-disable directives to carry a description and
+// forbids the Effect language-service form: `@effect-diagnostics` silences
+// tsgolint but escapes --report-unused-disable-directives, so Effect rules are
+// suppressed with oxlint-disable like every other rule. TypeScript directives
+// are covered by typescript/ban-ts-comment.
 // @see https://eslint-community.github.io/eslint-plugin-eslint-comments/rules/require-description.html
+import { definePlugin, defineRule } from '@oxlint/plugins';
 
-import { type Rule } from 'eslint';
+const lintDisablePattern =
+  /^\s*(eslint-disable|oxlint-disable)(-next-line|-line)?\b/;
+const effectDiagnosticsPattern = /^\s*@effect-diagnostics(-next-line)?(?:\s|$)/;
 
-const rule: Rule.RuleModule = {
+// A separator with nothing after it is not a description: `-- ` reads as
+// justified while saying nothing, which is the exact thing this rule exists
+// to prevent.
+const describedAfterDoubleDash = (text: string) => {
+  const separator = text.indexOf('--');
+  return separator !== -1 && text.slice(separator + 2).trim().length > 0;
+};
+
+const rule = defineRule({
   meta: {
     type: 'suggestion',
     docs: {
       description:
-        'Require descriptions on eslint-disable, oxlint-disable, @ts-ignore, and @ts-expect-error comments',
+        'Require descriptions on eslint-disable and oxlint-disable directives; forbid @effect-diagnostics suppressions',
     },
     messages: {
       missingLintDescription:
-        'Disable directive is missing a description. Add one after "--" (e.g., "// eslint-disable-next-line rule-name -- reason here").',
-      missingTsDescription:
-        'TypeScript directive is missing a description. Add one after the directive (e.g., "// @ts-expect-error: reason here" or "// @ts-expect-error -- reason here").',
+        'Disable directive is missing a description. Add one after "--" (e.g., "// oxlint-disable-next-line rule-name -- reason here").',
+      forbiddenEffectDiagnostics:
+        '@effect-diagnostics comments escape --report-unused-disable-directives. Use "// oxlint-disable-next-line effecttsgo/<rule> -- reason here" instead.',
     },
   },
   create(context) {
-    // Pattern for eslint/oxlint disable directives
-    const lintDisablePattern =
-      /^\s*(eslint-disable|oxlint-disable)(-next-line|-line)?\b/;
-
-    // Pattern for TypeScript directives - @ts-ignore, @ts-expect-error, @ts-nocheck
-    // These can have description after colon or double-dash
-    const tsDirectivePattern = /^\s*@ts-(ignore|expect-error|nocheck)\b/;
-
     return {
       Program() {
-        const { sourceCode } = context;
-        const comments = sourceCode.getAllComments();
-
-        for (const comment of comments) {
+        for (const comment of context.sourceCode.getAllComments()) {
           const text = comment.value.trim();
-
-          // Check lint disable directives (require --)
-          if (lintDisablePattern.test(text) && !text.includes('--')) {
+          if (effectDiagnosticsPattern.test(text)) {
             context.report({
-              // ESLint Comment type lacks loc/range but context.report accepts it
-              node: comment as unknown as Rule.Node,
+              node: comment,
+              messageId: 'forbiddenEffectDiagnostics',
+            });
+          } else if (
+            lintDisablePattern.test(text) &&
+            !describedAfterDoubleDash(text)
+          ) {
+            context.report({
+              node: comment,
               messageId: 'missingLintDescription',
             });
-            continue;
-          }
-
-          // Check TypeScript directives (allow -- or : for description)
-          const tsMatch = text.match(tsDirectivePattern);
-          if (tsMatch) {
-            const afterDirective = text.slice(
-              text.indexOf(tsMatch[0]) + tsMatch[0].length,
-            );
-            // Must have some description text after the directive
-            // Allow ":" or "--" as separator, or just whitespace followed by text
-            const hasDescription =
-              afterDirective.includes('--') ||
-              afterDirective.includes(':') ||
-              /\s+\S/.test(afterDirective);
-
-            if (!hasDescription) {
-              context.report({
-                // ESLint Comment type lacks loc/range but context.report accepts it
-                node: comment as unknown as Rule.Node,
-                messageId: 'missingTsDescription',
-              });
-            }
           }
         }
       },
     };
   },
-};
+});
 
-const plugin = {
-  meta: {
-    name: 'disable-comments',
-  },
-  rules: {
-    'require-description': rule,
-  },
-};
-
-export default plugin;
+export default definePlugin({
+  meta: { name: 'disable-comments' },
+  rules: { 'require-description': rule },
+});

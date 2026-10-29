@@ -1,10 +1,4 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "composite": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*", "../db/src/drizzle-effect.ts"],
-  "exclude": ["node_modules", "dist"]
+  "extends": "@shoe-box-tools/typescript-config/tsconfig.base.json",
+  "include": ["src/**/*"]
 }

@@ -1,0 +1,21 @@
+{
+  "recommendations": [
+    "mhutchie.git-graph",
+    "eamodio.gitlens",
+    "yoavbls.pretty-ts-errors",
+    "bradlc.vscode-tailwindcss",
+    "vercel.turbo-vsc",
+    "github.vscode-pull-request-github",
+    "ctf0.duplicated-code-new",
+    "nefrob.vscode-just-syntax",
+    "vitest.explorer",
+    "sst-dev.opencode",
+    "oven.bun-vscode",
+    "github.vscode-github-actions",
+    "ms-playwright.playwright",
+    "oxc.oxc-vscode",
+    "inlang.vs-code-extension",
+    "jnoortheen.nix-ide"
+  ],
+  "unwantedRecommendations": []
+}

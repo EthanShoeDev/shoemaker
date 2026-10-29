@@ -1,0 +1,22 @@
+{
+  "name": "@shoe-box-tools/typescript-config",
+  "version": "0.1.0",
+  "description": "Shared strict tsconfig base for Effect + bun monorepos",
+  "license": "MIT",
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.react.json"
+  ],
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.react.json": "./tsconfig.react.json",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@effect/language-service": "catalog:"
+  }
+}

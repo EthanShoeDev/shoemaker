@@ -1,196 +1,121 @@
 {
-  "$schema": "https://turbo.build/schema.json",
+  "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalPassThroughEnv": [
-    "NIX_*",
-    "ANDROID_*",
-    "GRADLE_OPTS"
-  ],
-  // ============================================================================
-  // TURBO TASK INHERITANCE PATTERN
-  // ============================================================================
-  //
-  // This root config defines BASE task definitions that all packages inherit.
-  // Packages can override/extend these in their own turbo.json files.
-  //
-  // Key concepts:
-  //   - "^taskName" in dependsOn = run taskName in all DEPENDENCY packages first
-  //   - "with": ["taskName"] = run taskName in parallel for the SAME package
-  //   - "//#taskName" = root-only task (runs once, not per-package)
-  //
-  // DO NOT add package-specific tasks (e.g., "mobile#foo") to this file.
-  // Instead, packages should override tasks in their own turbo.json.
-  //
-  // NOTE: Turbo uses SHALLOW extend - arrays are replaced, not merged.
-  // When overriding a task, copy the base definition and add your items:
-  //
-  //   // apps/mobile/turbo.jsonc
-  //   {
-  //     "extends": ["//"],
-  //     "tasks": {
-  //       // Copied from root + mobile-specific (lint:eslint:check, expo:doctor)
-  //       "lint": {
-  //         "dependsOn": ["fmt", "^build"],
-  //         "with": ["typecheck", "oxlint:fix", "lint:eslint:check", "expo:doctor", "//#lint:root"],
-  //       }
-  //     }
-  //   }
-  //
-  // This keeps the root config generic and scalable as packages are added.
-  // ============================================================================
+  // TMPDIR: tests that write fixtures to os.tmpdir() must see the same temp
+  // dir as outside turbo (nix shells and sandboxes set it).
+  "globalPassThroughEnv": ["NIX_*", "TMPDIR"],
+  // Task-inheritance pattern:
+  //   "^task"        -> run `task` in all DEPENDENCY packages first
+  //   "with": [...]  -> run these tasks in parallel for the SAME package
+  //   "//#task"      -> a root-only task (defined in root package.json)
+  // Package scripts are leaf commands. Aggregates (`lint`, `lint:check`) have
+  // no script: they only fan out, so turbo is never called from a script.
+  // Turbo uses shallow extend: a package overriding a task must copy the whole
+  // definition, it is not merged with the root one.
   "tasks": {
-    // === Base package tasks (inherited by all packages) ===
-    "fmt": {
-      "with": [
-        "//#fmt:root"
-      ]
-    },
-    "fmt:check": {
-      "with": [
-        "//#fmt:check:root"
-      ]
-    },
-    "lint": {
-      "dependsOn": [
-        "fmt",
-        "^build"
-      ],
-      "with": [
-        "typecheck",
-        "oxlint:fix",
-        "//#lint:root"
-      ],
-    },
-    "lint:check": {
-      "dependsOn": [
-        "^build"
-      ],
-      "with": [
-        "fmt:check",
-        "typecheck",
-        "oxlint:check",
-        "//#lint:check:root"
-      ],
-    },
-    "typecheck": {
-      "dependsOn": [
-        "^build",
-        "//#typecheck"
-      ],
+    // Tests and typecheck read workspace sources, not build output, so they
+    // depend on this no-op instead of `^build`.
+    "transit": {
+      "dependsOn": ["^transit"],
     },
     "build": {
-      "outputs": [
-        "dist/**"
-      ],
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only",
+    },
+    "typecheck": {
+      "dependsOn": ["^transit"],
+      "outputLogs": "new-only",
     },
     "test": {
-      "dependsOn": [
-        "^build"
-      ],
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true,
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^transit"],
+      "outputLogs": "new-only",
     },
     "clean": {
       "cache": false,
-      "dependsOn": [
-        "^clean"
-      ]
-    },
-    // === Database tasks ===
-    "db:push": {
-      "cache": false,
-      "env": [
-        "DATABASE_URL"
-      ],
-    },
-    "db:seed": {
-      "cache": false,
-      "env": [
-        "DATABASE_URL"
-      ],
-    },
-    // === Deployment tasks ===
-    "deploy": {
-      "cache": false
-    },
-    "deploy:staging": {
-      "cache": false
-    },
-    "deploy:prod": {
-      "cache": false
-    },
-    // === Package-level task dependencies ===
-    // These define dependencies for tasks that packages may have
-    "oxlint:fix": {
-      "dependsOn": [
-        "@shoe-box-tools/oxlint-plugins#build"
-      ]
     },
     "oxlint:check": {
-      "dependsOn": [
-        "@shoe-box-tools/oxlint-plugins#build"
-      ]
-    },
-    // === Root-only tasks (prefixed with //#) ===
-    "//#typecheck": {},
-    "//#fmt:root": {
-      "with": [
-        "fmt:root:nix",
-        "oxfmt:fix"
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "$TURBO_ROOT$/oxlint.config.ts",
       ],
+      "outputLogs": "new-only",
     },
-    "//#fmt:check:root": {
+    "oxlint:fix": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "$TURBO_ROOT$/oxlint.config.ts",
+      ],
+      "outputLogs": "new-only",
+    },
+    "lint:check": {
+      "with": ["oxlint:check", "typecheck", "//#lint:check:root"],
+      "outputLogs": "new-only",
+    },
+    "lint": {
+      "with": ["oxlint:fix", "typecheck", "//#lint:root"],
+      "outputLogs": "new-only",
+    },
+    // === Root-only tasks (bodies live in root package.json scripts) ===
+    "//#lint:check:root": {
       "with": [
-        "fmt:check:root:nix",
-        "oxfmt:check"
+        "//#typecheck",
+        "//#oxlint:check",
+        "//#oxfmt:check",
+        "//#jscpd:check",
+        "//#knip:check",
+        "//#catalog:check",
+        "//#effect-versions:check",
+        "//#nix:fmt:check",
       ],
     },
     "//#lint:root": {
-      "dependsOn": [
-        "fmt:root"
-      ],
       "with": [
-        "jscpd:check",
-        // "knip:fix:danger",
-        "oxlint:fix",
+        "//#typecheck",
+        "//#oxlint:fix",
+        "//#oxfmt:fix",
+        "//#jscpd:check",
+        "//#knip:fix:danger",
+        "//#catalog:fix",
+        "//#nix:fmt:fix",
       ],
     },
-    "//#lint:check:root": {
-      "with": [
-        "fmt:check:root",
-        "jscpd:check",
-        //"knip:check",
-        "oxlint:check",
-        "catalog:check",
-      ],
-    },
-    // === Root script tasks ===
-    "//#fmt:root:nix": {},
-    "//#fmt:check:root:nix": {},
-    "//#jscpd:check": {},
-    "//#knip:check": {},
-    "//#knip:fix:danger": {},
-    "//#oxfmt:fix": {},
-    "//#oxfmt:check": {},
-    "//#oxlint:fix": {
-      "dependsOn": [
-        "@shoe-box-tools/oxlint-plugins#build"
-      ]
+    "//#typecheck": {
+      "inputs": ["*.ts", "scripts/**", "tsconfig.json"],
     },
     "//#oxlint:check": {
-      "dependsOn": [
-        "@shoe-box-tools/oxlint-plugins#build"
-      ]
+      "inputs": ["*.ts", "scripts/**"],
     },
-    "//#catalog:check": {},
-    "//#catalog:fix": {},
+    "//#oxlint:fix": {
+      "inputs": ["*.ts", "scripts/**"],
+    },
+    "//#oxfmt:check": {},
+    "//#oxfmt:fix": {
+      "cache": false,
+    },
+    "//#jscpd:check": {},
+    // knip:fix:danger deletes what knip believes is dead; a missing entry in
+    // knip.ts makes it delete live code, so review its diff like a codemod.
+    "//#knip:check": {},
+    "//#knip:fix:danger": {
+      "cache": false,
+    },
+    "//#catalog:check": {
+      "inputs": ["package.json", "packages/*/package.json"],
+    },
+    "//#catalog:fix": {
+      "cache": false,
+    },
+    "//#effect-versions:check": {
+      "inputs": ["bun.lock"],
+    },
+    "//#nix:fmt:check": {
+      "inputs": ["flake.nix", "flake.lock"],
+    },
+    "//#nix:fmt:fix": {
+      "cache": false,
+    },
   },
 }

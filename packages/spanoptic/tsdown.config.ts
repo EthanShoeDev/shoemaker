@@ -1,17 +1,9 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  dts: true,
+  // cli.mjs keeps src/cli.ts's `#!/usr/bin/env bun` hashbang: @opentui/core
+  // loads its native renderer through bun:ffi, so the bin needs bun.
   entry: ['src/index.ts', 'src/cli.ts'],
+  dts: true,
   sourcemap: true,
-  exports: true,
-  external: [
-    'effect',
-    '@effect/opentelemetry',
-    '@effect/cli',
-    '@effect/platform',
-    '@effect/platform-node',
-    '@opentelemetry/api',
-    '@opentelemetry/sdk-trace-base',
-  ],
 });

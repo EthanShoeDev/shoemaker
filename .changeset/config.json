@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "EthanShoeDev/shoe-box-tools" }
+  ],
+  "commit": false,
+  "fixed": [["@shoe-box-tools/*"]],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": ["@shoe-box-tools/spanoptic", "@shoe-box-tools/utils"]
+}

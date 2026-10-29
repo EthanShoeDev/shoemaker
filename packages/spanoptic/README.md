@@ -26,8 +26,12 @@ bun add @shoe-box-tools/spanoptic
 Wrap your Effect program with `traceVisualize` to visualize traces:
 
 ```typescript
+import { BunRuntime } from '@effect/platform-bun';
 import { Effect } from 'effect';
 import { traceVisualize, withTracedSpan } from '@shoe-box-tools/spanoptic';
+import type { TraceExport } from '@shoe-box-tools/spanoptic';
+
+let lastExport: TraceExport | undefined;
 
 const program = Effect.gen(function* () {
   yield* Effect.log('Starting...');
@@ -38,21 +42,19 @@ const program = Effect.gen(function* () {
     yield* Effect.sleep('500 millis');
     yield* Effect.log('Data fetched');
     return { id: 123, name: 'Alice' };
-  }).pipe(withTracedSpan('fetchUser')); // Use withTracedSpan to capture logs
+  }).pipe(withTracedSpan('fetchUser'));
 
   yield* Effect.log('Done!');
 }).pipe(withTracedSpan('main'));
 
 // Run with trace visualization
-Effect.runPromise(
-  traceVisualize(program, {
-    serviceName: 'my-app',
-    onExport: (data) => {
-      // Called when user presses 'e' to export
-      console.log('Exported:', JSON.stringify(data));
-    },
-  })
-);
+traceVisualize(program, {
+  serviceName: 'my-app',
+  // Called when the user presses 'e' to export
+  onExport: (data) => {
+    lastExport = data;
+  },
+}).pipe(BunRuntime.runMain);
 ```
 
 ### CLI
@@ -78,93 +80,114 @@ bunx @shoe-box-tools/spanoptic replay trace.json
 
 ## TUI Controls
 
-| Key | Action |
-|-----|--------|
-| `↑` / `k` | Move selection up |
-| `↓` / `j` | Move selection down |
-| `e` | Export trace to file |
-| `q` / `Escape` | Quit |
+| Key            | Action                                     |
+| -------------- | ------------------------------------------ |
+| `↑` / `k`      | Move selection up                          |
+| `↓` / `j`      | Move selection down                        |
+| `e`            | Export trace (calls `onExport`)            |
+| `q` / `Escape` | Quit (once the program has finished)       |
+| `Ctrl+C`       | Exit immediately                           |
 
 ## API Reference
 
 ### `traceVisualize(effect, options)`
 
-Wraps an Effect program with OTEL tracing and visualizes it in a TUI.
+Runs an Effect program with OTEL tracing and visualizes it in a TUI. The
+returned effect succeeds with the program's result once the user quits.
 
 ```typescript
-function traceVisualize<A, E, R>(
+const traceVisualize: <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  options: TraceVisualizeOptions
-): Effect.Effect<A, E, R>;
+  options: TraceVisualizeOptions,
+) => Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
 
-interface TraceVisualizeOptions {
-  serviceName: string;
-  onExport?: (data: TraceExport) => void;
-}
+type TraceVisualizeOptions = {
+  readonly serviceName: string;
+  readonly onExport?: (data: TraceExport) => void;
+};
 ```
+
+Logs are attached to the tracing span that is current when they are emitted,
+so both `Effect.withSpan` and `withTracedSpan` spans collect logs.
 
 ### `withTracedSpan(name, options?)`
 
-A helper that wraps an effect with both OTEL tracing span and Effect log span.
-This ensures logs are properly associated with spans in the TUI.
-
-**Important:** Use this instead of `Effect.withSpan` when you want logs to be captured and displayed in the logs panel.
+Wraps an effect in a tracing span and an Effect log span of the same name. The
+log span adds the span name to console log output when the program runs
+outside the TUI.
 
 ```typescript
 import { withTracedSpan } from '@shoe-box-tools/spanoptic';
 
 const myEffect = Effect.gen(function* () {
-  yield* Effect.log("This log will be associated with mySpan");
-  return "result";
-}).pipe(withTracedSpan("mySpan"));
+  yield* Effect.log('This log will be associated with mySpan');
+  return 'result';
+}).pipe(withTracedSpan('mySpan'));
 ```
 
-### `replayVisualize(data, options)`
+### `replayVisualize(data, options?)`
 
 Replays a previously exported trace in the TUI.
 
 ```typescript
-function replayVisualize(
+const replayVisualize: (
   data: TraceExport,
-  options?: { onExport?: (data: TraceExport) => void }
-): Effect.Effect<void>;
+  options?: { readonly onExport?: (data: TraceExport) => void },
+) => Effect.Effect<void>;
+```
 
-interface TraceExport {
-  version: 1;
-  serviceName: string;
-  exportedAt: number;
-  spans: SpanInfo[];
-}
+### `encodeTraceExport` / `decodeTraceExport`
+
+Convert a `TraceExport` to and from the pretty-printed JSON file the CLI writes
+(`TraceExportJson` is the underlying `Schema`):
+
+```typescript
+import { decodeTraceExport, replayVisualize } from '@shoe-box-tools/spanoptic';
+
+const program = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const data = yield* decodeTraceExport(yield* fs.readFileString('trace.json'));
+  yield* replayVisualize(data);
+});
 ```
 
 ### Types
 
-```typescript
-interface SpanInfo {
-  spanId: string;
-  parentSpanId: string | undefined;
-  name: string;
-  startTime: number;
-  endTime: number | null;
-  status: 'running' | 'ok' | 'error';
-  errorMessage?: string;
-  attributes: Record<string, unknown>;
-  logs: LogEntry[];
-}
+`LogEntry`, `SpanInfo` and `TraceExport` are exported both as Effect `Schema`s
+and as their (readonly) types:
 
-interface LogEntry {
-  timestamp: number;
-  level: string;
-  message: string;
-  spanId: string | null;
-}
+```typescript
+type TraceExport = {
+  readonly version: 1;
+  readonly serviceName: string;
+  readonly exportedAt: number;
+  readonly spans: ReadonlyArray<SpanInfo>;
+};
+
+type SpanInfo = {
+  readonly spanId: string;
+  readonly parentSpanId?: string | undefined;
+  readonly name: string;
+  readonly startTime: number;
+  readonly endTime: number | null;
+  readonly status: 'running' | 'ok' | 'error';
+  readonly errorMessage?: string | undefined;
+  readonly attributes: { readonly [key: string]: unknown };
+  readonly logs: ReadonlyArray<LogEntry>;
+};
+
+type LogEntry = {
+  readonly timestamp: number;
+  readonly level: string; // 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | ...
+  readonly message: string;
+  readonly spanName: string | null;
+};
 ```
 
 ## Requirements
 
-- Effect 3.x
-- @effect/opentelemetry
-- Node.js 18+ or Bun
+- Effect 4 (`effect` and `@effect/opentelemetry` 4.0.6)
+- Bun (`@opentui/core` loads its native renderer through `bun:ffi`)
 
 ## License
 

@@ -1,26 +1,89 @@
 {
   "name": "@shoe-box-tools/oxlint-plugins",
+  "version": "0.1.0",
+  "description": "Generic oxlint JS plugin rules plus vendored anti-slop, used by @shoe-box-tools/oxlint-config",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EthanShoeDev/shoe-box-tools.git",
+    "directory": "packages/oxlint-plugins"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "type": "module",
   "exports": {
-    "./require-disable-description": {
-      "types": "./dist/require-disable-description.d.mts",
-      "default": "./dist/require-disable-description.mjs"
+    "./no-backdrop-filter": "./src/no-backdrop-filter.ts",
+    "./no-cross-package-relative-imports": "./src/no-cross-package-relative-imports.ts",
+    "./no-raw-env-access": "./src/no-raw-env-access.ts",
+    "./no-render-time-match-route": "./src/no-render-time-match-route.ts",
+    "./no-unexplained-dynamic-import": "./src/no-unexplained-dynamic-import.ts",
+    "./require-disable-description": "./src/require-disable-description.ts",
+    "./vendor/anti-slop": "./src/vendor/anti-slop/index.ts",
+    "./vendor/anti-slop/effect": "./src/vendor/anti-slop/effect/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./no-backdrop-filter": {
+        "types": "./dist/no-backdrop-filter.d.mts",
+        "default": "./dist/no-backdrop-filter.mjs"
+      },
+      "./no-cross-package-relative-imports": {
+        "types": "./dist/no-cross-package-relative-imports.d.mts",
+        "default": "./dist/no-cross-package-relative-imports.mjs"
+      },
+      "./no-raw-env-access": {
+        "types": "./dist/no-raw-env-access.d.mts",
+        "default": "./dist/no-raw-env-access.mjs"
+      },
+      "./no-render-time-match-route": {
+        "types": "./dist/no-render-time-match-route.d.mts",
+        "default": "./dist/no-render-time-match-route.mjs"
+      },
+      "./no-unexplained-dynamic-import": {
+        "types": "./dist/no-unexplained-dynamic-import.d.mts",
+        "default": "./dist/no-unexplained-dynamic-import.mjs"
+      },
+      "./require-disable-description": {
+        "types": "./dist/require-disable-description.d.mts",
+        "default": "./dist/require-disable-description.mjs"
+      },
+      "./vendor/anti-slop": {
+        "types": "./dist/vendor/anti-slop/index.d.mts",
+        "default": "./dist/vendor/anti-slop/index.mjs"
+      },
+      "./vendor/anti-slop/effect": {
+        "types": "./dist/vendor/anti-slop/effect/index.d.mts",
+        "default": "./dist/vendor/anti-slop/effect/index.mjs"
+      },
+      "./package.json": "./package.json"
     },
-    "./require-unknown-cast-comment": {
-      "types": "./dist/require-unknown-cast-comment.d.mts",
-      "default": "./dist/require-unknown-cast-comment.mjs"
-    }
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsgo --noEmit"
+    "clean": "rm -rf dist .turbo *.tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "oxlint:check": "oxlint -c ../../oxlint.config.ts .",
+    "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
+    "test": "vitest run",
+    "prepack": "bun ../../scripts/publish-manifest.ts swap",
+    "postpack": "bun ../../scripts/publish-manifest.ts restore"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "catalog:"
   },
   "devDependencies": {
-    "@shoe-box-tools/config": "workspace:*",
-    "@types/eslint": "catalog:",
-    "tsdown": "catalog:"
+    "@shoe-box-tools/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
-    "typescript": "catalog:"
+    "oxlint": "catalog:"
   }
 }

@@ -32,7 +32,7 @@ lerna-debug.log*
 # Turbo
 .turbo
 
-# Better-T-Stack
+# alchemy state
 .alchemy
 
 # Testing
@@ -45,3 +45,9 @@ coverage
 tmp
 temp
 .vercel
+.external
+.direnv
+.env.local
+.env.*.local
+.vitest
+.e2e

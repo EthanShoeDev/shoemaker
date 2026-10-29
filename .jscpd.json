@@ -1,15 +1,18 @@
 {
   "pattern": "**/*",
   "ignore": [
-    "**/docs/**",
+    "**/node_modules/**",
+    "**/dist/**",
     "**/.turbo/**",
     "**/.output/**",
     "**/.nitro/**",
-    "**/mnt/**",
-    "**/dist/**",
-    "**/node_modules/**",
     "**/generated/**",
-    "**/eslint.config.{js,ts}"
+    "**/*.gen.*",
+    "**/vendor/**",
+    "**/docs/**",
+    "**/mnt/**",
+    ".external/**",
+    "bun.lock"
   ],
   "threshold": 0,
   "minTokens": 50,

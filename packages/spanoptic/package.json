@@ -1,42 +1,64 @@
 {
   "name": "@shoe-box-tools/spanoptic",
   "version": "0.0.1",
+  "private": true,
   "description": "TUI OTEL visualizer for Effect programs",
-  "type": "module",
   "bin": {
-    "spanoptic": "./dist/cli.mjs"
+    "spanoptic": "./src/cli.ts"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
   "exports": {
-    ".": "./dist/index.mjs",
-    "./cli": "./dist/cli.mjs",
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts",
     "./package.json": "./package.json"
   },
+  "publishConfig": {
+    "bin": {
+      "spanoptic": "./dist/cli.mjs"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./cli": {
+        "types": "./dist/cli.d.mts",
+        "default": "./dist/cli.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "scripts": {
-    "typecheck": "tsgo --noEmit",
     "build": "tsdown",
-    "demo": "bun src/demo.ts"
+    "clean": "rm -rf dist .turbo *.tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "oxlint:check": "oxlint -c ../../oxlint.config.ts .",
+    "oxlint:fix": "oxlint -c ../../oxlint.config.ts --fix .",
+    "test": "vitest run",
+    "demo": "bun src/demo.ts",
+    "prepack": "bun ../../scripts/publish-manifest.ts swap",
+    "postpack": "bun ../../scripts/publish-manifest.ts restore"
   },
   "dependencies": {
-    "@effect/cli": "^0.56.0",
-    "@effect/opentelemetry": "^0.45.0",
-    "@effect/platform": "^0.78.0",
-    "@effect/platform-node": "^0.74.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/sdk-logs": "^0.200.0",
-    "@opentelemetry/sdk-metrics": "^1.30.0",
-    "@opentelemetry/sdk-trace-base": "^1.30.0",
-    "@opentelemetry/sdk-trace-node": "^1.30.0",
-    "@opentelemetry/sdk-trace-web": "^1.30.0",
-    "@opentui/core": "^0.1.74",
+    "@effect/opentelemetry": "catalog:",
+    "@effect/platform-bun": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentui/core": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@shoe-box-tools/config": "workspace:*",
+    "@effect/vitest": "catalog:",
+    "@shoe-box-tools/typescript-config": "workspace:*",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:",
-    "tsdown": "catalog:"
-  },
-  "peerDependencies": {
-    "effect": "catalog:"
+    "bun-types": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

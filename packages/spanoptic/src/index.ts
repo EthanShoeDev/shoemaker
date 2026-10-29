@@ -5,282 +5,158 @@
  * Inspired by Kit Langton's spanoptic.
  */
 
-import type { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace-base';
-import type { Context } from '@opentelemetry/api';
-import { NodeSdk } from '@effect/opentelemetry';
-import { Effect, Layer, Fiber, Logger, LogLevel } from 'effect';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import { SpanStatusCode } from '@opentelemetry/api';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
+import type {
+  ReadableSpan,
+  SpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
 import {
-  createCliRenderer,
   BoxRenderable,
-  TextRenderable,
-  type CliRenderer,
-  type KeyEvent,
   RGBA,
+  TextRenderable,
+  createCliRenderer,
 } from '@opentui/core';
+import type { CliRenderer, KeyEvent } from '@opentui/core';
+import {
+  Array as Arr,
+  Clock,
+  Deferred,
+  Effect,
+  Layer,
+  Logger,
+  Predicate,
+  Queue,
+  Record as Rec,
+  References,
+  String as Str,
+} from 'effect';
+import type { Tracer } from 'effect';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+import {
+  appendLog,
+  applySpanEvent,
+  buildSpanTree,
+  flattenTree,
+  formatDuration,
+  formatLogMessage,
+  hrTimeToMillis,
+} from './trace.ts';
+import type { LogEntry, SpanEvent, SpanInfo, TraceExport } from './trace.ts';
 
-interface LogEntry {
-  timestamp: number;
-  level: string;
-  message: string;
-  spanName: string | null;
-}
+export {
+  LogEntry,
+  SpanInfo,
+  TraceExport,
+  TraceExportJson,
+  decodeTraceExport,
+  encodeTraceExport,
+} from './trace.ts';
 
-interface SpanInfo {
-  spanId: string;
-  parentSpanId: string | undefined;
-  name: string;
-  startTime: number;
-  endTime: number | null;
-  status: 'running' | 'ok' | 'error';
-  errorMessage?: string;
-  attributes: Record<string, unknown>;
-  logs: LogEntry[];
-}
-
-interface TraceVisualizeOptions {
-  serviceName: string;
-  /** Called when user presses 'e' to export trace data */
-  onExport?: (data: TraceExport) => void;
-}
-
-/** Exported trace data for replay */
-interface TraceExport {
-  version: 1;
-  serviceName: string;
-  exportedAt: number;
-  spans: SpanInfo[];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Spinner Animation
-// ─────────────────────────────────────────────────────────────────────────────
+export type TraceVisualizeOptions = {
+  readonly serviceName: string;
+  /** Called when the user presses `e` to export the trace. */
+  readonly onExport?: (data: TraceExport) => void;
+};
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Colors
-// ─────────────────────────────────────────────────────────────────────────────
-
 const colors = {
-  background: RGBA.fromInts(15, 23, 42, 255),       // slate-900
-  header: RGBA.fromInts(34, 211, 238, 255),         // cyan-400
-  running: RGBA.fromInts(251, 191, 36, 255),        // amber-400
-  success: RGBA.fromInts(74, 222, 128, 255),        // green-400
-  error: RGBA.fromInts(248, 113, 113, 255),         // red-400
-  text: RGBA.fromInts(226, 232, 240, 255),          // slate-200
-  dimText: RGBA.fromInts(148, 163, 184, 255),       // slate-400
-  selected: RGBA.fromInts(59, 130, 246, 255),       // blue-500
-  selectedBg: RGBA.fromInts(30, 58, 138, 255),      // blue-900
-  detailsBg: RGBA.fromInts(30, 41, 59, 255),        // slate-800
-  detailsBorder: RGBA.fromInts(71, 85, 105, 255),   // slate-600
-  attrKey: RGBA.fromInts(167, 139, 250, 255),       // violet-400
-  attrValue: RGBA.fromInts(253, 224, 71, 255),      // yellow-300
-  logDebug: RGBA.fromInts(156, 163, 175, 255),      // gray-400
-  logInfo: RGBA.fromInts(96, 165, 250, 255),        // blue-400
-  logWarn: RGBA.fromInts(251, 191, 36, 255),        // amber-400
-  logError: RGBA.fromInts(248, 113, 113, 255),      // red-400
+  background: RGBA.fromInts(15, 23, 42, 255), // slate-900
+  header: RGBA.fromInts(34, 211, 238, 255), // cyan-400
+  running: RGBA.fromInts(251, 191, 36, 255), // amber-400
+  success: RGBA.fromInts(74, 222, 128, 255), // green-400
+  error: RGBA.fromInts(248, 113, 113, 255), // red-400
+  text: RGBA.fromInts(226, 232, 240, 255), // slate-200
+  dimText: RGBA.fromInts(148, 163, 184, 255), // slate-400
+  selected: RGBA.fromInts(59, 130, 246, 255), // blue-500
+  detailsBg: RGBA.fromInts(30, 41, 59, 255), // slate-800
+  detailsBorder: RGBA.fromInts(71, 85, 105, 255), // slate-600
+  attrKey: RGBA.fromInts(167, 139, 250, 255), // violet-400
+  logDebug: RGBA.fromInts(156, 163, 175, 255), // gray-400
+  logInfo: RGBA.fromInts(96, 165, 250, 255), // blue-400
+  logWarn: RGBA.fromInts(251, 191, 36, 255), // amber-400
+  logError: RGBA.fromInts(248, 113, 113, 255), // red-400
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Duration Formatting
-// ─────────────────────────────────────────────────────────────────────────────
+const levelColor = (level: string) => {
+  if (level === 'ERROR') return colors.logError;
+  if (level === 'WARN') return colors.logWarn;
+  if (level === 'DEBUG') return colors.logDebug;
+  return colors.logInfo;
+};
 
-function formatDuration(ms: number): string {
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
-  if (ms < 1000) return `${ms.toFixed(0)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
+const statusColor = (status: SpanInfo['status']) => {
+  if (status === 'running') return colors.running;
+  if (status === 'error') return colors.error;
+  return colors.success;
+};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Log Collector
-// ─────────────────────────────────────────────────────────────────────────────
+const statusLabel = (status: SpanInfo['status']) => {
+  if (status === 'running') return 'Running...';
+  if (status === 'error') return 'Error';
+  return 'Success';
+};
 
-type LogCallback = (entry: LogEntry) => void;
-
-function createLogCollector(onLog: LogCallback) {
-  return Logger.make(({ logLevel, message, spans }) => {
-    // Get the innermost span name from Effect's span context
-    let spanName: string | null = null;
-    if (spans && spans._tag === 'Cons') {
-      spanName = spans.head.label;
-    }
-
-    // Convert message to string
-    const messageStr = Array.isArray(message)
-      ? message.map(m => typeof m === 'string' ? m : JSON.stringify(m)).join(' ')
-      : typeof message === 'string' ? message : JSON.stringify(message);
-
-    onLog({
-      timestamp: Date.now(),
-      level: logLevel.label,
-      message: messageStr,
-      spanName,
-    });
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Span Processor (Real-time)
-// ─────────────────────────────────────────────────────────────────────────────
-
-type SpanEvent =
-  | { type: 'start'; span: SpanInfo }
-  | { type: 'end'; spanId: string; endTime: number; status: 'ok' | 'error'; errorMessage?: string };
-
-class LiveSpanProcessor implements SpanProcessor {
-  private onEvent: (event: SpanEvent) => void;
-
-  constructor(onEvent: (event: SpanEvent) => void) {
-    this.onEvent = onEvent;
-  }
-
-  onStart(span: ReadableSpan, _parentContext: Context): void {
-    const spanContext = span.spanContext();
-    this.onEvent({
-      type: 'start',
-      span: {
-        spanId: spanContext.spanId,
-        parentSpanId: span.parentSpanId,
-        name: span.name,
-        startTime: Date.now(),
-        endTime: null,
-        status: 'running',
-        attributes: { ...span.attributes },
-        logs: [],
-      },
-    });
-  }
-
-  onEnd(span: ReadableSpan): void {
-    const spanContext = span.spanContext();
-    const isError = span.status.code === 2;
-    this.onEvent({
-      type: 'end',
-      spanId: spanContext.spanId,
-      endTime: Date.now(),
-      status: isError ? 'error' : 'ok',
-      errorMessage: isError ? span.status.message : undefined,
-    });
-  }
-
-  shutdown(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  forceFlush(): Promise<void> {
-    return Promise.resolve();
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tree Building
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface SpanNode {
-  span: SpanInfo;
-  children: SpanNode[];
-}
-
-function buildSpanTree(spans: Map<string, SpanInfo>): SpanNode[] {
-  const nodes = new Map<string, SpanNode>();
-  const roots: SpanNode[] = [];
-
-  for (const [id, span] of spans) {
-    nodes.set(id, { span, children: [] });
-  }
-
-  for (const [_id, span] of spans) {
-    const node = nodes.get(span.spanId)!;
-    if (span.parentSpanId && nodes.has(span.parentSpanId)) {
-      nodes.get(span.parentSpanId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  const sortChildren = (node: SpanNode) => {
-    node.children.sort((a, b) => a.span.startTime - b.span.startTime);
-    node.children.forEach(sortChildren);
-  };
-  roots.sort((a, b) => a.span.startTime - b.span.startTime);
-  roots.forEach(sortChildren);
-
-  return roots;
-}
-
-function flattenTree(roots: SpanNode[]): SpanInfo[] {
-  const result: SpanInfo[] = [];
-  const visit = (node: SpanNode) => {
-    result.push(node.span);
-    node.children.forEach(visit);
-  };
-  roots.forEach(visit);
-  return result;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TUI Renderer
-// ─────────────────────────────────────────────────────────────────────────────
+const MAX_LOGS_IN_PANEL = 8;
+const DETAILS_WIDTH = 50;
+const SPANS_TOP = 3;
 
 class SpanopticTUI {
-  private renderer: CliRenderer;
-  private container: BoxRenderable;
-  private headerText: TextRenderable;
-  private spans: Map<string, SpanInfo> = new Map();
-  private spansByName: Map<string, SpanInfo> = new Map();
-  private spinnerFrame = 0;
-  private serviceName: string;
-  private startY = 3;
-  private selectedIndex = 0;
-  private flatSpans: SpanInfo[] = [];
-  private detailsBox: BoxRenderable | null = null;
-  private logsBox: BoxRenderable | null = null;
-  private allLogs: LogEntry[] = [];
-  private maxLogsInPanel = 8;
-  private isComplete = false;
+  readonly #renderer: CliRenderer;
+  readonly #serviceName: string;
+  readonly #container: BoxRenderable;
+  readonly #logsBox: BoxRenderable;
+  readonly #summaryText: TextRenderable;
+  readonly #helpText: TextRenderable;
+  readonly #spanLines = new Map<string, TextRenderable>();
+  readonly #indicators = new Map<string, TextRenderable>();
+  readonly #spans = new Map<string, SpanInfo>();
+  #detailsBox: BoxRenderable | undefined;
+  #detailLines: Array<string> = [];
+  #logLines: Array<string> = [];
+  #flatSpans: Array<SpanInfo> = [];
+  #selectedIndex = 0;
+  #spinnerFrame = 0;
+  #complete = false;
+  // Clock time from the last tick or span event; renders read this instead
+  // of the wall clock so the TUI stays a plain synchronous view.
+  #now: number;
 
-  constructor(renderer: CliRenderer, serviceName: string) {
-    this.renderer = renderer;
-    this.serviceName = serviceName;
+  constructor(renderer: CliRenderer, serviceName: string, now: number) {
+    this.#renderer = renderer;
+    this.#serviceName = serviceName;
+    this.#now = now;
 
     renderer.setBackgroundColor(colors.background);
 
-    this.container = new BoxRenderable(renderer, {
+    this.#container = new BoxRenderable(renderer, {
       id: 'spanoptic-container',
       zIndex: 10,
     });
-    renderer.root.add(this.container);
+    renderer.root.add(this.#container);
 
-    this.headerText = new TextRenderable(renderer, {
-      id: 'header',
-      content: `● Trace (${serviceName})`,
-      position: 'absolute',
-      left: 2,
-      top: 1,
-      fg: colors.header,
-      zIndex: 100,
-    });
-    this.container.add(this.headerText);
+    this.#container.add(
+      new TextRenderable(renderer, {
+        id: 'header',
+        content: `● Trace (${serviceName})`,
+        position: 'absolute',
+        left: 2,
+        top: 1,
+        fg: colors.header,
+        zIndex: 100,
+      }),
+    );
 
-    // Create logs panel at the bottom
-    this.createLogsPanel();
-  }
-
-  private createLogsPanel(): void {
-    const logsHeight = this.maxLogsInPanel + 2; // +2 for border
-    const logsY = this.renderer.terminalHeight - logsHeight - 1;
-    const logsWidth = Math.floor(this.renderer.terminalWidth * 0.5);
-
-    this.logsBox = new BoxRenderable(this.renderer, {
+    const logsHeight = MAX_LOGS_IN_PANEL + 2;
+    this.#logsBox = new BoxRenderable(renderer, {
       id: 'logs-box',
       position: 'absolute',
       left: 2,
-      top: logsY,
-      width: logsWidth,
+      top: renderer.terminalHeight - logsHeight - 1,
+      width: Math.floor(renderer.terminalWidth * 0.5),
       height: logsHeight,
       backgroundColor: colors.detailsBg,
       borderColor: colors.detailsBorder,
@@ -290,443 +166,480 @@ class SpanopticTUI {
       titleAlignment: 'left',
       zIndex: 150,
     });
-    this.container.add(this.logsBox);
+    this.#container.add(this.#logsBox);
+
+    this.#summaryText = this.#addText('summary', SPANS_TOP + 1);
+    this.#helpText = this.#addText('help', SPANS_TOP + 2);
   }
 
-  private renderLogsPanel(): void {
-    if (!this.logsBox) return;
+  #addText(id: string, top: number) {
+    const text = new TextRenderable(this.#renderer, {
+      id,
+      content: '',
+      position: 'absolute',
+      left: 2,
+      top,
+      fg: colors.dimText,
+      zIndex: 50,
+    });
+    this.#container.add(text);
+    return text;
+  }
 
-    // Clear old log lines
-    for (let i = 0; i < this.maxLogsInPanel + 5; i++) {
-      const old = this.logsBox.getRenderable(`log-line-${i}`);
-      if (old) this.logsBox.remove(`log-line-${i}`);
-    }
+  get #selected() {
+    return this.#flatSpans[this.#selectedIndex];
+  }
 
-    // Get logs for the selected span only
-    const selectedSpan = this.flatSpans[this.selectedIndex];
-    const spanLogs = selectedSpan ? selectedSpan.logs : [];
-    const recentLogs = spanLogs.slice(-this.maxLogsInPanel);
-    const logsWidth = Math.floor(this.renderer.terminalWidth * 0.5) - 4;
+  #elapsed(span: SpanInfo) {
+    return (span.endTime ?? this.#now) - span.startTime;
+  }
 
-    // Update the logs box title to show the span name
-    if (this.logsBox && selectedSpan) {
-      this.logsBox.title = `Logs (${selectedSpan.name})`;
-    } else if (this.logsBox) {
-      this.logsBox.title = 'Logs';
-    }
+  #renderLogsPanel() {
+    for (const id of this.#logLines) this.#logsBox.remove(id);
+    this.#logLines = [];
 
-    if (recentLogs.length === 0) {
-      const emptyText = new TextRenderable(this.renderer, {
-        id: 'log-line-0',
-        content: '(no logs)',
-        position: 'absolute',
-        left: 1,
-        top: 1,
-        fg: colors.dimText,
-        zIndex: 151,
-      });
-      this.logsBox.add(emptyText);
-      return;
-    }
+    const selected = this.#selected;
+    this.#logsBox.title =
+      selected === undefined ? 'Logs' : `Logs (${selected.name})`;
+    const recentLogs = (selected?.logs ?? []).slice(-MAX_LOGS_IN_PANEL);
+    const logsWidth = Math.floor(this.#renderer.terminalWidth * 0.5) - 4;
 
-    for (let i = 0; i < recentLogs.length; i++) {
-      const log = recentLogs[i]!;
-      const levelColor = log.level === 'ERROR' ? colors.logError
-        : log.level === 'WARN' ? colors.logWarn
-        : log.level === 'DEBUG' ? colors.logDebug
-        : colors.logInfo;
+    const lines =
+      recentLogs.length === 0
+        ? [{ content: '(no logs)', fg: colors.dimText }]
+        : Arr.map(recentLogs, (log) => ({
+            content: Str.slice(
+              0,
+              logsWidth,
+            )(`[${Str.padEnd(4)(Str.slice(0, 4)(log.level))}] ${log.message}`),
+            fg: levelColor(log.level),
+          }));
 
-      // Format: [LEVEL] message (truncated)
-      const levelBadge = `[${log.level.slice(0, 4).padEnd(4)}]`;
-      const content = `${levelBadge} ${log.message}`.slice(0, logsWidth);
-
-      const text = new TextRenderable(this.renderer, {
-        id: `log-line-${i}`,
-        content,
-        position: 'absolute',
-        left: 1,
-        top: i + 1,
-        fg: levelColor,
-        zIndex: 151,
-      });
-      this.logsBox.add(text);
+    for (const [i, line] of lines.entries()) {
+      const id = `log-line-${i}`;
+      this.#logsBox.add(
+        new TextRenderable(this.#renderer, {
+          id,
+          content: line.content,
+          position: 'absolute',
+          left: 1,
+          top: i + 1,
+          fg: line.fg,
+          zIndex: 151,
+        }),
+      );
+      this.#logLines.push(id);
     }
   }
 
-  handleEvent(event: SpanEvent): void {
-    if (event.type === 'start') {
-      this.spans.set(event.span.spanId, event.span);
-      this.spansByName.set(event.span.name, event.span);
-    } else {
-      const span = this.spans.get(event.spanId);
-      if (span) {
-        span.endTime = event.endTime;
-        span.status = event.status;
-        span.errorMessage = event.errorMessage;
-      }
-    }
-    this.updateFlatSpans();
+  handleEvent(event: SpanEvent) {
+    this.#now = event.type === 'start' ? event.span.startTime : event.endTime;
+    applySpanEvent(this.#spans, event);
+    this.#updateFlatSpans();
     this.render();
   }
 
-  handleLog(entry: LogEntry): void {
-    // Add to global logs list
-    this.allLogs.push(entry);
+  handleLog(spanId: string, entry: LogEntry) {
+    if (!appendLog(this.#spans, spanId, entry)) return;
+    this.#updateFlatSpans();
+    this.#renderLogsPanel();
+    this.renderDetails();
+  }
 
-    // Find the span by name and add the log to it
-    if (entry.spanName) {
-      const span = this.spansByName.get(entry.spanName);
-      if (span) {
-        span.logs.push(entry);
-        this.renderLogsPanel();
-        this.renderDetails();
-      }
+  #updateFlatSpans() {
+    this.#flatSpans = flattenTree(buildSpanTree(this.#spans));
+    if (this.#selectedIndex >= this.#flatSpans.length) {
+      this.#selectedIndex = Math.max(0, this.#flatSpans.length - 1);
     }
   }
 
-  private updateFlatSpans(): void {
-    const roots = buildSpanTree(this.spans);
-    this.flatSpans = flattenTree(roots);
-    if (this.selectedIndex >= this.flatSpans.length) {
-      this.selectedIndex = Math.max(0, this.flatSpans.length - 1);
-    }
-  }
-
-  moveSelection(delta: number): void {
-    if (this.flatSpans.length === 0) return;
-    this.selectedIndex = Math.max(0, Math.min(this.flatSpans.length - 1, this.selectedIndex + delta));
+  moveSelection(delta: number) {
+    if (this.#flatSpans.length === 0) return;
+    this.#selectedIndex = Math.max(
+      0,
+      Math.min(this.#flatSpans.length - 1, this.#selectedIndex + delta),
+    );
     this.render();
     this.renderDetails();
-    this.renderLogsPanel();
+    this.#renderLogsPanel();
   }
 
-  private getDepth(spanId: string): number {
+  #isTracked(parentSpanId: string | undefined) {
+    return parentSpanId !== undefined && this.#spans.has(parentSpanId);
+  }
+
+  #depth(span: SpanInfo) {
     let depth = 0;
-    let current = this.spans.get(spanId);
-    while (current?.parentSpanId && this.spans.has(current.parentSpanId)) {
-      depth++;
-      current = this.spans.get(current.parentSpanId);
+    let current = span;
+    while (current.parentSpanId !== undefined) {
+      const parent = this.#spans.get(current.parentSpanId);
+      if (parent === undefined) break;
+      depth += 1;
+      current = parent;
     }
     return depth;
   }
 
-  private renderSpanLine(span: SpanInfo, index: number, y: number): void {
-    const isSelected = index === this.selectedIndex;
-    const depth = this.getDepth(span.spanId);
+  #renderSpanLine(span: SpanInfo, index: number, y: number) {
+    const isSelected = index === this.#selectedIndex;
+    const siblings = this.#isTracked(span.parentSpanId)
+      ? Arr.filter(this.#flatSpans, (s) => s.parentSpanId === span.parentSpanId)
+      : Arr.filter(this.#flatSpans, (s) => !this.#isTracked(s.parentSpanId));
+    const isLast = siblings.at(-1)?.spanId === span.spanId;
 
-    const parent = span.parentSpanId ? this.spans.get(span.parentSpanId) : null;
-    const siblings = parent
-      ? this.flatSpans.filter(s => s.parentSpanId === parent.spanId)
-      : this.flatSpans.filter(s => !s.parentSpanId || !this.spans.has(s.parentSpanId));
-    const isLast = siblings[siblings.length - 1]?.spanId === span.spanId;
-
-    let prefix = '';
-    for (let i = 0; i < depth; i++) {
-      prefix += '   ';
-    }
+    const prefix = Str.repeat(this.#depth(span))('   ');
     const connector = isLast ? '└─' : '├─';
-
-    let icon: string;
-    let statusColor: RGBA;
+    let icon = '✓';
     if (span.status === 'running') {
-      icon = SPINNER_FRAMES[this.spinnerFrame % SPINNER_FRAMES.length]!;
-      statusColor = colors.running;
+      icon = SPINNER_FRAMES[this.#spinnerFrame % SPINNER_FRAMES.length] ?? '';
     } else if (span.status === 'error') {
       icon = '✗';
-      statusColor = colors.error;
-    } else {
-      icon = '✓';
-      statusColor = colors.success;
     }
-
-    let duration = '';
-    if (span.endTime !== null) {
-      const ms = span.endTime - span.startTime;
-      duration = ` ${formatDuration(ms)}`;
-    } else {
-      const ms = Date.now() - span.startTime;
-      duration = ` ${formatDuration(ms)}...`;
-    }
-
-    // Show log count indicator
-    const logCount = span.logs.length;
-    const logIndicator = logCount > 0 ? ` 📝${logCount}` : '';
-
+    const duration =
+      span.endTime === null
+        ? ` ${formatDuration(this.#elapsed(span))}...`
+        : ` ${formatDuration(this.#elapsed(span))}`;
+    const logIndicator = span.logs.length > 0 ? ` 📝${span.logs.length}` : '';
     const content = `${prefix}${connector} ${icon} ${span.name}${duration}${logIndicator}`;
+    const fg = isSelected ? colors.selected : statusColor(span.status);
 
-    const textId = `span-${span.spanId}`;
-    let textRenderable = this.container.getRenderable(textId) as TextRenderable | undefined;
-
-    const fgColor = isSelected ? colors.selected : statusColor;
-
-    if (!textRenderable) {
-      textRenderable = new TextRenderable(this.renderer, {
-        id: textId,
+    const line = this.#spanLines.get(span.spanId);
+    if (line === undefined) {
+      const created = new TextRenderable(this.#renderer, {
+        id: `span-${span.spanId}`,
         content,
         position: 'absolute',
         left: 2,
         top: y,
-        fg: fgColor,
+        fg,
         zIndex: 50,
       });
-      this.container.add(textRenderable);
+      this.#container.add(created);
+      this.#spanLines.set(span.spanId, created);
     } else {
-      textRenderable.content = content;
-      textRenderable.fg = fgColor;
-      textRenderable.y = y;
+      line.content = content;
+      line.fg = fg;
+      line.y = y;
     }
 
-    const indicatorId = `indicator-${span.spanId}`;
-    let indicator = this.container.getRenderable(indicatorId) as TextRenderable | undefined;
-
-    if (isSelected) {
-      if (!indicator) {
-        indicator = new TextRenderable(this.renderer, {
-          id: indicatorId,
-          content: '▶',
-          position: 'absolute',
-          left: 0,
-          top: y,
-          fg: colors.selected,
-          zIndex: 51,
-        });
-        this.container.add(indicator);
-      } else {
-        indicator.y = y;
-        indicator.visible = true;
-      }
-    } else if (indicator) {
-      indicator.visible = false;
+    const indicator = this.#indicators.get(span.spanId);
+    if (!isSelected) {
+      if (indicator !== undefined) indicator.visible = false;
+    } else if (indicator === undefined) {
+      const created = new TextRenderable(this.#renderer, {
+        id: `indicator-${span.spanId}`,
+        content: '▶',
+        position: 'absolute',
+        left: 0,
+        top: y,
+        fg: colors.selected,
+        zIndex: 51,
+      });
+      this.#container.add(created);
+      this.#indicators.set(span.spanId, created);
+    } else {
+      indicator.y = y;
+      indicator.visible = true;
     }
   }
 
-  render(): void {
-    let y = this.startY;
-    for (let i = 0; i < this.flatSpans.length; i++) {
-      const span = this.flatSpans[i]!;
-      this.renderSpanLine(span, i, y);
-      y++;
+  render() {
+    for (const [i, span] of this.#flatSpans.entries()) {
+      this.#renderSpanLine(span, i, SPANS_TOP + i);
     }
+    const y = SPANS_TOP + this.#flatSpans.length;
 
-    const total = this.spans.size;
-    const running = [...this.spans.values()].filter(s => s.status === 'running').length;
-    const errors = [...this.spans.values()].filter(s => s.status === 'error').length;
-    const totalLogs = [...this.spans.values()].reduce((sum, s) => sum + s.logs.length, 0);
+    const spans = [...this.#spans.values()];
+    const running = Arr.filter(spans, (s) => s.status === 'running').length;
+    const errors = Arr.filter(spans, (s) => s.status === 'error').length;
+    const totalLogs = Arr.reduce(spans, 0, (sum, s) => sum + s.logs.length);
+    const summary = Arr.join(
+      [
+        `${spans.length} spans`,
+        ...(running > 0 ? [`${running} running`] : []),
+        ...(errors > 0 ? [`${errors} errors`] : []),
+        ...(totalLogs > 0 ? [`${totalLogs} logs`] : []),
+      ],
+      ' • ',
+    );
 
-    let summaryContent = `${total} spans`;
-    if (running > 0) summaryContent += ` • ${running} running`;
-    if (errors > 0) summaryContent += ` • ${errors} errors`;
-    if (totalLogs > 0) summaryContent += ` • ${totalLogs} logs`;
-
-    const summaryId = 'summary';
-    let summaryText = this.container.getRenderable(summaryId) as TextRenderable | undefined;
-    if (!summaryText) {
-      summaryText = new TextRenderable(this.renderer, {
-        id: summaryId,
-        content: summaryContent,
-        position: 'absolute',
-        left: 2,
-        top: y + 1,
-        fg: colors.dimText,
-        zIndex: 50,
-      });
-      this.container.add(summaryText);
-    } else {
-      summaryText.content = summaryContent;
-      summaryText.y = y + 1;
-    }
-
-    const helpId = 'help';
-    let helpText = this.container.getRenderable(helpId) as TextRenderable | undefined;
-    const helpContent = this.isComplete
+    this.#summaryText.content = summary;
+    this.#summaryText.y = y + 1;
+    this.#helpText.content = this.#complete
       ? '↑/↓ Navigate • e Export • q Quit'
       : '↑/↓ Navigate';
+    this.#helpText.y = y + 2;
+  }
 
-    if (!helpText) {
-      helpText = new TextRenderable(this.renderer, {
-        id: helpId,
-        content: helpContent,
-        position: 'absolute',
-        left: 2,
-        top: y + 2,
-        fg: colors.dimText,
-        zIndex: 50,
-      });
-      this.container.add(helpText);
-    } else {
-      helpText.content = helpContent;
-      helpText.y = y + 2;
+  #detailsBoxFor(x: number, height: number) {
+    if (this.#detailsBox !== undefined) {
+      this.#detailsBox.x = x;
+      this.#detailsBox.height = height;
+      return this.#detailsBox;
+    }
+    const box = new BoxRenderable(this.#renderer, {
+      id: 'details-box',
+      position: 'absolute',
+      left: x,
+      top: 2,
+      width: DETAILS_WIDTH,
+      height,
+      backgroundColor: colors.detailsBg,
+      borderColor: colors.detailsBorder,
+      borderStyle: 'single',
+      border: true,
+      title: 'Span Details',
+      titleAlignment: 'center',
+      zIndex: 200,
+    });
+    this.#container.add(box);
+    this.#detailsBox = box;
+    return box;
+  }
+
+  renderDetails() {
+    const selected = this.#selected;
+    if (selected === undefined) return;
+
+    const height = Math.min(25, this.#renderer.terminalHeight - 4);
+    const box = this.#detailsBoxFor(
+      this.#renderer.terminalWidth - DETAILS_WIDTH - 2,
+      height,
+    );
+    for (const id of this.#detailLines) box.remove(id);
+    this.#detailLines = [];
+
+    const lines: Array<{ content: string; fg: RGBA }> = [
+      { content: `Name: ${selected.name}`, fg: colors.text },
+      {
+        content: `Status: ${statusLabel(selected.status)}`,
+        fg: statusColor(selected.status),
+      },
+      selected.endTime === null
+        ? {
+            content: `Duration: ${formatDuration(this.#elapsed(selected))} (running)`,
+            fg: colors.running,
+          }
+        : {
+            content: `Duration: ${formatDuration(this.#elapsed(selected))}`,
+            fg: colors.text,
+          },
+    ];
+    if (selected.errorMessage !== undefined && selected.errorMessage !== '') {
+      lines.push(
+        { content: '', fg: colors.dimText },
+        { content: `Error: ${selected.errorMessage}`, fg: colors.error },
+      );
+    }
+    const attributes = Arr.filter(
+      Rec.toEntries(selected.attributes),
+      ([key]) => !Str.startsWith('code.')(key),
+    );
+    if (attributes.length > 0) {
+      lines.push(
+        { content: '', fg: colors.dimText },
+        { content: 'Attributes:', fg: colors.dimText },
+        ...Arr.map(attributes, ([key, value]) => ({
+          content: `  ${key}: ${JSON.stringify(value)}`,
+          fg: colors.attrKey,
+        })),
+      );
+    }
+    if (selected.logs.length > 0) {
+      lines.push(
+        { content: '', fg: colors.dimText },
+        { content: `Logs (${selected.logs.length}):`, fg: colors.dimText },
+        ...Arr.map(selected.logs, (log) => ({
+          content: `  [${log.level}] ${log.message}`,
+          fg: levelColor(log.level),
+        })),
+      );
+    }
+
+    for (const [i, line] of lines.slice(0, height - 2).entries()) {
+      const id = `detail-line-${i}`;
+      box.add(
+        new TextRenderable(this.#renderer, {
+          id,
+          content: Str.slice(0, DETAILS_WIDTH - 4)(line.content),
+          position: 'absolute',
+          left: 1,
+          top: i + 1,
+          fg: line.fg,
+          zIndex: 201,
+        }),
+      );
+      this.#detailLines.push(id);
     }
   }
 
-  renderDetails(): void {
-    if (this.flatSpans.length === 0) return;
-
-    const selectedSpan = this.flatSpans[this.selectedIndex];
-    if (!selectedSpan) return;
-
-    const detailsWidth = 50;
-    const detailsX = this.renderer.terminalWidth - detailsWidth - 2;
-    const detailsY = 2;
-    const detailsHeight = Math.min(25, this.renderer.terminalHeight - 4);
-
-    if (!this.detailsBox) {
-      this.detailsBox = new BoxRenderable(this.renderer, {
-        id: 'details-box',
-        position: 'absolute',
-        left: detailsX,
-        top: detailsY,
-        width: detailsWidth,
-        height: detailsHeight,
-        backgroundColor: colors.detailsBg,
-        borderColor: colors.detailsBorder,
-        borderStyle: 'single',
-        border: true,
-        title: 'Span Details',
-        titleAlignment: 'center',
-        zIndex: 200,
-      });
-      this.container.add(this.detailsBox);
-    } else {
-      this.detailsBox.x = detailsX;
-      this.detailsBox.height = detailsHeight;
-    }
-
-    // Clear old detail lines
-    for (let i = 0; i < 50; i++) {
-      const old = this.detailsBox.getRenderable(`detail-line-${i}`);
-      if (old) this.detailsBox.remove(`detail-line-${i}`);
-    }
-
-    let line = 0;
-    const addLine = (content: string, color: RGBA) => {
-      if (line >= detailsHeight - 2) return;
-      const text = new TextRenderable(this.renderer, {
-        id: `detail-line-${line}`,
-        content: content.slice(0, detailsWidth - 4),
-        position: 'absolute',
-        left: 1,
-        top: line + 1,
-        fg: color,
-        zIndex: 201,
-      });
-      this.detailsBox!.add(text);
-      line++;
-    };
-
-    // Span name
-    addLine(`Name: ${selectedSpan.name}`, colors.text);
-
-    // Status
-    const statusText = selectedSpan.status === 'running' ? 'Running...'
-      : selectedSpan.status === 'error' ? 'Error'
-      : 'Success';
-    const statusColor = selectedSpan.status === 'running' ? colors.running
-      : selectedSpan.status === 'error' ? colors.error
-      : colors.success;
-    addLine(`Status: ${statusText}`, statusColor);
-
-    // Duration
-    if (selectedSpan.endTime !== null) {
-      const ms = selectedSpan.endTime - selectedSpan.startTime;
-      addLine(`Duration: ${formatDuration(ms)}`, colors.text);
-    } else {
-      const ms = Date.now() - selectedSpan.startTime;
-      addLine(`Duration: ${formatDuration(ms)} (running)`, colors.running);
-    }
-
-    // Error message
-    if (selectedSpan.errorMessage) {
-      addLine('', colors.dimText);
-      addLine(`Error: ${selectedSpan.errorMessage}`, colors.error);
-    }
-
-    // Attributes
-    const attrs = selectedSpan.attributes;
-    const attrKeys = Object.keys(attrs).filter(k => !k.startsWith('code.'));
-
-    if (attrKeys.length > 0) {
-      addLine('', colors.dimText);
-      addLine('Attributes:', colors.dimText);
-
-      for (const key of attrKeys) {
-        const value = JSON.stringify(attrs[key]);
-        addLine(`  ${key}: ${value}`, colors.attrKey);
-      }
-    }
-
-    // Logs
-    if (selectedSpan.logs.length > 0) {
-      addLine('', colors.dimText);
-      addLine(`Logs (${selectedSpan.logs.length}):`, colors.dimText);
-
-      for (const log of selectedSpan.logs) {
-        const levelColor = log.level === 'ERROR' ? colors.logError
-          : log.level === 'WARN' ? colors.logWarn
-          : log.level === 'DEBUG' ? colors.logDebug
-          : colors.logInfo;
-
-        const levelBadge = `[${log.level}]`;
-        addLine(`  ${levelBadge} ${log.message}`, levelColor);
-      }
-    }
-  }
-
-  tick(): void {
-    this.spinnerFrame++;
-    const hasRunning = [...this.spans.values()].some(s => s.status === 'running');
-    if (hasRunning) {
+  tick(now: number) {
+    this.#now = now;
+    this.#spinnerFrame += 1;
+    if (Arr.some(this.#flatSpans, (s) => s.status === 'running')) {
       this.render();
       this.renderDetails();
     }
   }
 
-  setComplete(): void {
-    this.isComplete = true;
+  get complete() {
+    return this.#complete;
+  }
+
+  setComplete() {
+    this.#complete = true;
     this.render();
+    this.renderDetails();
   }
 
-  destroy(): void {
-    this.container.destroyRecursively();
+  destroy() {
+    this.#container.destroyRecursively();
   }
 
-  hasRunningSpans(): boolean {
-    return [...this.spans.values()].some(s => s.status === 'running');
-  }
-
-  /** Export trace data for replay */
   exportTrace(): TraceExport {
     return {
       version: 1,
-      serviceName: this.serviceName,
-      exportedAt: Date.now(),
-      spans: this.flatSpans,
+      serviceName: this.#serviceName,
+      exportedAt: this.#now,
+      spans: this.#flatSpans,
     };
   }
 
-  /** Load trace data from export for replay */
-  loadTrace(data: TraceExport): void {
-    this.spans.clear();
-    this.spansByName.clear();
-    this.allLogs = [];
-    for (const span of data.spans) {
-      this.spans.set(span.spanId, span);
-      this.spansByName.set(span.name, span);
-      // Collect all logs from spans
-      this.allLogs.push(...span.logs);
-    }
-    // Sort logs by timestamp
-    this.allLogs.sort((a, b) => a.timestamp - b.timestamp);
-    this.updateFlatSpans();
+  loadTrace(data: TraceExport) {
+    this.#spans.clear();
+    for (const span of data.spans) this.#spans.set(span.spanId, span);
+    this.#updateFlatSpans();
     this.render();
     this.renderDetails();
-    this.renderLogsPanel();
+    this.#renderLogsPanel();
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public API
-// ─────────────────────────────────────────────────────────────────────────────
+const liveSpanProcessor = (
+  onEvent: (event: SpanEvent) => void,
+): SpanProcessor => ({
+  onStart: (span: ReadableSpan) => {
+    onEvent({
+      type: 'start',
+      span: {
+        spanId: span.spanContext().spanId,
+        ...(span.parentSpanContext === undefined
+          ? {}
+          : { parentSpanId: span.parentSpanContext.spanId }),
+        name: span.name,
+        startTime: hrTimeToMillis(span.startTime),
+        endTime: null,
+        status: 'running',
+        attributes: { ...span.attributes },
+        logs: [],
+      },
+    });
+  },
+  onEnd: (span) => {
+    const isError = span.status.code === SpanStatusCode.ERROR;
+    onEvent({
+      type: 'end',
+      spanId: span.spanContext().spanId,
+      endTime: hrTimeToMillis(span.endTime),
+      status: isError ? 'error' : 'ok',
+      errorMessage: isError ? span.status.message : undefined,
+    });
+  },
+  shutdown: () => Promise.resolve(),
+  forceFlush: () => Promise.resolve(),
+});
+
+// Spans reach the TUI through a span processor on a private tracer provider,
+// so tracing is scoped to the visualized program rather than registered
+// globally.
+const tracingLayer = (serviceName: string, processor: SpanProcessor) =>
+  OtelTracer.layer.pipe(
+    Layer.provide(
+      Layer.effect(
+        OtelTracer.OtelTracerProvider,
+        Effect.acquireRelease(
+          Effect.sync(
+            () =>
+              new BasicTracerProvider({
+                resource: resourceFromAttributes({
+                  'service.name': serviceName,
+                }),
+                spanProcessors: [processor],
+              }),
+          ),
+          (provider) => Effect.promise(() => provider.shutdown()),
+        ),
+      ),
+    ),
+  );
+
+// Replaces the console loggers so nothing is printed over the TUI; the tracer
+// logger stays so logs are still recorded as span events.
+const tuiLoggerLayer = (tui: SpanopticTUI) =>
+  Logger.layer([
+    Logger.make(({ logLevel, message, fiber, date }) => {
+      const span = fiber.cache.span;
+      if (!Predicate.isTagged(span, 'Span')) return;
+      tui.handleLog(span.spanId, {
+        timestamp: date.getTime(),
+        level: Str.toUpperCase(logLevel),
+        message: formatLogMessage(message),
+        spanName: span.name,
+      });
+    }),
+    Logger.tracerLogger,
+  ]);
+
+const acquireTui = (serviceName: string) =>
+  Effect.gen(function* () {
+    const renderer = yield* Effect.acquireRelease(
+      Effect.promise(() =>
+        createCliRenderer({ exitOnCtrlC: true, targetFps: 30 }),
+      ),
+      (r) => Effect.sync(() => r.destroy()),
+    );
+    const now = yield* Clock.currentTimeMillis;
+    const tui = yield* Effect.acquireRelease(
+      Effect.sync(() => new SpanopticTUI(renderer, serviceName, now)),
+      (t) => Effect.sync(() => t.destroy()),
+    );
+    return { renderer, tui };
+  });
+
+/**
+ * Handles navigation and export keys, and resolves once the user quits
+ * (`q` / Escape) after the trace is complete.
+ */
+const runKeys = (
+  renderer: CliRenderer,
+  tui: SpanopticTUI,
+  onExport: TraceVisualizeOptions['onExport'],
+) =>
+  Effect.gen(function* () {
+    const keys = yield* Queue.unbounded<KeyEvent>();
+    const onKey = (key: KeyEvent) => {
+      Queue.offerUnsafe(keys, key);
+    };
+    yield* Effect.acquireRelease(
+      Effect.sync(() => renderer.keyInput.on('keypress', onKey)),
+      () => Effect.sync(() => renderer.keyInput.off('keypress', onKey)),
+    );
+    const quit = yield* Deferred.make<void>();
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.gen(function* () {
+          const key = yield* Queue.take(keys);
+          if (key.name === 'up' || key.name === 'k') tui.moveSelection(-1);
+          else if (key.name === 'down' || key.name === 'j')
+            tui.moveSelection(1);
+          else if (key.name === 'e') onExport?.(tui.exportTrace());
+          else if ((key.name === 'q' || key.name === 'escape') && tui.complete)
+            yield* Deferred.succeed(quit, undefined);
+        }),
+      ),
+    );
+    return { quit };
+  });
 
 /**
  * Wraps an Effect program with OTEL tracing and visualizes the trace
@@ -734,173 +647,98 @@ class SpanopticTUI {
  *
  * @example
  * ```ts
+ * import { BunRuntime } from "@effect/platform-bun"
  * import { Effect } from "effect"
- * import { traceVisualize } from "@shoe-box-tools/spanoptic"
+ * import { traceVisualize, withTracedSpan } from "@shoe-box-tools/spanoptic"
  *
  * const program = Effect.gen(function* () {
  *   yield* Effect.log("Starting...")
  *   yield* Effect.sleep("100 millis")
  *   yield* Effect.log("Done!")
  *   return "done"
- * }).pipe(Effect.withSpan("main"))
+ * }).pipe(withTracedSpan("main"))
  *
- * Effect.runPromise(traceVisualize(program, { serviceName: "my-app" }))
+ * BunRuntime.runMain(traceVisualize(program, { serviceName: "my-app" }))
  * ```
  */
-export function traceVisualize<A, E, R>(
+export const traceVisualize = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  options: TraceVisualizeOptions
-): Effect.Effect<A, E, R> {
-  return Effect.gen(function* () {
-    const renderer = yield* Effect.promise(() =>
-      createCliRenderer({
-        exitOnCtrlC: true,
-        targetFps: 30,
-      })
-    );
+  options: TraceVisualizeOptions,
+) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { renderer, tui } = yield* acquireTui(options.serviceName);
+      const { quit } = yield* runKeys(renderer, tui, options.onExport);
 
-    const tui = new SpanopticTUI(renderer, options.serviceName);
-
-    const processor = new LiveSpanProcessor((event) => {
-      tui.handleEvent(event);
-    });
-
-    // Create log collector that sends logs to the TUI
-    const logCollector = createLogCollector((entry) => {
-      tui.handleLog(entry);
-    });
-
-    // Handle keyboard input
-    const keyHandler = (key: KeyEvent) => {
-      if (key.name === 'up' || key.name === 'k') {
-        tui.moveSelection(-1);
-      } else if (key.name === 'down' || key.name === 'j') {
-        tui.moveSelection(1);
-      } else if (key.name === 'e' && options.onExport) {
-        options.onExport(tui.exportTrace());
-      }
-    };
-    renderer.keyInput.on('keypress', keyHandler);
-
-    // Animation loop for spinners
-    const animationFiber = yield* Effect.fork(
-      Effect.gen(function* () {
-        while (true) {
-          yield* Effect.sleep('80 millis');
-          tui.tick();
-        }
-      })
-    );
-
-    const TracingLayer = NodeSdk.layer(() => ({
-      resource: { serviceName: options.serviceName },
-      spanProcessor: processor,
-    }));
-
-    // Use Logger.none to suppress default logger, then add our custom collector
-    // This ensures no logs escape to the console
-    const LoggingLayer = Layer.mergeAll(
-      Logger.remove(Logger.defaultLogger),
-      Logger.add(logCollector)
-    );
-
-    let result: A;
-    try {
-      result = yield* effect.pipe(
-        Effect.provide(LoggingLayer),
-        Effect.provide(TracingLayer as Layer.Layer<never>),
-        Logger.withMinimumLogLevel(LogLevel.All)
+      yield* Effect.forkScoped(
+        Effect.forever(
+          Effect.gen(function* () {
+            yield* Effect.sleep('80 millis');
+            tui.tick(yield* Clock.currentTimeMillis);
+          }),
+        ),
       );
 
-      // Wait a moment for final render
+      const processor = liveSpanProcessor((event) => {
+        tui.handleEvent(event);
+      });
+      // Built in this scope, so the tracer provider outlives the program and
+      // shuts down with the TUI.
+      const services = yield* Layer.build(
+        Layer.mergeAll(
+          tracingLayer(options.serviceName, processor),
+          tuiLoggerLayer(tui),
+        ),
+      );
+      const result = yield* effect.pipe(
+        Effect.provideContext(services),
+        Effect.provideService(References.MinimumLogLevel, 'All'),
+      );
+
+      // Let the final span renders land before showing the quit hint.
       yield* Effect.sleep('200 millis');
       tui.setComplete();
-      tui.renderDetails();
-
-      // Wait for 'q' to quit
-      yield* Effect.async<void>((resume) => {
-        const quitHandler = (key: KeyEvent) => {
-          if (key.name === 'q' || key.name === 'escape') {
-            renderer.keyInput.off('keypress', quitHandler);
-            resume(Effect.void);
-          }
-        };
-        renderer.keyInput.on('keypress', quitHandler);
-      });
-
-    } finally {
-      yield* Fiber.interrupt(animationFiber);
-      renderer.keyInput.off('keypress', keyHandler);
-      tui.destroy();
-      renderer.destroy();
-    }
-
-    return result!;
-  });
-}
+      yield* Deferred.await(quit);
+      return result;
+    }),
+  );
 
 /**
  * Replays a previously exported trace in the TUI.
  *
  * @example
  * ```ts
- * import { Effect } from "effect"
- * import { replayVisualize } from "@shoe-box-tools/spanoptic"
+ * import { BunRuntime, BunServices } from "@effect/platform-bun"
+ * import { Effect, FileSystem } from "effect"
+ * import { decodeTraceExport, replayVisualize } from "@shoe-box-tools/spanoptic"
  *
- * const traceData = JSON.parse(fs.readFileSync("trace.json", "utf-8"))
- * Effect.runPromise(replayVisualize(traceData))
+ * const program = Effect.gen(function* () {
+ *   const fs = yield* FileSystem.FileSystem
+ *   const data = yield* decodeTraceExport(yield* fs.readFileString("trace.json"))
+ *   yield* replayVisualize(data)
+ * })
+ * BunRuntime.runMain(program.pipe(Effect.provide(BunServices.layer)))
  * ```
  */
-export function replayVisualize(
+export const replayVisualize = (
   data: TraceExport,
-  options?: { onExport?: (data: TraceExport) => void }
-): Effect.Effect<void> {
-  return Effect.gen(function* () {
-    const renderer = yield* Effect.promise(() =>
-      createCliRenderer({
-        exitOnCtrlC: true,
-        targetFps: 30,
-      })
-    );
-
-    const tui = new SpanopticTUI(renderer, data.serviceName);
-    tui.loadTrace(data);
-    tui.setComplete();
-
-    // Handle keyboard input
-    const keyHandler = (key: KeyEvent) => {
-      if (key.name === 'up' || key.name === 'k') {
-        tui.moveSelection(-1);
-      } else if (key.name === 'down' || key.name === 'j') {
-        tui.moveSelection(1);
-      } else if (key.name === 'e' && options?.onExport) {
-        options.onExport(tui.exportTrace());
-      }
-    };
-    renderer.keyInput.on('keypress', keyHandler);
-
-    // Wait for 'q' to quit
-    yield* Effect.async<void>((resume) => {
-      const quitHandler = (key: KeyEvent) => {
-        if (key.name === 'q' || key.name === 'escape') {
-          renderer.keyInput.off('keypress', quitHandler);
-          resume(Effect.void);
-        }
-      };
-      renderer.keyInput.on('keypress', quitHandler);
-    });
-
-    renderer.keyInput.off('keypress', keyHandler);
-    tui.destroy();
-    renderer.destroy();
-  });
-}
+  options?: Pick<TraceVisualizeOptions, 'onExport'>,
+) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { renderer, tui } = yield* acquireTui(data.serviceName);
+      tui.loadTrace(data);
+      tui.setComplete();
+      const { quit } = yield* runKeys(renderer, tui, options?.onExport);
+      yield* Deferred.await(quit);
+    }),
+  );
 
 /**
- * Helper that wraps an effect with both OTEL tracing span and Effect log span.
- * This ensures logs are properly associated with spans in the TUI.
- *
- * Use this instead of Effect.withSpan when you want logs to be captured.
+ * Wraps an effect in an Effect log span and a tracing span of the same name.
+ * The TUI attaches logs to the current tracing span, so plain
+ * `Effect.withSpan` works too; the log span adds the span name to console
+ * log output when the program runs outside the TUI.
  *
  * @example
  * ```ts
@@ -910,16 +748,7 @@ export function replayVisualize(
  * }).pipe(withTracedSpan("mySpan"));
  * ```
  */
-export function withTracedSpan<A, E, R>(
-  name: string,
-  options?: Parameters<typeof Effect.withSpan>[1]
-) {
-  return (effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-    effect.pipe(
-      Effect.withLogSpan(name),
-      Effect.withSpan(name, options)
-    );
-}
-
-// Re-export types
-export type { TraceVisualizeOptions, SpanInfo, LogEntry, TraceExport };
+export const withTracedSpan =
+  (name: string, options?: Tracer.SpanOptionsNoTrace) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(Effect.withLogSpan(name), Effect.withSpan(name, options));
