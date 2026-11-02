@@ -1,5 +1,75 @@
 # shoemaker
 
+## 0.2.3
+
+### Patch Changes
+
+- [`083eb38`](https://github.com/EthanShoeDev/shoemaker/commit/083eb387a8a13da569c0f25020d32f81b5be1446) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - New package kind `frontend` (`{ name: 'frontend', kind: 'frontend', api: 'api' }`):
+  client code the repo's frontends share, with no React and no UI. It holds the
+  effect-api app's endpoints as Effect atoms: `ApiClient` (`AtomHttpApi` over the
+  contract), `withApiTransport` to seed an atom registry with where requests go,
+  and one atom module per resource. `init` adds one when a TanStack Start site
+  serves an API (`--no-frontend` to skip).
+  
+  A site that serves an API with a frontend package reads it through those atoms
+  instead of `callApi`: the router owns a raf-effect-atom registry (one per
+  server request, one per tab), route loaders start atoms with
+  `context.atoms.ensure`, components read them with `useAtomResult`, and the
+  server's results stream into the browser's registry. Every TanStack Start
+  app's `tsconfig.json` now sets `declaration: false`, since an app emits no
+  declarations and raf-effect-atom's router context otherwise fails TS2883.
+  
+  Existing repos with a site serving an API that want this (for a coding agent;
+  `web` stands for the site, `api` for the effect-api app, `@scope` for the
+  repo's scope):
+  
+  1. Add `{ name: 'frontend', kind: 'frontend', api: 'api' }` to `packages` in
+     `shoemaker.config.ts`, then run `bun run shoemaker:sync`. It writes
+     `packages/frontend/` and updates `apps/web/package.json`
+     (`@scope/frontend`, `@effect/atom-react` and `raf-effect-atom` in;
+     `@scope/api-contract` out) and `apps/web/tsconfig.json`.
+  2. Generate a scratch repo with the same config
+     (`bunx shoemaker init /tmp/frontend-ref --yes --no-git --apps tanstack-start,effect-api`)
+     and copy its `apps/web/src/api-transport.ts` and
+     `apps/web/test/api-transport.test.ts` into the repo, fixing the scope.
+  3. Merge the scratch repo's `apps/web/src/router.tsx` (`makeRegistry`,
+     `Loader.make`, `setupRouterAtoms`) and `apps/web/src/routes/__root.tsx`
+     (`createRootRouteWithContext`, `WaterfallDetection`) into the repo's.
+  4. For each `callApi(...)` in a loader, add a query atom to
+     `packages/frontend/src/<resource>.ts` (`ApiClient.query` with a
+     `serializationKey`), return `context.atoms.ensure(atom, ...args)` from the
+     loader, and read it in the component with
+     `useAtomResult(atom, Route.useLoaderData())`. Writes become
+     `ApiClient.mutation` atoms that pass `reactivityKeys`.
+  5. Delete `apps/web/src/api-client.ts` and its test once nothing imports
+     `callApi`.
+  6. `bun install`, then `bunx turbo run lint:check typecheck test build`.
+
+- [`1c07e69`](https://github.com/EthanShoeDev/shoemaker/commit/1c07e69e919797bd8e9431cfd55aad2f5a3622ff) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Generated repos get newer dependency versions:
+  
+  - `effect`: 4.1.0 → 4.1.1
+  - `expoSdk`: ~58.0.21 → ~58.0.22
+  - `knip`: ^6.43.0 → ^6.44.1
+  - `@tanstack/eslint-plugin-query`: ^5.105.0 → ^5.105.1
+  - `nx`: ^24.0.2 → ^24.0.3
+  - `tsdown`: ^0.23.3 → ^0.23.4
+  - `varlock`: ^1.23.0 → ^1.24.0
+  - `@varlock/vite-integration`: ^1.5.4 → ^1.5.5
+  - `@varlock/cloudflare-integration`: ^1.6.2 → ^1.6.3
+  - `@rolldown/plugin-babel`: ^0.2.4 → ^0.3.0
+  - `@babel/core`: ^7.29.0 → ^8.0.10
+  - `@tanstack/react-query`: ^5.105.0 → ^5.105.1
+  - `foldkit`: ~0.169.0 → ~0.170.0
+  - `@foldkit/vite-plugin`: ~0.28.0 → ~0.29.0
+  - `@foldkit/devtools`: ~0.169.0 → ~0.170.0
+  - `expo-router`: ~58.0.28 → ~58.0.29
+  - `react-native-screens`: ~4.30.0 → ~4.30.1
+  
+  Existing repos: `bun run shoemaker:sync`, then `bun install`. A version the
+  repo already raised past these stays as it is.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes

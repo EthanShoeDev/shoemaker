@@ -1,5 +1,14 @@
 # shoemaker-spanoptic
 
+## 0.0.3
+
+### Patch Changes
+
+- [`f243bc6`](https://github.com/EthanShoeDev/shoemaker/commit/f243bc6ba59ac703a1c2996ab422678ff2eb611b) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Moves to OpenTelemetry 3 and OpenTUI 0.8. The tracer provider now comes from
+  `@opentelemetry/sdk-trace` (`TracerProvider`), which replaces the deprecated
+  `@opentelemetry/sdk-trace-base`, with `@opentelemetry/resources` 3. Effect is
+  4.1.1.
+
 ## 0.0.2
 
 ### Patch Changes
