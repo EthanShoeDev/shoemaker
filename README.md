@@ -44,6 +44,9 @@ they're the setup I use for my own repos.
   and Actions secrets
 - **Environment**: a Nix dev shell, GitHub Actions CI, and an AGENTS.md for
   coding agents
+- **MCP servers**: `.mcp.json` gives coding agents the project's MCP servers:
+  Cloudflare's observability server (Workers logs and traces) when the Stack
+  registers Cloudflare. Sync merges its servers in, so ones you add stay.
 - **Android**: with an Expo app, `nix develop .#android` adds the Android
   SDK, NDK and JDK that its Gradle builds need, from nix, on NixOS too.
 - **Releases**: changesets. An Expo app with

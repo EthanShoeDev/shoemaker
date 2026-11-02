@@ -2,6 +2,7 @@ import type { Generator, Renderer } from '../../engine/types.ts';
 import { agentFiles } from './agents.ts';
 import { changesets, ci, vscode } from './editor-ci.ts';
 import { gitignore } from './gitignore.ts';
+import { mcpConfig } from './mcp.ts';
 import { flake, nixFiles } from './nix.ts';
 import { rootCatalog, rootPackageJson, rootTooling } from './package-json.ts';
 import { readmeFile } from './readme.ts';
@@ -22,6 +23,7 @@ export const rootGenerators: ReadonlyArray<Generator> = [
   bunfig,
   nixFiles,
   agentFiles,
+  mcpConfig,
   vscode,
   ci,
   changesets,

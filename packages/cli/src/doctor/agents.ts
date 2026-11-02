@@ -1,6 +1,15 @@
-import { Effect, String as Str } from 'effect';
+import {
+  Array as Arr,
+  Effect,
+  Predicate,
+  Record as Rec,
+  Result,
+  String as Str,
+} from 'effect';
 
-import { fail, pass } from './shared.ts';
+import { hasDep, isRecord, parseJsonc } from '../checks/workspace.ts';
+import { CLOUDFLARE_OBSERVABILITY_MCP } from '../generators/root/mcp.ts';
+import { fail, manifestsOf, pass } from './shared.ts';
 import type { DoctorCheck, Finding } from './types.ts';
 
 export const agentsMd: DoctorCheck = {
@@ -39,4 +48,42 @@ export const agentsMd: DoctorCheck = {
   }),
 };
 
-export const agentChecks = [agentsMd];
+// Packages that mean the repo deploys Workers.
+const CLOUDFLARE_DEPS = ['@alchemy.run/cloudflare', 'wrangler'];
+
+const mcpUrls = (text: string | undefined) => {
+  const config = parseJsonc(text ?? '');
+  const servers = isRecord(config) ? config.mcpServers : undefined;
+  return isRecord(servers)
+    ? Arr.filterMap(Rec.values(servers), (server) =>
+        isRecord(server) && Predicate.isString(server.url)
+          ? Result.succeed(server.url)
+          : Result.failVoid,
+      )
+    : [];
+};
+
+export const cloudflareObservabilityMcp: DoctorCheck = {
+  id: 'cloudflare-observability-mcp',
+  description:
+    'A repo that deploys to Cloudflare gives agents the Cloudflare observability MCP server',
+  run: Effect.fnUntraced(function* (repo) {
+    const manifests = yield* manifestsOf(repo);
+    const cloudflare = Arr.some(manifests, (manifest) =>
+      Arr.some(CLOUDFLARE_DEPS, (dep) => hasDep(manifest.pkg, dep)),
+    );
+    if (!cloudflare) return [];
+    return mcpUrls(yield* repo.read('.mcp.json')).includes(
+      CLOUDFLARE_OBSERVABILITY_MCP,
+    )
+      ? [pass('.mcp.json has the Cloudflare observability MCP server')]
+      : [
+          fail('.mcp.json lacks the Cloudflare observability MCP server', {
+            path: '.mcp.json',
+            fix: `shoemaker sync adds it (agents feature, Cloudflare provider), or add "cloudflare-observability": { "type": "http", "url": "${CLOUDFLARE_OBSERVABILITY_MCP}" } under mcpServers`,
+          }),
+        ];
+  }),
+};
+
+export const agentChecks = [agentsMd, cloudflareObservabilityMcp];

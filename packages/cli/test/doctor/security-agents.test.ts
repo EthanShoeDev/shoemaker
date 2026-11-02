@@ -1,7 +1,10 @@
 import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Effect } from 'effect';
 
-import { agentsMd } from '../../src/doctor/agents.ts';
+import {
+  agentsMd,
+  cloudflareObservabilityMcp,
+} from '../../src/doctor/agents.ts';
 import {
   mcpSecrets,
   rawEnvAccess,
@@ -156,5 +159,38 @@ describe('agents doctor check', () => {
       );
       assert.include(bad[0]?.fix ?? '', 'move CLAUDE.md to AGENTS.md');
     }),
+  );
+
+  it.effect(
+    'cloudflare-observability-mcp wants the server only where Workers deploy',
+    () =>
+      Effect.gen(function* () {
+        const pkg = (deps: Record<string, string>) =>
+          json({ name: 'x', devDependencies: deps });
+        assert.lengthOf(
+          yield* runCheck(cloudflareObservabilityMcp, {
+            'package.json': pkg({ '@alchemy.run/aws': '2.0.0' }),
+          }),
+          0,
+        );
+        const missing = yield* failures(cloudflareObservabilityMcp, {
+          'package.json': pkg({ wrangler: '4.0.0' }),
+          '.mcp.json': json({ mcpServers: { other: { type: 'http' } } }),
+        });
+        assert.lengthOf(missing, 1);
+        assert.strictEqual(missing[0]?.path, '.mcp.json');
+        const found = yield* runCheck(cloudflareObservabilityMcp, {
+          'package.json': pkg({ '@alchemy.run/cloudflare': '2.0.0' }),
+          '.mcp.json': json({
+            mcpServers: {
+              cf: {
+                type: 'http',
+                url: 'https://observability.mcp.cloudflare.com/mcp',
+              },
+            },
+          }),
+        });
+        assert.isTrue(found.length === 1 && found[0]?.ok === true);
+      }),
   );
 });

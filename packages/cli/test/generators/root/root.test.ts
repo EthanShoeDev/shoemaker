@@ -9,6 +9,8 @@ import {
 
 import { makeContext } from '../../../src/engine/generate.ts';
 import type { FileStrategy } from '../../../src/engine/types.ts';
+import { alchemyProviders } from '../../../src/generators/infra/target.ts';
+import { CLOUDFLARE_OBSERVABILITY_MCP } from '../../../src/generators/root/mcp.ts';
 import { workspaces } from '../../../src/generators/root/workspaces.ts';
 import { effectFamily, versions } from '../../../src/versions.ts';
 import { parseJson, preset, presetNames, record, render } from './fixtures.ts';
@@ -63,6 +65,27 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     assert.strictEqual(
       byPath.has('bunfig.toml'),
       Arr.some(config.apps, (app) => app.kind === 'expo'),
+    );
+  });
+
+  it('gives agents the Cloudflare observability MCP server when the Stack registers Cloudflare', () => {
+    const cloudflare = alchemyProviders(config).includes('cloudflare');
+    assert.strictEqual(byPath.has('.mcp.json'), cloudflare);
+    if (!cloudflare) return;
+    assert.strictEqual(file('.mcp.json').strategy, 'json-merge');
+    assert.deepStrictEqual(parseJson(file('.mcp.json')), {
+      mcpServers: {
+        'cloudflare-observability': {
+          type: 'http',
+          url: CLOUDFLARE_OBSERVABILITY_MCP,
+        },
+      },
+    });
+    assert.isFalse(
+      render({
+        ...config,
+        features: { ...config.features, agents: false },
+      }).byPath.has('.mcp.json'),
     );
   });
 
