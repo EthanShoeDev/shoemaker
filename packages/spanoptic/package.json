@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-spanoptic",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "TUI OTEL visualizer for Effect programs",
   "repository": {
     "type": "git",
