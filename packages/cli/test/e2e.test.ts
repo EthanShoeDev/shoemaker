@@ -133,14 +133,9 @@ const checkPreset = Effect.fnUntraced(function* (name: string) {
   assert.strictEqual(`${changed}${added}`, '');
 });
 
-// `full` builds a foldkit site, and foldkit (0.169.0, @foldkit/vite-plugin
-// 0.28.0) still imports `Crypto` from effect, which Effect 4.1.0 removed, so
-// its build fails. Unskip once a foldkit release supports Effect 4.1.0.
-const skipped = new Set(['full']);
-
 describe('generated repos install and pass their own checks', () => {
   for (const name of Rec.keys(presets)) {
-    it.live.skipIf(skipped.has(name))(
+    it.live(
       name,
       () => checkPreset(name).pipe(Effect.provide(BunServices.layer)),
       PRESET_TIMEOUT,

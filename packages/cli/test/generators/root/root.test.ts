@@ -114,7 +114,8 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     for (const name of effectFamily) {
       assert.strictEqual(overrides[name], versions.effect, name);
     }
-    assert.strictEqual(overrides.effect, '4.1.0');
+    // An exact version, not a range: a range would let the family drift apart.
+    assert.match(String(overrides.effect), /^\d+\.\d+\.\d+$/u);
   });
 
   it('balances every managed region', () => {

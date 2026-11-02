@@ -8,11 +8,11 @@ import { cliVersion } from './engine/meta.ts';
 // as one edit. `bun run update:generated-versions` moves every pin here to
 // npm's latest.
 
-const effect = '4.1.0';
+const effect = '4.1.1';
 const oxlint = '1.90.0';
 const alchemy = '2.0.0-beta.84';
 const tanstackRouter = '^1.170.46';
-const expoSdk = '~58.0.21';
+const expoSdk = '~58.0.22';
 // Changesets releases the shoemaker packages as one fixed group, so the CLI's
 // own version is theirs. On 0.x a caret only admits patches, so a literal here
 // fell behind the first minor release.
@@ -92,17 +92,17 @@ export const versions = {
   '@oxlint/plugins': oxlint,
   'oxlint-tsgolint': '7.0.2005',
   oxfmt: '0.75.0',
-  knip: '^6.43.0',
+  knip: '^6.44.1',
   jscpd: '^5.4.2',
-  '@tanstack/eslint-plugin-query': '^5.105.0',
+  '@tanstack/eslint-plugin-query': '^5.105.1',
   'eslint-plugin-playwright': '^2.12.1',
   'eslint-plugin-testing-library': '^7.16.2',
 
   // Toolchain
   typescript: '^7.0.2',
   turbo: '^2.11.10',
-  nx: '^24.0.2',
-  tsdown: '^0.23.3',
+  nx: '^24.0.3',
+  tsdown: '^0.23.4',
   vitest: '^5.0.5',
   'happy-dom': '^21.0.4',
   '@types/node': '^26.6.6',
@@ -111,10 +111,10 @@ export const versions = {
   '@changesets/changelog-github': '^1.0.1',
 
   // Secrets
-  varlock: '^1.23.0',
-  '@varlock/vite-integration': '^1.5.4',
+  varlock: '^1.24.0',
+  '@varlock/vite-integration': '^1.5.5',
   '@varlock/expo-integration': '^1.2.2',
-  '@varlock/cloudflare-integration': '^1.6.2',
+  '@varlock/cloudflare-integration': '^1.6.3',
   '@varlock/effect-plugin': '^0.1.0',
 
   // Infra (alchemy is Effect-native; pin exact while in beta)
@@ -131,33 +131,33 @@ export const versions = {
   '@types/react-dom': '^19.3.0',
   vite: '^8.3.5',
   '@vitejs/plugin-react': '^6.1.2',
-  '@rolldown/plugin-babel': '^0.2.4',
+  '@rolldown/plugin-babel': '^0.3.0',
   'babel-plugin-react-compiler': '^1.0.0',
-  '@babel/core': '^7.29.0',
+  '@babel/core': '^8.0.10',
   tailwindcss: '^4.3.3',
   '@tailwindcss/vite': '^4.3.3',
   '@tanstack/react-start': '^1.169.4',
   '@tanstack/react-router': tanstackRouter,
   '@tanstack/router-plugin': '^1.168.48',
-  '@tanstack/react-query': '^5.105.0',
+  '@tanstack/react-query': '^5.105.1',
   '@tanstack/react-router-ssr-query': '^1.167.3',
   // Pre-1.0: pin minor.
   'raf-effect-atom': '~0.3.3',
 
   // foldkit (pre-1.0: pin minor)
-  foldkit: '~0.169.0',
-  '@foldkit/vite-plugin': '~0.28.0',
-  '@foldkit/devtools': '~0.169.0',
+  foldkit: '~0.170.0',
+  '@foldkit/vite-plugin': '~0.29.0',
+  '@foldkit/devtools': '~0.170.0',
 
   // Expo family: let `expo install --fix` own the exact RN-side versions.
   expo: expoSdk,
-  'expo-router': '~58.0.28',
+  'expo-router': '~58.0.29',
   'expo-status-bar': '~58.0.4',
   'expo-system-ui': '~58.0.7',
   'expo-constants': '~58.0.14',
   'expo-linking': '~58.0.15',
   'react-native-safe-area-context': '~5.10.1',
-  'react-native-screens': '~4.30.0',
+  'react-native-screens': '~4.30.1',
   'react-native': '0.88.1',
   uniwind: '^1.13.1',
 } as const;
