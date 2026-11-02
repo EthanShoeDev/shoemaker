@@ -8,11 +8,8 @@
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
-import type {
-  ReadableSpan,
-  SpanProcessor,
-} from '@opentelemetry/sdk-trace-base';
+import { TracerProvider } from '@opentelemetry/sdk-trace';
+import type { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace';
 import {
   BoxRenderable,
   RGBA,
@@ -115,8 +112,8 @@ class SpanopticTUI {
   readonly #indicators = new Map<string, TextRenderable>();
   readonly #spans = new Map<string, SpanInfo>();
   #detailsBox: BoxRenderable | undefined;
-  #detailLines: Array<string> = [];
-  #logLines: Array<string> = [];
+  #detailLines: Array<TextRenderable> = [];
+  #logLines: Array<TextRenderable> = [];
   #flatSpans: Array<SpanInfo> = [];
   #selectedIndex = 0;
   #spinnerFrame = 0;
@@ -195,7 +192,10 @@ class SpanopticTUI {
   }
 
   #renderLogsPanel() {
-    for (const id of this.#logLines) this.#logsBox.remove(id);
+    for (const line of this.#logLines) {
+      this.#logsBox.remove(line);
+      line.destroy();
+    }
     this.#logLines = [];
 
     const selected = this.#selected;
@@ -216,19 +216,17 @@ class SpanopticTUI {
           }));
 
     for (const [i, line] of lines.entries()) {
-      const id = `log-line-${i}`;
-      this.#logsBox.add(
-        new TextRenderable(this.#renderer, {
-          id,
-          content: line.content,
-          position: 'absolute',
-          left: 1,
-          top: i + 1,
-          fg: line.fg,
-          zIndex: 151,
-        }),
-      );
-      this.#logLines.push(id);
+      const text = new TextRenderable(this.#renderer, {
+        id: `log-line-${i}`,
+        content: line.content,
+        position: 'absolute',
+        left: 1,
+        top: i + 1,
+        fg: line.fg,
+        zIndex: 151,
+      });
+      this.#logsBox.add(text);
+      this.#logLines.push(text);
     }
   }
 
@@ -406,7 +404,10 @@ class SpanopticTUI {
       this.#renderer.terminalWidth - DETAILS_WIDTH - 2,
       height,
     );
-    for (const id of this.#detailLines) box.remove(id);
+    for (const line of this.#detailLines) {
+      box.remove(line);
+      line.destroy();
+    }
     this.#detailLines = [];
 
     const lines: Array<{ content: string; fg: RGBA }> = [
@@ -457,19 +458,17 @@ class SpanopticTUI {
     }
 
     for (const [i, line] of lines.slice(0, height - 2).entries()) {
-      const id = `detail-line-${i}`;
-      box.add(
-        new TextRenderable(this.#renderer, {
-          id,
-          content: Str.slice(0, DETAILS_WIDTH - 4)(line.content),
-          position: 'absolute',
-          left: 1,
-          top: i + 1,
-          fg: line.fg,
-          zIndex: 201,
-        }),
-      );
-      this.#detailLines.push(id);
+      const text = new TextRenderable(this.#renderer, {
+        id: `detail-line-${i}`,
+        content: Str.slice(0, DETAILS_WIDTH - 4)(line.content),
+        position: 'absolute',
+        left: 1,
+        top: i + 1,
+        fg: line.fg,
+        zIndex: 201,
+      });
+      box.add(text);
+      this.#detailLines.push(text);
     }
   }
 
@@ -560,7 +559,7 @@ const tracingLayer = (serviceName: string, processor: SpanProcessor) =>
         Effect.acquireRelease(
           Effect.sync(
             () =>
-              new BasicTracerProvider({
+              new TracerProvider({
                 resource: resourceFromAttributes({
                   'service.name': serviceName,
                 }),

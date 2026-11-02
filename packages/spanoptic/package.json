@@ -49,7 +49,7 @@
     "@effect/platform-node-shared": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/resources": "catalog:",
-    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "@opentui/core": "catalog:",
     "effect": "catalog:"
   },

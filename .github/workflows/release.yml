@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      # npm trusted publishing needs Node >= 22.14 to run the pinned npm.
+      # The pinned npm (12) needs Node ^22.22.2 or >= 24.15; trusted publishing needs npm 11.5+.
       - uses: actions/setup-node@v6
         with:
           node-version: 24
