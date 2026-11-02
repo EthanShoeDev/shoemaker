@@ -10,7 +10,7 @@ import { cliVersion } from './engine/meta.ts';
 
 const effect = '4.1.2';
 const oxlint = '1.90.0';
-const alchemy = '2.0.0-beta.84';
+const alchemy = '2.0.0-beta.85';
 const tanstackRouter = '^1.170.46';
 const expoSdk = '~58.0.22';
 // Changesets releases the shoemaker packages as one fixed group, so the CLI's
@@ -137,8 +137,8 @@ export const versions = {
   // the web app's @babel/core at the root, where Metro loads it and Expo's
   // Babel 7 presets refuse 8. @rolldown/plugin-babel takes either.
   '@babel/core': '^7.29.0',
-  tailwindcss: '^4.3.3',
-  '@tailwindcss/vite': '^4.3.3',
+  tailwindcss: '^4.3.4',
+  '@tailwindcss/vite': '^4.3.4',
   '@tanstack/react-start': '^1.169.4',
   '@tanstack/react-router': tanstackRouter,
   '@tanstack/router-plugin': '^1.168.48',
