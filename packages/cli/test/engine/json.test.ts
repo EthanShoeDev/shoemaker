@@ -61,39 +61,50 @@ describe('json-merge', () => {
     });
   });
 
-  it('keeps dependency versions a repo has raised', () => {
+  it('keeps dependency and package versions a repo has raised', () => {
     const owned = {
       version: '0.0.0',
+      devEngines: { packageManager: { version: '1.4.4' } },
       dependencies: { a: '^1.2.0', b: '^1.2.0', c: 'catalog:', d: '1.0.0' },
       workspaces: { catalog: { e: '2.0.0-beta.84' } },
     };
     const existing = {
       version: '9.9.9',
+      devEngines: { packageManager: { version: '1.5.0' } },
       dependencies: { a: '^1.3.0', b: '^1.1.0', c: '^5.0.0', d: '~1.0.1' },
       workspaces: { catalog: { e: '2.0.0-beta.100' } },
     };
     assert.deepStrictEqual(keepRaisedVersions(owned, existing), {
-      // Outside a dependency map a version is an ordinary value.
-      version: '0.0.0',
+      // changesets owns the package's own version once it moves.
+      version: '9.9.9',
+      // Any other version outside a dependency map is an ordinary value.
+      devEngines: { packageManager: { version: '1.4.4' } },
       // Raised specs stay; lower ones and non-version specs take shoemaker's.
       dependencies: { a: '^1.3.0', b: '^1.2.0', c: 'catalog:', d: '~1.0.1' },
       workspaces: { catalog: { e: '2.0.0-beta.100' } },
     });
   });
 
-  it('masks only version specs inside dependency maps', () => {
-    assert.deepStrictEqual(
-      maskVersions({
-        version: '1.0.0',
-        devDependencies: { a: '^1.0.0', b: 'catalog:' },
-        catalogs: { react: { react: '19.3.0' } },
-      }),
-      {
-        version: '1.0.0',
-        devDependencies: { a: '<version>', b: 'catalog:' },
-        catalogs: { react: { react: '<version>' } },
-      },
-    );
+  it('masks version specs in dependency maps and the package version', () => {
+    const manifest = {
+      version: '1.0.0',
+      engines: { version: '1.0.0' },
+      devDependencies: { a: '^1.0.0', b: 'catalog:' },
+      catalogs: { react: { react: '19.3.0' } },
+    };
+    const masked = {
+      engines: { version: '1.0.0' },
+      devDependencies: { a: '<version>', b: 'catalog:' },
+      catalogs: { react: { react: '<version>' } },
+    };
+    assert.deepStrictEqual(maskVersions(manifest), {
+      version: '<version>',
+      ...masked,
+    });
+    assert.deepStrictEqual(maskVersions(manifest, { own: false }), {
+      version: '1.0.0',
+      ...masked,
+    });
   });
 
   it('canonical JSON ignores key order', () => {

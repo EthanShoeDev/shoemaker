@@ -3,6 +3,7 @@ import {
   Option,
   Predicate,
   Record as Rec,
+  Result,
   String as Str,
 } from 'effect';
 import { type ParseError, parse } from 'jsonc-parser';
@@ -96,6 +97,31 @@ export const ownedPointers = (
     return isPlainObject(value) ? ownedPointers(value, pointer) : [pointer];
   });
 
+// List entries in `before` that `after` no longer has, as `pointer: entry`.
+// A list `after` lacks entirely loses every entry.
+export const droppedEntries = (
+  before: unknown,
+  after: unknown,
+  prefix = '',
+): ReadonlyArray<string> => {
+  if (Arr.isArray(before)) {
+    const kept = new Set(
+      Arr.isArray(after) ? Arr.map(after, canonicalJson) : [],
+    );
+    return Arr.filterMap(before, (entry) => {
+      const key = canonicalJson(entry);
+      return kept.has(key)
+        ? Result.failVoid
+        : Result.succeed(`${prefix === '' ? '/' : prefix}: ${key}`);
+    });
+  }
+  if (!isPlainObject(before)) return [];
+  const next = isPlainObject(after) && !Arr.isArray(after) ? after : {};
+  return Arr.flatMap(Rec.toEntries(before), ([key, value]) =>
+    droppedEntries(value, next[key], `${prefix}/${escapeKey(key)}`),
+  );
+};
+
 // The owned-key tree back from pointers, in the shape `ownedProjection` reads.
 export const shapeOf = (pointers: ReadonlyArray<string>) => {
   const root: Record<string, unknown> = {};
@@ -153,24 +179,30 @@ const VERSION_SPEC = /^[~^]?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/u;
 const floorOf = (value: unknown) =>
   Predicate.isString(value) ? VERSION_SPEC.exec(value)?.[1] : undefined;
 
+// A package's own top-level `version` is a floor too: shoemaker writes 0.0.0
+// and changesets owns it from the first release on.
+const isFloor = (key: string, inMap: boolean, top: boolean) =>
+  inMap || (top && key === 'version');
+
 // `owned` with each spec the existing file already raises kept as the file
-// has it, so a sync never moves a dependency back.
+// has it, so a sync never moves a dependency (or the package) back.
 export const keepRaisedVersions = (
   owned: Record<string, unknown>,
   existing: Record<string, unknown>,
   inMap = false,
+  top = true,
 ): Record<string, unknown> =>
   Rec.map(owned, (value, key) => {
     const current = existing[key];
     const nested = inMap || VERSION_MAPS.has(key);
     if (isPlainObject(value)) {
       return isPlainObject(current)
-        ? keepRaisedVersions(value, current, nested)
+        ? keepRaisedVersions(value, current, nested, false)
         : value;
     }
     const mine = floorOf(value);
     const theirs = floorOf(current);
-    return inMap &&
+    return isFloor(key, inMap, top) &&
       mine !== undefined &&
       theirs !== undefined &&
       Bun.semver.order(theirs, mine) > 0
@@ -180,14 +212,23 @@ export const keepRaisedVersions = (
 
 // `value` with every version spec in a dependency map blanked, so a hash of
 // it ignores version bumps but still sees a spec turned into `catalog:`.
-export const maskVersions = (value: unknown, inMap = false): unknown =>
+// `own: false` leaves the package's own version alone, the way locks written
+// before it was a floor hashed it.
+export const maskVersions = (
+  value: unknown,
+  { own = true }: { readonly own?: boolean } = {},
+  inMap = false,
+  top = true,
+): unknown =>
   isPlainObject(value)
     ? Rec.map(value, (child, key) =>
-        maskVersions(child, inMap || VERSION_MAPS.has(key)),
+        !isPlainObject(child) &&
+        isFloor(key, inMap, top && own) &&
+        floorOf(child) !== undefined
+          ? '<version>'
+          : maskVersions(child, { own }, inMap || VERSION_MAPS.has(key), false),
       )
-    : inMap && floorOf(value) !== undefined
-      ? '<version>'
-      : value;
+    : value;
 
 // Stable serialization (sorted keys) for hashing.
 export const canonicalJson = (value: unknown): string => {

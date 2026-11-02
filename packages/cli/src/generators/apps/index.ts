@@ -1,6 +1,7 @@
 import type { Generator } from '../../engine/types.ts';
 import { effectApiGenerator } from './effect-api.ts';
 import { effectCliGenerator } from './effect-cli.ts';
+import { releaseGenerator } from './expo-release.ts';
 import { expoGenerator } from './expo.ts';
 import { foldkitGenerator } from './foldkit.ts';
 import { frontendGenerator } from './frontend.ts';
@@ -15,4 +16,5 @@ export const appGenerators: ReadonlyArray<Generator> = [
   effectCliGenerator,
   libraryGenerator,
   frontendGenerator,
+  releaseGenerator,
 ];

@@ -32,6 +32,14 @@ they're the setup I use for my own repos.
   and Actions secrets
 - **Environment**: a Nix dev shell, GitHub Actions CI, and an AGENTS.md for
   coding agents
+- **Android**: with an Expo app, `nix develop .#android` adds the Android
+  SDK, NDK and JDK that its Gradle builds need, from nix, on NixOS too.
+- **Releases**: changesets. An Expo app with
+  `androidRelease: { package: 'dev.example.app' }` ships each release as a
+  GitHub Release with a signed APK, which
+  [Obtainium](https://obtainium.imranr.dev) installs and keeps updated.
+  `bun run apk:<app>` builds the same APK locally. The app's README covers
+  creating the upload key.
 
 ## Stay up to date
 
@@ -46,7 +54,12 @@ bunx shoemaker sync
 Sync never clobbers your work. Files you edited by hand are reported as
 conflicts (`--force <glob>` takes the generated version), and it refuses to run
 on a dirty git tree, so git is always your undo. Dependency versions are a
-floor: one you've raised past shoemaker's stays.
+floor: one you've raised past shoemaker's stays. So is each package's own
+version, which changesets owns once it moves. In a repo being adopted, sync
+never drops a list entry from a file it merges into (`package.json`): the file
+is a conflict naming the entries until you remove them by hand, and `--force`
+does not override that. Files shoemaker owns whole (`turbo.jsonc`, tsconfigs)
+are still replaced by `--force`.
 
 ## Commands
 

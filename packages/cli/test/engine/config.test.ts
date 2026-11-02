@@ -17,6 +17,11 @@ const full: ShoemakerConfig = {
   apps: [
     { name: 'web', kind: 'tanstack-start', api: 'api' },
     { name: 'api', kind: 'effect-api' },
+    {
+      name: 'mobile',
+      kind: 'expo',
+      androidRelease: { package: 'dev.listen.mobile' },
+    },
   ],
   packages: [
     { name: 'domain', kind: 'library' },
@@ -123,9 +128,47 @@ describe('shoemaker.config.ts', () => {
       ],
       'api-contract is reserved for its HttpApi contract package',
     ],
+    [
+      'an Android release from a non-Expo app',
+      [
+        {
+          name: 'cli',
+          kind: 'effect-cli',
+          androidRelease: { package: 'dev.listen.cli' },
+        },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      'only an expo app ships Android releases',
+    ],
+    [
+      'an Android application id that is not one',
+      [
+        {
+          name: 'mobile',
+          kind: 'expo',
+          androidRelease: { package: 'mobile' },
+        },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      '["androidRelease"]["package"]',
+    ],
   ] as const)('rejects %s', ([, apps, message]) =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(roundTrip({ ...full, apps }));
+      assert.include(error.message, message);
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect.each([
+    [
+      'without changesets',
+      { features: { ...full.features, changesets: false } },
+      'needs features.changesets',
+    ],
+    ['without GitHub Actions', { ci: 'none' }, "needs ci: 'github'"],
+  ] as const)('rejects an Android release %s', ([, overrides, message]) =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(roundTrip({ ...full, ...overrides }));
       assert.include(error.message, message);
     }).pipe(Effect.provide(BunServices.layer)),
   );

@@ -182,8 +182,7 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
 
 const repoName = (repo: Repo, manifest: Manifest | undefined) => {
   const raw = manifest?.pkg.name;
-  if (raw === undefined)
-    return kebab(Arr.lastNonEmpty(Str.split(repo.root, '/')));
+  if (raw === undefined) return kebab(repo.name);
   // `@wisely/monorepo` names the scope, not the project.
   const bare = Str.replace(/^@[^/]+\//u, '')(raw);
   const scope = /^@([^/]+)\//u.exec(raw)?.[1];

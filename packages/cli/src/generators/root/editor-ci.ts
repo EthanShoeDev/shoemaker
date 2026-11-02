@@ -1,3 +1,5 @@
+import { Array as Arr } from 'effect';
+
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator } from '../../engine/types.ts';
 import { hasApp, json, owned, seed } from '../shared.ts';
@@ -201,6 +203,14 @@ export const changesets: Generator = (ctx) =>
               baseBranch: 'main',
               updateInternalDependencies: 'patch',
               ignore: [],
+              // Apps are private packages; an Android release starts from
+              // the tag `changeset tag` gives its new version.
+              ...(Arr.some(
+                ctx.config.apps,
+                (app) => app.androidRelease !== undefined,
+              )
+                ? { privatePackages: { version: true, tag: true } }
+                : {}),
             }),
           ),
           seed('.changeset/README.md', CHANGESET_README),

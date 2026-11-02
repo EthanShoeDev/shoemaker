@@ -7,9 +7,15 @@ import {
   appDir,
   catalogOf,
   forApps,
+  mergeContributions,
   toolchainDevDependencies,
   vitestConfig,
 } from './common.ts';
+import {
+  androidRelease,
+  androidReleaseReadme,
+  apkScript,
+} from './expo-release.ts';
 
 // expo-router's required peers for a JS-only app; `expo install --fix` owns
 // the exact native versions within the SDK.
@@ -27,13 +33,16 @@ const dependencies = [
 ];
 const devDependencies = [...toolchainDevDependencies, '@types/react'];
 
-const appConfig = (app: App) => `import type { ExpoConfig } from 'expo/config';
-
+// With `androidRelease`, android-release.ts sets the version from
+// package.json, so the seed leaves it out.
+const appConfig = (app: App) => {
+  const release = app.androidRelease !== undefined;
+  return `import type { ExpoConfig } from 'expo/config';
+${release ? "\nimport { withAndroidRelease } from './android-release.ts';\n" : ''}
 const config: ExpoConfig = {
   name: '${app.name}',
   slug: '${app.name}',
-  scheme: '${app.name}',
-  version: '0.0.0',
+  scheme: '${app.name}',${release ? '' : "\n  version: '0.0.0',"}
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   // OTA updates need expo-updates and an EAS project; turn this on with both.
@@ -41,9 +50,17 @@ const config: ExpoConfig = {
   plugins: ['expo-router'],
   experiments: { typedRoutes: true },
 };
-
+${
+  release
+    ? `
+// Versions the app from package.json and signs Android release builds.
+export default withAndroidRelease(config);
+`
+    : `
 export default config;
-`;
+`
+}`;
+};
 
 // Expo compiles TS metro configs to CommonJS, so \`__dirname\` (not
 // \`import.meta\`) is what exists at load time. The default config already
@@ -126,7 +143,7 @@ const tsconfig = (dir: string) =>
 
 export const expoApp = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);
-  return {
+  const base: Contribution = {
     files: [
       workspacePackageJson(ctx, {
         dir,
@@ -136,9 +153,14 @@ export const expoApp = (ctx: GenContext, app: App): Contribution => {
         sharedTsconfig: false,
         scripts: {
           dev: 'expo start',
-          ios: 'expo start --ios',
-          android: 'expo start --android',
+          // `expo prebuild` rewrites exactly `expo start --ios` / `--android`
+          // to `expo run:*`; the short flags keep these as sync wrote them.
+          ios: 'expo start -i',
+          android: 'expo start -a',
           clean: 'rm -rf .expo .turbo',
+          ...(app.androidRelease === undefined
+            ? {}
+            : { 'build:apk': apkScript }),
         },
         dependencies,
         devDependencies,
@@ -154,7 +176,7 @@ export const expoApp = (ctx: GenContext, app: App): Contribution => {
       seed(`${dir}/test/greeting.test.ts`, testSource),
       seed(
         `${dir}/README.md`,
-        `# ${ctx.pkg(app.name)}\n\nExpo Router app. \`bun run dev\` starts Metro; \`bun run ios\` / \`bun run android\` open a simulator.\n`,
+        `# ${ctx.pkg(app.name)}\n\nExpo Router app. \`bun run dev\` starts Metro; \`bun run ios\` / \`bun run android\` open a simulator.\n${app.androidRelease === undefined ? '' : androidReleaseReadme(ctx, app)}`,
       ),
     ],
     tasks: Arr.map(['ios', 'android'], (name) => ({
@@ -166,6 +188,9 @@ export const expoApp = (ctx: GenContext, app: App): Contribution => {
     catalog: catalogOf(dependencies, devDependencies),
     gitignore: ['.expo/', 'expo-env.d.ts'],
   };
+  return app.androidRelease === undefined
+    ? base
+    : mergeContributions([base, androidRelease(ctx, app, app.androidRelease)]);
 };
 
 export const expoGenerator = forApps('expo', expoApp);

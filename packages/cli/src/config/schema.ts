@@ -51,12 +51,27 @@ export type Ci = typeof Ci.Type;
 
 const KebabName = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/u));
 
+// An Android application id (`dev.example.app`).
+const AndroidPackage = Schema.String.check(
+  Schema.isPattern(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/u),
+);
+
+export const AndroidRelease = Schema.Struct({
+  // The application id. Android only updates an app in place under the same
+  // id, so it can never change once people have installed the app.
+  package: AndroidPackage,
+});
+export type AndroidRelease = typeof AndroidRelease.Type;
+
 export const App = Schema.Struct({
   name: KebabName,
   kind: AppKind,
   // tanstack-start only: the effect-api app this site serves at /api. The
   // site then deploys the API too; the API app keeps its standalone server.
   api: Schema.optionalKey(KebabName),
+  // expo only: every changesets release of the app becomes a GitHub Release
+  // carrying a signed APK, the feed Obtainium installs and updates from.
+  androidRelease: Schema.optionalKey(AndroidRelease),
 });
 export type App = typeof App.Type;
 
@@ -171,12 +186,28 @@ const frontendProblem = (config: typeof ShoemakerConfigFields.Type) => {
   return undefined;
 };
 
+// Why an app can't ship Android releases: it is not an Expo app, or the
+// repo has no changesets to version it or no GitHub Actions to build it.
+const androidReleaseProblem = (config: typeof ShoemakerConfigFields.Type) => {
+  for (const app of config.apps) {
+    if (app.androidRelease === undefined) continue;
+    if (app.kind !== 'expo')
+      return `apps.${app.name}.androidRelease: only an expo app ships Android releases`;
+    if (!config.features.changesets)
+      return `apps.${app.name}.androidRelease: needs features.changesets, which versions and tags each release`;
+    if (config.ci !== 'github')
+      return `apps.${app.name}.androidRelease: needs ci: 'github', which builds and publishes each release`;
+  }
+  return undefined;
+};
+
 export const ShoemakerConfig = ShoemakerConfigFields.check(
   Schema.makeFilter(
     (config) =>
       mountProblem(config) ??
       contractProblem(config) ??
       frontendProblem(config) ??
+      androidReleaseProblem(config) ??
       true,
   ),
 );

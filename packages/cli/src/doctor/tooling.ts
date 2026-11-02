@@ -81,7 +81,12 @@ export const turboFixUncached: DoctorCheck = {
       const turbo = decodeJsonc(TurboTasks, yield* repo.read(path));
       if (Option.isNone(turbo)) continue;
       for (const [key, task] of Rec.toEntries(turbo.value.tasks ?? {})) {
-        if (isFixTask(key) && !(isRecord(task) && task.cache === false)) {
+        // `"command": null` opts a package out: nothing runs, so nothing caches.
+        const runs = !(
+          isRecord(task) &&
+          (task.cache === false || task.command === null)
+        );
+        if (isFixTask(key) && runs) {
           cached.push(`${path}#${key}`);
         }
       }
@@ -437,7 +442,7 @@ export const nixDevShell: DoctorCheck = {
     const name = properName(description);
     const [root] = yield* manifestsOf(repo);
     const known = pipe(
-      [root?.pkg.name ?? '', Arr.lastNonEmpty(Str.split(repo.root, '/'))],
+      [root?.pkg.name ?? '', repo.name],
       Arr.map((value) => kebab(value)),
       Arr.join(' '),
     );

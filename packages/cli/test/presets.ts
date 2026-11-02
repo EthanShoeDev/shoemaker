@@ -40,7 +40,11 @@ export const presets: Readonly<Record<string, ShoemakerConfig>> = {
     apps: [
       { name: 'web', kind: 'tanstack-start' },
       { name: 'site', kind: 'foldkit' },
-      { name: 'mobile', kind: 'expo' },
+      {
+        name: 'mobile',
+        kind: 'expo',
+        androidRelease: { package: 'dev.sample.mobile' },
+      },
       { name: 'api', kind: 'effect-api' },
       { name: 'cli', kind: 'effect-cli' },
     ],

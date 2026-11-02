@@ -11,6 +11,7 @@ import { matchesAny } from './glob.ts';
 import { sha256 } from './hash.ts';
 import {
   canonicalJson,
+  droppedEntries,
   keepRaisedVersions,
   maskVersions,
   mergeJson,
@@ -35,7 +36,9 @@ import type { FileStrategy, GeneratedFile } from './types.ts';
 // - update: differs, and disk still matches the lock baseline (safe).
 // - unchanged: disk already holds the generated result.
 // - conflict: differs and was hand-edited since the baseline (or a managed
-//   file lost or duplicated a region / a json-merge file is not JSON).
+//   file lost or duplicated a region / a json-merge file is not JSON / a
+//   json-merge file with no baseline would lose list entries, which --force
+//   never overrides).
 // - untracked: differs and has no baseline (a repo being adopted).
 // - skip: a seed file that already exists, or that shoemaker wrote and the
 //   user deleted.
@@ -115,13 +118,15 @@ export type Scope =
 // What the lock records per strategy, so hand edits can be told apart from
 // shoemaker's own writes: the whole file for owned/seed, only the region bodies
 // for managed, only the owned keys for json-merge, minus their dependency
-// versions (a repo may raise those; see keepRaisedVersions).
+// and package versions (a repo may raise those; see keepRaisedVersions).
 export const fingerprint = (
   strategy: FileStrategy,
   path: string,
   content: string,
   scope: Scope,
-  versions: 'masked' | 'exact' = 'masked',
+  // `dependencies`: the package's own version unmasked; `exact`: nothing
+  // masked. Older locks hashed that way.
+  versions: 'masked' | 'dependencies' | 'exact' = 'masked',
 ) => {
   const text = toLf(content);
   switch (strategy) {
@@ -150,7 +155,9 @@ export const fingerprint = (
       const projection = ownedProjection(existing, shape);
       return sha256(
         canonicalJson(
-          versions === 'masked' ? maskVersions(projection) : projection,
+          versions === 'exact'
+            ? projection
+            : maskVersions(projection, { own: versions === 'masked' }),
         ),
       );
     }
@@ -285,6 +292,34 @@ const blocker = (
   return undefined;
 };
 
+// List entries a json-merge write would drop from a file shoemaker has no
+// baseline for. json-merge promises to leave the user's content alone, and
+// with no baseline every entry is the user's, so shoemaker reports the clash
+// instead of shortening the list, even under --force. Owned files are
+// shoemaker's whole, so --force replacing them is the point.
+const droppedByAdoption = (
+  file: GeneratedFile,
+  disk: string,
+  after: string,
+  baseline: LockEntry | undefined,
+) => {
+  if (baseline !== undefined || file.strategy !== 'json-merge') return [];
+  const before = parseJsonObject(toLf(disk));
+  const next = parseJsonObject(toLf(after));
+  return before === undefined || next === undefined
+    ? []
+    : droppedEntries(before, next);
+};
+
+const SHOWN = 3;
+
+const droppedReason = (dropped: ReadonlyArray<string>) => {
+  const shown = Arr.join(dropped.slice(0, SHOWN), ', ');
+  const more =
+    dropped.length > SHOWN ? ` and ${dropped.length - SHOWN} more` : '';
+  return `would drop list entries shoemaker did not write (${shown}${more}); --force never drops them, so remove them by hand first`;
+};
+
 const classify = Effect.fnUntraced(function* (
   file: GeneratedFile,
   repo: Repo,
@@ -319,12 +354,25 @@ const classify = Effect.fnUntraced(function* (
   if (problem === undefined && after === disk) {
     return { ...base, after, action: 'unchanged' } satisfies PlannedFile;
   }
+  const dropped = droppedByAdoption(file, disk, after, baseline);
+  if (dropped.length > 0) {
+    return {
+      ...base,
+      after,
+      action: 'conflict',
+      reason: droppedReason(dropped),
+    } satisfies PlannedFile;
+  }
   const scope = scopeOf(file, baseline);
   const blocked = blocker(problem, baseline, [
     fingerprint(file.strategy, file.path, disk, scope),
-    // Locks written before versions were masked hashed them exactly.
+    // Locks written before versions were masked hashed them exactly, and
+    // before the package version was masked, hashed it exactly.
     ...(file.strategy === 'json-merge'
-      ? [fingerprint(file.strategy, file.path, disk, scope, 'exact')]
+      ? [
+          fingerprint(file.strategy, file.path, disk, scope, 'dependencies'),
+          fingerprint(file.strategy, file.path, disk, scope, 'exact'),
+        ]
       : []),
   ]);
   if (blocked === undefined) {

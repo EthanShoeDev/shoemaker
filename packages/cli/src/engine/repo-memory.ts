@@ -11,6 +11,7 @@ export const makeMemoryRepo = (
   root = '/repo',
 ): Repo => ({
   root,
+  name: Arr.lastNonEmpty(Str.split(root, '/')),
   read: (file) => Effect.succeed(files[file]),
   exists: (file) =>
     Effect.succeed(

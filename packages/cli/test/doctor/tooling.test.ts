@@ -295,6 +295,10 @@ describe('tooling doctor checks', () => {
           },
         }),
         'apps/web/turbo.jsonc': json({ tasks: { 'lint:fix': {} } }),
+        // Opted out: the package runs nothing for this task.
+        'packages/config/turbo.jsonc': json({
+          tasks: { 'oxlint:fix': { command: null } },
+        }),
       });
       assert.lengthOf(found, 1);
       for (const task of [
@@ -305,6 +309,7 @@ describe('tooling doctor checks', () => {
         assert.include(found[0]?.message, task);
       }
       assert.notInclude(found[0]?.message, 'oxfmt');
+      assert.notInclude(found[0]?.message, 'packages/config');
     }),
   );
 

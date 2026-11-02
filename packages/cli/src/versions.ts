@@ -186,3 +186,95 @@ export const nixpkgsLock = {
   narHash: 'sha256-lNZLwWf5tYNKjothaoFq/VZYvzaclmLafjgMdUlpJPQ=',
   lastModified: 1793195608,
 } as const;
+
+// The Android toolchain nix/android.nix composes for Expo apps, matching what
+// the Expo SDK's React Native builds with
+// (react-native/gradle/libs.versions.toml: compileSdk, buildTools,
+// ndkVersion). Bump it with `expo`.
+export const androidToolchain = {
+  // android-nixpkgs attribute; installs platforms/android-37.0.
+  platform: 'platforms-android-37-0',
+  buildTools: '37.0.0',
+  // AGP's default, for library modules that set no buildToolsVersion
+  // (react-native-gesture-handler). Bump it with AGP.
+  agpBuildTools: '36.0.0',
+  ndk: '27.1.12297006',
+  cmake: '3.22.1',
+} as const;
+
+// android-nixpkgs (and its own inputs) as `nix flake lock` pins them next to
+// nixpkgsLock, so a new repo with an Expo app is locked before any nix
+// command runs.
+export const androidLockNodes = {
+  'android-nixpkgs': {
+    inputs: {
+      devshell: 'devshell',
+      'flake-utils': 'flake-utils',
+      nixpkgs: ['nixpkgs'],
+    },
+    locked: {
+      lastModified: 1793575374,
+      narHash: 'sha256-O54fgRT+pGzUtNOsz/JBM29NqiB5LZo1S93pLjuCXfY=',
+      owner: 'tadfisher',
+      repo: 'android-nixpkgs',
+      rev: '37100dff199a34fcce56518facbc75321b379468',
+      type: 'github',
+    },
+    original: {
+      owner: 'tadfisher',
+      repo: 'android-nixpkgs',
+      type: 'github',
+    },
+  },
+  devshell: {
+    inputs: {
+      nixpkgs: ['android-nixpkgs', 'nixpkgs'],
+    },
+    locked: {
+      lastModified: 1791918082,
+      narHash: 'sha256-oN9JrhRfHa7MUTdUq+11dHn7u0Z4WfEA4mhzBq0/zoQ=',
+      owner: 'numtide',
+      repo: 'devshell',
+      rev: '9e29c63dde99a2d80c94b3d024c9768c01544558',
+      type: 'github',
+    },
+    original: {
+      owner: 'numtide',
+      repo: 'devshell',
+      type: 'github',
+    },
+  },
+  'flake-utils': {
+    inputs: {
+      systems: 'systems',
+    },
+    locked: {
+      lastModified: 1791914995,
+      narHash: 'sha256-Zf/xfQEAasnwnmEfHqW/4hjDE/s44yn2hD4RuVIZRjA=',
+      owner: 'numtide',
+      repo: 'flake-utils',
+      rev: 'b7a79d3fea1e214f6d668d521cecec0c01e26544',
+      type: 'github',
+    },
+    original: {
+      owner: 'numtide',
+      repo: 'flake-utils',
+      type: 'github',
+    },
+  },
+  systems: {
+    locked: {
+      lastModified: 1681028828,
+      narHash: 'sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=',
+      owner: 'nix-systems',
+      repo: 'default',
+      rev: 'da67096a3b9bf56a91d16901293e51ba5b49a27e',
+      type: 'github',
+    },
+    original: {
+      owner: 'nix-systems',
+      repo: 'default',
+      type: 'github',
+    },
+  },
+} as const;

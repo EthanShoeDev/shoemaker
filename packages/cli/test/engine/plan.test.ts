@@ -10,9 +10,11 @@ import {
 import type { Lock } from '../../src/engine/lock.ts';
 import {
   type Action,
+  fingerprint,
   lockEntry,
   makePlan,
   nextLock,
+  ownedSet,
   type Plan,
 } from '../../src/engine/plan.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
@@ -92,6 +94,60 @@ describe('plan', () => {
       assert.strictEqual(forced?.forced, true);
       assert.strictEqual(actionOf(plan, 'b/y.txt'), 'untracked');
     }),
+  );
+
+  it.effect(
+    'never drops a list entry from a json-merge file it has no baseline for',
+    () =>
+      Effect.gen(function* () {
+        const manifest = (workspaces: ReadonlyArray<string>) =>
+          file('package.json', JSON.stringify({ workspaces }), 'json-merge');
+        const generated = manifest(['apps/*', 'packages/*']);
+        const text = (workspaces: ReadonlyArray<string>) =>
+          `${JSON.stringify({ name: 'x', workspaces })}\n`;
+        const disk = (workspaces: ReadonlyArray<string>) =>
+          makeMemoryRepo({ 'package.json': text(workspaces) });
+        const extended = ['apps/*', 'packages/*', 'tools/*'];
+        const force = { force: ['**'] };
+
+        const adopted = yield* makePlan(
+          disk(extended),
+          [generated],
+          undefined,
+          force,
+        );
+        const clash = adopted.files[0];
+        assert.strictEqual(clash?.action, 'conflict');
+        assert.include(clash?.reason, '/workspaces: "tools/*"');
+        assert.isUndefined(clash?.forced);
+
+        // Adding entries drops nothing, so --force applies.
+        const grown = yield* makePlan(
+          disk(['apps/*']),
+          [generated],
+          undefined,
+          force,
+        );
+        assert.strictEqual(actionOf(grown, 'package.json'), 'update');
+
+        // Owned files are shoemaker's whole: --force still replaces them.
+        const turbo = file('turbo.jsonc', '{ "globalEnv": ["CI"] }\n');
+        const owned = yield* makePlan(
+          makeMemoryRepo({ 'turbo.jsonc': '{ "globalEnv": ["CI", "TZ"] }\n' }),
+          [turbo],
+          undefined,
+          force,
+        );
+        assert.strictEqual(actionOf(owned, 'turbo.jsonc'), 'update');
+
+        // With a baseline the list is shoemaker's own, so it may shorten it.
+        const tracked = yield* makePlan(
+          disk(extended),
+          [generated],
+          lockOf([[manifest(extended), text(extended)]]),
+        );
+        assert.strictEqual(actionOf(tracked, 'package.json'), 'update');
+      }),
   );
 
   it.effect('formats TypeScript before comparing', () =>
@@ -191,6 +247,65 @@ describe('plan', () => {
           planned?.after,
           disk('tsdown --watch', ',\n    "mine": "echo"'),
         );
+      }),
+    );
+
+    const manifest = (build: string) =>
+      file(
+        'package.json',
+        JSON.stringify({
+          name: 'x',
+          version: '0.0.0',
+          scripts: { build },
+          dependencies: { a: '^1.0.0' },
+        }),
+        'json-merge',
+      );
+    const manifestOnDisk = (version: string, build: string) =>
+      `{\n  "name": "x",\n  "version": "${version}",\n  "scripts": {\n    "build": "${build}"\n  },\n  "dependencies": {\n    "a": "^1.0.0"\n  }\n}\n`;
+
+    it.effect('keeps a package version changesets raised', () =>
+      Effect.gen(function* () {
+        const repo = makeMemoryRepo({
+          'package.json': manifestOnDisk('0.2.0', 'tsdown'),
+        });
+        const lock = lockOf([
+          [manifest('tsdown'), manifestOnDisk('0.0.0', 'tsdown')],
+        ]);
+        const same = yield* makePlan(repo, [manifest('tsdown')], lock);
+        assert.strictEqual(actionOf(same, 'package.json'), 'unchanged');
+        const plan = yield* makePlan(repo, [manifest('tsdown -w')], lock);
+        assert.strictEqual(plan.files[0]?.action, 'update');
+        assert.strictEqual(
+          plan.files[0]?.after,
+          manifestOnDisk('0.2.0', 'tsdown -w'),
+        );
+      }),
+    );
+
+    it.effect('accepts locks that hashed the package version exactly', () =>
+      Effect.gen(function* () {
+        const written = manifestOnDisk('0.0.0', 'tsdown');
+        const owned = ownedSet(manifest('tsdown')) ?? [];
+        const repo = makeMemoryRepo({ 'package.json': written });
+        const lock: Lock = {
+          cliVersion: '0.0.0',
+          files: {
+            'package.json': {
+              strategy: 'json-merge',
+              sha256: fingerprint(
+                'json-merge',
+                'package.json',
+                written,
+                { owned },
+                'dependencies',
+              ),
+              owned,
+            },
+          },
+        };
+        const plan = yield* makePlan(repo, [manifest('tsdown -w')], lock);
+        assert.strictEqual(actionOf(plan, 'package.json'), 'update');
       }),
     );
 

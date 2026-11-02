@@ -85,6 +85,9 @@
         "!**/*.md",
         "$TURBO_ROOT$/oxlint.config.ts"
       ],
+      // Fixers are never cached: a hit on the pre-fix hash would replay the
+      // old run and leave the files unfixed.
+      "cache": false,
       "outputLogs": "new-only"
     },
     "lint:check": {
@@ -126,7 +129,8 @@
       "inputs": ["*.ts", "scripts/**"]
     },
     "//#oxlint:fix": {
-      "inputs": ["*.ts", "scripts/**"]
+      "inputs": ["*.ts", "scripts/**"],
+      "cache": false
     },
     "//#oxfmt:check": {},
     "//#oxfmt:fix": {

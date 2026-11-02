@@ -7,12 +7,16 @@ import type { PlatformError } from 'effect/PlatformError';
 export interface Repo {
   // Absolute root path.
   readonly root: string;
+  // The root folder's name. Split from `root` by Path, never on `/`: a
+  // Windows root uses backslashes.
+  readonly name: string;
   // Repo-relative POSIX path -> contents, or undefined when missing.
   readonly read: (
     path: string,
   ) => Effect.Effect<string | undefined, PlatformError>;
   readonly exists: (path: string) => Effect.Effect<boolean, PlatformError>;
-  // Repo-relative matches, excluding node_modules, .git, dist, .turbo and .external.
+  // Repo-relative matches, excluding node_modules, .git, dist, .turbo,
+  // .external, and in a git repo anything gitignored.
   readonly glob: (
     pattern: string,
   ) => Effect.Effect<ReadonlyArray<string>, PlatformError>;
