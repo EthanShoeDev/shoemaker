@@ -224,6 +224,8 @@ const jscpdIgnore = [
   '**/*.svg',
   '**/*.gen.*',
   '**/generated/**',
+  // drizzle-kit's migration snapshots: each repeats most of the one before.
+  '**/migrations/*/snapshot.json',
   '**/vendor/**',
   '**/.agents/**',
   '**/.claude/**',

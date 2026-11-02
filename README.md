@@ -35,7 +35,11 @@ they're the setup I use for my own repos.
 - **Tooling**: Effect 4, strict TypeScript, oxlint with every rule at error,
   oxfmt, knip and jscpd
 - **Task runner**: turbo or nx
-- **Secrets**: varlock or secretspec
+- **Secrets**: varlock or secretspec. In `.env.schema`, the lines between
+  shoemaker's header and the `# ---` divider belong to the repo: varlock
+  plugins (`@plugin`, `@initInfisical`, ...) go there and `sync` leaves them
+  alone. A public repo passes private plugin arguments, such as a self-hosted
+  URL, as `$VAR` references instead of writing them in.
 - **Infra**: alchemy, deploying to Cloudflare or AWS, plus GitHub for repos
   and Actions secrets
 - **Environment**: a Nix dev shell, GitHub Actions CI, and an AGENTS.md for

@@ -59,6 +59,13 @@ describe('varlock', () => {
     assert.isFalse(byPath.has('secretspec.toml'));
   });
 
+  it('leaves a project-owned header slot for plugins above the divider', () => {
+    assert.include(
+      schema,
+      '@currentEnv=$APP_ENV\n# shoemaker:end header\n# Project root decorators (plugins) go here; shoemaker never touches them.\n# ---\n\n# shoemaker:begin vars\n',
+    );
+  });
+
   it('never commits a secret value', () => {
     for (const v of Arr.filter(allEnvVars(aggregate), (x) => x.sensitive)) {
       assert.match(schema, new RegExp(`^${v.key}=$`, 'mu'), v.key);

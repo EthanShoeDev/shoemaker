@@ -6,12 +6,14 @@
 // (publish-manifest.ts swaps in publishConfig); npm then publishes that
 // tarball. npm, not `bun publish`, because only npm speaks trusted publishing
 // (OIDC), so CI needs no token (oven-sh/bun#15601). Locally it uses your
-// `npm login`. SHOEMAKER_RELEASE_DRY_RUN=true packs with --dry-run instead,
-// which needs no npm auth.
+// `npm login`. npm runs from the tarball's temp directory: inside the repo it
+// reads the root devEngines (bun) and refuses with EBADDEVENGINES.
+// SHOEMAKER_RELEASE_DRY_RUN=true packs with --dry-run instead, which needs no
+// npm auth.
 import { Config, Console, Effect, FileSystem, Path } from 'effect';
 
 import { readJsonObject } from './lib/json.ts';
-import { publishStatus } from './lib/packages.ts';
+import { publishStatus, repoRoot } from './lib/packages.ts';
 import { run, runInherit, runScript } from './lib/run.ts';
 
 const program = Effect.gen(function* () {
@@ -38,13 +40,13 @@ const program = Effect.gen(function* () {
   if (dryRun) {
     return yield* runInherit('bun', ['pm', 'pack', '--dry-run'], { cwd });
   }
-  const tarball = path.join(yield* fs.makeTempDirectoryScoped(), 'package.tgz');
+  const dir = yield* fs.makeTempDirectoryScoped();
+  const tarball = path.join(dir, 'package.tgz');
   yield* run('bun', ['pm', 'pack', '--filename', tarball], { cwd });
-  yield* runInherit(
-    'bun',
-    ['run', 'npm', 'publish', tarball, '--access', 'public'],
-    { cwd },
-  );
+  const npm = path.join(yield* repoRoot, 'node_modules', '.bin', 'npm');
+  yield* runInherit(npm, ['publish', tarball, '--access', 'public'], {
+    cwd: dir,
+  });
 });
 
 runScript(Effect.scoped(program));

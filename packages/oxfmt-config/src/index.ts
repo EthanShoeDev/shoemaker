@@ -9,6 +9,8 @@ export const sharedIgnorePatterns = [
   // Generated code is regenerated wholesale; formatting it is churn.
   '**/*.gen.*',
   '**/generated/**',
+  // drizzle-kit writes each migration's schema snapshot.
+  '**/migrations/*/snapshot.json',
   // Vendored upstream code stays a clean diff against upstream.
   '**/vendor/**',
   '**/*.vendored.*',
