@@ -49,7 +49,6 @@ import { Command } from 'effect/cli';
 import { cli, version } from './cli.ts';
 
 Command.run(cli, { version }).pipe(
-  // oxlint-disable-next-line effecttsgo/strict-effect-provide -- this is the entry point
   Effect.provide(BunServices.layer),
   BunRuntime.runMain,
 );

@@ -9,6 +9,7 @@ import {
 import type { ShoemakerConfig } from '../config/schema.ts';
 import { generators, renderers } from '../generators/index.ts';
 import { versionOf } from '../versions.ts';
+import { matchesAny } from './glob.ts';
 import type {
   Aggregate,
   Contribution,
@@ -118,12 +119,17 @@ export const generate = (
   const ctx = makeContext(config, options);
   const contributions = Arr.map(generators, (g) => g(ctx));
   const agg = aggregate(contributions);
-  const files = Arr.filter(
-    mergeFiles([
-      ...Arr.flatMap(contributions, (c) => c.files ?? []),
-      ...Arr.flatMap(renderers, (r) => r(ctx, agg)),
-    ]),
-    (file) => !config.unmanaged.includes(file.path),
+  const files = Arr.map(
+    Arr.filter(
+      mergeFiles([
+        ...Arr.flatMap(contributions, (c) => c.files ?? []),
+        ...Arr.flatMap(renderers, (r) => r(ctx, agg)),
+      ]),
+      (file) => !config.unmanaged.includes(file.path),
+    ),
+    // The repo's formatter skips these, so sync writes them as rendered.
+    (file) =>
+      matchesAny(file.path, agg.ignore) ? { ...file, verbatim: true } : file,
   );
   return { files, aggregate: agg };
 };

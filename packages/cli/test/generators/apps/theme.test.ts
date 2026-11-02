@@ -1,7 +1,9 @@
 import { assert, describe, it } from '@effect/vitest';
+import { Effect } from 'effect';
 
 import { parseJsonc } from '../../../src/checks/workspace.ts';
 import type { ShoemakerConfig } from '../../../src/config/schema.ts';
+import { formatFiles } from '../../../src/engine/format.ts';
 import { parseJson, record, render } from '../root/fixtures.ts';
 import { sampleConfig } from './helpers.ts';
 
@@ -113,4 +115,18 @@ describe('Expo styling', () => {
     assert.include(aggregate.ignore, 'apps/mobile/uniwind-types.d.ts');
     assert.include(file('apps/mobile/tsconfig.json').content, '"expo/types"');
   });
+
+  it.effect(
+    'writes the Uniwind types unformatted, as Metro rewrites them',
+    () =>
+      Effect.gen(function* () {
+        const types = file('apps/mobile/uniwind-types.d.ts');
+        const [written] = yield* formatFiles([types]);
+        assert.strictEqual(written?.content, types.content);
+        assert.include(
+          types.content,
+          "    themes: readonly ['light', 'dark']\n",
+        );
+      }),
+  );
 });

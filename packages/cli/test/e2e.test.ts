@@ -118,6 +118,23 @@ const checkPreset = Effect.fnUntraced(function* (name: string) {
         { cwd: dir, env: { ...env, NX_DAEMON: 'false', NX_NO_CLOUD: 'true' } },
       );
   yield* run('bun', ['run', 'test'], { cwd: dir, env });
+  // No check above runs Metro, so a Babel the Expo presets refuse (hoisted
+  // from a web app) only shows when an Expo app bundles.
+  for (const app of config.apps) {
+    if (app.kind !== 'expo') continue;
+    yield* run(
+      'bunx',
+      [
+        'expo',
+        'export',
+        '--platform',
+        'android',
+        '--output-dir',
+        path.join(out, `${name}-${app.name}-bundle`),
+      ],
+      { cwd: path.join(dir, 'apps', app.name), env },
+    );
+  }
   yield* run('bun', [cli, 'sync', '--check', '--allow-dirty'], {
     cwd: dir,
     env,

@@ -36,6 +36,11 @@ const SPEC = /^([~^]?)(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/u;
 // Shared with web apps, which take npm's latest rather than Expo's pin.
 const NOT_FROM_EXPO = new Set(['react', 'react-dom']);
 
+// Pins that stay put until their reason no longer holds.
+const HELD: Readonly<Record<string, string>> = {
+  '@babel/core': "Expo's Metro presets need Babel 7 (see versions.ts)",
+};
+
 class RegistryError extends Schema.TaggedError<
   RegistryError,
   { readonly brand: unique symbol }
@@ -165,6 +170,11 @@ const proposeChanges = Effect.fnUntraced(function* (source: string) {
 
   for (const [name, current] of Rec.toEntries(pinned)) {
     if (users.has(name)) continue;
+    const reason = HELD[name];
+    if (reason !== undefined) {
+      held.push(`${name} ${current}: ${reason}`);
+      continue;
+    }
     const fromExpo = NOT_FROM_EXPO.has(name) ? undefined : expoPins[name];
     if (fromExpo !== undefined) {
       propose(name, current, fromExpo);

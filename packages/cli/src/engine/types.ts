@@ -23,6 +23,8 @@ export interface GeneratedFile {
   readonly strategy: FileStrategy;
   // Mark executable (scripts/*.sh).
   readonly executable?: boolean;
+  // Written as rendered, unformatted: the repo's oxfmt ignores it.
+  readonly verbatim?: boolean;
 }
 
 // Facts generators share. Generators are pure: config in, files out.

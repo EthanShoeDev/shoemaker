@@ -39,7 +39,8 @@ import { ${service} } from '../src/index.ts';
 it.effect('greets by name', () =>
   Effect.gen(function* () {
     const greeter = yield* ${service};
-    assert.strictEqual(yield* greeter.greet('Ada'), 'Hello, Ada!');
+    const greeting = yield* greeter.greet('Ada');
+    assert.strictEqual(greeting, 'Hello, Ada!');
   }).pipe(Effect.provide(${service}.layer)),
 );
 `;

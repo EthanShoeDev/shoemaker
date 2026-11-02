@@ -8,7 +8,7 @@ import { cliVersion } from './engine/meta.ts';
 // as one edit. `bun run update:generated-versions` moves every pin here to
 // npm's latest.
 
-const effect = '4.1.1';
+const effect = '4.1.2';
 const oxlint = '1.90.0';
 const alchemy = '2.0.0-beta.84';
 const tanstackRouter = '^1.170.46';
@@ -84,7 +84,7 @@ export const versions = {
   '@effect/atom-react': effect,
   '@effect/sql-pg': effect,
   // @effect/tsgo 0.63 supports oxlint 1.88-1.90, tsgolint 7.0.2004-2005, TS 7.0.2.
-  '@effect/tsgo': '0.63.0',
+  '@effect/tsgo': '0.64.1',
   '@effect/language-service': '^0.87.5',
 
   // Lint / format family: oxlint, its plugin API and tsgolint move together.
@@ -94,8 +94,8 @@ export const versions = {
   oxfmt: '0.75.0',
   knip: '^6.44.1',
   jscpd: '^5.4.2',
-  '@tanstack/eslint-plugin-query': '^5.105.1',
-  'eslint-plugin-playwright': '^2.12.1',
+  '@tanstack/eslint-plugin-query': '^5.105.3',
+  'eslint-plugin-playwright': '^2.12.2',
   'eslint-plugin-testing-library': '^7.16.2',
 
   // Toolchain
@@ -103,7 +103,7 @@ export const versions = {
   turbo: '^2.11.10',
   nx: '^24.0.3',
   tsdown: '^0.23.4',
-  vitest: '^5.0.5',
+  vitest: '^5.1.0',
   'happy-dom': '^21.0.4',
   '@types/node': '^26.6.6',
   'bun-types': '^1.4.4',
@@ -130,16 +130,19 @@ export const versions = {
   '@types/react': '^19.3.0',
   '@types/react-dom': '^19.3.0',
   vite: '^8.3.5',
-  '@vitejs/plugin-react': '^6.1.2',
+  '@vitejs/plugin-react': '^6.2.1',
   '@rolldown/plugin-babel': '^0.3.0',
   'babel-plugin-react-compiler': '^1.0.0',
-  '@babel/core': '^8.0.10',
+  // Babel 7 while the repo can hold an Expo app: bun's hoisted linker puts
+  // the web app's @babel/core at the root, where Metro loads it and Expo's
+  // Babel 7 presets refuse 8. @rolldown/plugin-babel takes either.
+  '@babel/core': '^7.29.0',
   tailwindcss: '^4.3.3',
   '@tailwindcss/vite': '^4.3.3',
   '@tanstack/react-start': '^1.169.4',
   '@tanstack/react-router': tanstackRouter,
   '@tanstack/router-plugin': '^1.168.48',
-  '@tanstack/react-query': '^5.105.1',
+  '@tanstack/react-query': '^5.105.3',
   '@tanstack/react-router-ssr-query': '^1.167.3',
   // Pre-1.0: pin minor.
   'raf-effect-atom': '~0.3.3',

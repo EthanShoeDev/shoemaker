@@ -38,13 +38,13 @@ export const formatContent = (path: string, content: string) =>
         ),
       );
 
-// json-merge content is a fragment that is merged before formatting, so it is
-// left alone here.
+// json-merge content is a fragment that is merged before formatting, and a
+// verbatim file is one the repo's formatter ignores, so both are left alone.
 export const formatFiles = (files: ReadonlyArray<GeneratedFile>) =>
   Effect.forEach(
     files,
     (file) =>
-      file.strategy === 'json-merge'
+      file.strategy === 'json-merge' || file.verbatim === true
         ? Effect.succeed(file)
         : Effect.map(formatContent(file.path, file.content), (content) => ({
             ...file,
