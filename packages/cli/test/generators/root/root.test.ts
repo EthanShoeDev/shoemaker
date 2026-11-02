@@ -151,7 +151,11 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     );
     assert.deepStrictEqual(known, generatedDirs);
     const vitest = file('vitest.config.ts').content;
-    for (const dir of known) assert.include(vitest, `'${dir}'`);
+    for (const dir of known) {
+      // The theme package is CSS only: no tests, so no vitest project.
+      if (dir === 'packages/theme') assert.notInclude(vitest, `'${dir}'`);
+      else assert.include(vitest, `'${dir}'`);
+    }
   });
 
   it('tests and builds through the task runner in CI, cached', () => {

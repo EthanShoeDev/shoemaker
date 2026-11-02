@@ -15,6 +15,7 @@ import {
   vitestConfig,
 } from './common.ts';
 import { contractName, frontendFor, servedApi } from './mount.ts';
+import { appStylesheet, themeDependency } from './theme.ts';
 
 const baseDependencies = [
   '@tanstack/react-router',
@@ -653,10 +654,12 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
     ...(api === undefined ? [] : ['@effect/vitest']),
     ...(varlock ? ['@varlock/vite-integration', 'varlock'] : []),
   ];
-  const workspaceDependencies =
-    api === undefined
+  const workspaceDependencies = [
+    ...(api === undefined
       ? []
-      : [api.name, frontend === undefined ? contractName(api) : frontend.name];
+      : [api.name, frontend === undefined ? contractName(api) : frontend.name]),
+    ...themeDependency(ctx),
+  ];
   return {
     files: [
       workspacePackageJson(ctx, {
@@ -721,7 +724,7 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
             frontendPackage,
           )),
       seed(`${dir}/src/components/welcome.tsx`, welcomeSource),
-      seed(`${dir}/src/styles.css`, "@import 'tailwindcss';\n"),
+      seed(`${dir}/src/styles.css`, appStylesheet(ctx, 'web')),
       seed(`${dir}/test/welcome.test.tsx`, welcomeTestSource),
       seed(`${dir}/README.md`, readme(ctx, app, apiPackage, frontendPackage)),
     ],

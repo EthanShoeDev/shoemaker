@@ -9,7 +9,9 @@ export interface TaskDef {
   // Argv every workspace package runs for this task, unless its package.json
   // has a script of the same name. Turbo renders it as the task `command`;
   // nx runs package scripts, so `packageScripts` writes it as one there.
-  readonly command?: ReadonlyArray<string>;
+  // `null` on a package override opts that package out (it has nothing to
+  // typecheck or test); its package.json then carries no script for it.
+  readonly command?: ReadonlyArray<string> | null;
   readonly root?: boolean;
   // Restrict a package task override to one workspace package (`@scope/web`).
   // Rendered as a package-level turbo.jsonc / project.json target.

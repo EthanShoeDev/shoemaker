@@ -1,4 +1,4 @@
-import { Array as Arr } from 'effect';
+import { Array as Arr, pipe } from 'effect';
 
 import type { GenContext, Generator } from '../../engine/types.ts';
 import { workspaces } from '../root/workspaces.ts';
@@ -25,6 +25,16 @@ export const packageCommands = {
   'oxlint:check': ['oxlint', '-c', '../../oxlint.config.ts', '.'],
   'oxlint:fix': ['oxlint', '-c', '../../oxlint.config.ts', '--fix', '.'],
 };
+
+export type PackageCommand = keyof typeof packageCommands;
+
+// Overrides that opt one package out of shared commands it has nothing to
+// run them on; its package.json must pass the same names as `optOut`.
+export const optOutTasks = (
+  pkg: string,
+  names: ReadonlyArray<PackageCommand>,
+): ReadonlyArray<TaskDef> =>
+  Arr.map(names, (name) => ({ name, package: pkg, command: null }));
 
 const packageTasks: ReadonlyArray<TaskDef> = [
   {
@@ -143,7 +153,12 @@ const rootTasks = (ctx: GenContext): ReadonlyArray<TaskDef> => [
     dependsOn: [
       '//#oxlint:fix',
       '//#catalog:fix',
-      ...Arr.map(workspaces(ctx), (w) => `${w.name}#oxlint:fix`),
+      ...pipe(
+        workspaces(ctx),
+        // The theme package is CSS only and has no oxlint:fix to wait on.
+        Arr.filter((w) => w.kind !== 'theme'),
+        Arr.map((w) => `${w.name}#oxlint:fix`),
+      ),
     ],
     cache: false,
     comment:

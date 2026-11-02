@@ -180,7 +180,14 @@ export const nxRenderer: Renderer = (ctx, aggregate) => {
             ...Rec.fromEntries(
               Arr.map(aggregates, (name) => [name, {}] as const),
             ),
-            ...targets(byPackage.get(workspace.name) ?? [], rootProject),
+            // An opted-out task has no script, so nx has no target to run.
+            ...targets(
+              Arr.filter(
+                byPackage.get(workspace.name) ?? [],
+                (task) => task.command !== null,
+              ),
+              rootProject,
+            ),
           },
         },
         NX_JSON,

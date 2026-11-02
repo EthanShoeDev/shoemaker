@@ -186,6 +186,29 @@ const frontendProblem = (config: typeof ShoemakerConfigFields.Type) => {
   return undefined;
 };
 
+// Apps that render UI and so style with Tailwind.
+export const UI_APP_KINDS: ReadonlyArray<AppKind> = [
+  'tanstack-start',
+  'foldkit',
+  'expo',
+];
+
+export const THEME_PACKAGE = 'theme';
+
+// More than one UI app share their design tokens through a `theme` package,
+// so web and native read the same colors under the same names.
+export const hasTheme = (config: typeof ShoemakerConfigFields.Type) =>
+  Arr.filter(config.apps, (app) => UI_APP_KINDS.includes(app.kind)).length > 1;
+
+const themeProblem = (config: typeof ShoemakerConfigFields.Type) =>
+  hasTheme(config) &&
+  Arr.some(
+    [...config.apps, ...config.packages],
+    (unit) => unit.name === THEME_PACKAGE,
+  )
+    ? `${THEME_PACKAGE} is reserved for the design tokens the repo's UI apps share`
+    : undefined;
+
 // Why an app can't ship Android releases: it is not an Expo app, or the
 // repo has no changesets to version it or no GitHub Actions to build it.
 const androidReleaseProblem = (config: typeof ShoemakerConfigFields.Type) => {
@@ -208,6 +231,7 @@ export const ShoemakerConfig = ShoemakerConfigFields.check(
       contractProblem(config) ??
       frontendProblem(config) ??
       androidReleaseProblem(config) ??
+      themeProblem(config) ??
       true,
   ),
 );

@@ -1,6 +1,10 @@
 import { Array as Arr, pipe } from 'effect';
 
-import type { ShoemakerConfig } from '../../config/schema.ts';
+import {
+  hasTheme,
+  THEME_PACKAGE,
+  type ShoemakerConfig,
+} from '../../config/schema.ts';
 import type { GenContext } from '../../engine/types.ts';
 import { contractName } from '../apps/mount.ts';
 
@@ -9,7 +13,8 @@ export interface Workspace {
   readonly name: string;
   readonly kind:
     | ShoemakerConfig['apps'][number]['kind']
-    | ShoemakerConfig['packages'][number]['kind'];
+    | ShoemakerConfig['packages'][number]['kind']
+    | 'theme';
 }
 
 // Every workspace package shoemaker generates, in a stable order. Renderers that
@@ -35,4 +40,13 @@ export const workspaces = (ctx: GenContext): ReadonlyArray<Workspace> => [
       kind: 'library' as const,
     })),
   ),
+  ...(hasTheme(ctx.config)
+    ? [
+        {
+          dir: `packages/${THEME_PACKAGE}`,
+          name: ctx.pkg(THEME_PACKAGE),
+          kind: 'theme' as const,
+        },
+      ]
+    : []),
 ];

@@ -131,7 +131,8 @@ const knipEntries = (workspace: Workspace): ReadonlyArray<string> => {
       return ['src/bin.ts', 'src/main.ts'];
     }
     case 'library':
-    case 'frontend': {
+    case 'frontend':
+    case 'theme': {
       return [];
     }
   }
@@ -277,9 +278,14 @@ export const rootTsconfig: Generator = () => ({
   ],
 });
 
-// Every workspace shoemaker generates carries a test dir, so each is a project.
+// Every workspace shoemaker generates carries a test dir, so each is a
+// project; the theme package is CSS only.
 export const vitestConfig: Renderer = (ctx) => {
-  const projects = Arr.map(workspaces(ctx), (w) => w.dir);
+  const projects = pipe(
+    workspaces(ctx),
+    Arr.filter((w) => w.kind !== 'theme'),
+    Arr.map((w) => w.dir),
+  );
   return [
     owned(
       'vitest.config.ts',

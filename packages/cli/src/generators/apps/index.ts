@@ -7,6 +7,7 @@ import { foldkitGenerator } from './foldkit.ts';
 import { frontendGenerator } from './frontend.ts';
 import { libraryGenerator } from './library.ts';
 import { tanstackStartGenerator } from './tanstack-start.ts';
+import { themeGenerator } from './theme.ts';
 
 export const appGenerators: ReadonlyArray<Generator> = [
   tanstackStartGenerator,
@@ -17,4 +18,5 @@ export const appGenerators: ReadonlyArray<Generator> = [
   libraryGenerator,
   frontendGenerator,
   releaseGenerator,
+  themeGenerator,
 ];

@@ -13,6 +13,7 @@ import {
   toolchainDevDependencies,
   vitestConfig,
 } from './common.ts';
+import { appStylesheet, themeDependency } from './theme.ts';
 
 // Mirrors create-foldkit-app's SPA template (base + counter example),
 // minus @foldkit/ui so the starter has no component library to unpick.
@@ -215,6 +216,7 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
         },
         dependencies,
         devDependencies,
+        workspaceDependencies: themeDependency(ctx),
       }),
       packageTsconfig(dir, {
         compilerOptions: {
@@ -237,7 +239,7 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
       seed(`${dir}/index.html`, indexHtml(app)),
       seed(`${dir}/src/entry.ts`, entrySource),
       seed(`${dir}/src/main.ts`, mainSource),
-      seed(`${dir}/src/styles.css`, "@import 'tailwindcss';\n"),
+      seed(`${dir}/src/styles.css`, appStylesheet(ctx, 'web')),
       seed(
         `${dir}/src/vitest-setup.ts`,
         "import { setup } from 'foldkit/test/vitest';\n\nsetup();\n",

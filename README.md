@@ -24,6 +24,14 @@ they're the setup I use for my own repos.
   [raf-effect-atom](https://raf-effect-atom.katt.dev), and server-rendered
   results reach the browser without a second request. `--no-frontend` keeps
   the plain `callApi` client instead.
+- **Styling**: Tailwind on the web, and [Uniwind](https://uniwind.dev) on Expo,
+  so React Native components take the same `className`s. A repo with more
+  than one UI app gets `packages/theme`: one `tokens.css` holding the light
+  and dark colors under shadcn/ui's names. Every app imports it, so
+  `bg-background` is the same color on the web and on the phone. A `light` or
+  `dark` class picks the theme; without one, the system setting does. `doctor`
+  checks that every theme sets the same colors and every app imports the
+  tokens.
 - **Tooling**: Effect 4, strict TypeScript, oxlint with every rule at error,
   oxfmt, knip and jscpd
 - **Task runner**: turbo or nx

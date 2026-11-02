@@ -152,6 +152,16 @@ describe('shoemaker.config.ts', () => {
       ],
       '["androidRelease"]["package"]',
     ],
+    [
+      'an app named after the shared theme package',
+      [
+        { name: 'web', kind: 'tanstack-start' },
+        { name: 'mobile', kind: 'expo' },
+        { name: 'theme', kind: 'effect-cli' },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      'theme is reserved for the design tokens',
+    ],
   ] as const)('rejects %s', ([, apps, message]) =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(roundTrip({ ...full, apps }));

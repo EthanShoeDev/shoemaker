@@ -168,7 +168,14 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
     assert.include(oxfmt, '//#oxlint:fix');
     assert.include(oxfmt, '//#catalog:fix');
     for (const pkg of packageNames) {
-      assert.include(oxfmt, `${pkg}#oxlint:fix`);
+      // The CSS-only theme package has no oxlint:fix.
+      if (pkg === '@sample-full/theme') {
+        assert.notInclude(oxfmt, `${pkg}#oxlint:fix`);
+        const theme = record(record(overrides.get(pkg)).tasks);
+        assert.isNull(record(theme['oxlint:fix']).command);
+      } else {
+        assert.include(oxfmt, `${pkg}#oxlint:fix`);
+      }
     }
     assert.deepStrictEqual(
       strings(record(tasks['//#knip:fix:danger']).dependsOn),
@@ -275,6 +282,15 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
   it('keeps shared leaf commands as package scripts', () => {
     assert.notInclude(file('nx.json').content, '"command"');
     for (const [path, scripts] of workspaceScripts(files)) {
+      // The CSS-only theme package opts out of them.
+      if (path === 'packages/theme/package.json') {
+        assert.deepStrictEqual(Rec.keys(scripts), ['clean'], path);
+        assert.notProperty(
+          record(parseJson(file('packages/theme/project.json'))).targets,
+          'typecheck',
+        );
+        continue;
+      }
       assert.strictEqual(scripts.typecheck, 'tsc --noEmit', path);
       assert.isDefined(scripts.test, path);
     }

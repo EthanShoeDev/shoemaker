@@ -49,7 +49,9 @@ const quietLogs = (task: TaskDef) =>
 const turboTask = (task: TaskDef): Jsonc => {
   const body: Record<string, Jsonc | undefined> = {
     command:
-      task.command === undefined ? undefined : turboCommand(task.command),
+      task.command === undefined || task.command === null
+        ? task.command
+        : turboCommand(task.command),
     dependsOn: task.dependsOn,
     inputs: task.inputs,
     outputs: task.outputs,
@@ -85,7 +87,10 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
     Arr.map((v) => v.key),
     Arr.filter((key) => key !== 'APP_ENV'),
   );
-  const commands = Arr.some(tasks, (task) => task.command !== undefined);
+  const commands = Arr.some(
+    tasks,
+    (task) => task.command !== undefined && task.command !== null,
+  );
   const github = ctx.config.ci === 'github';
 
   const root = owned(

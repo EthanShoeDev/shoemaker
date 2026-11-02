@@ -1,8 +1,8 @@
-import { Array as Arr, Record as Rec, String as Str } from 'effect';
+import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
 
 import type { ShoemakerConfig } from '../config/schema.ts';
 import type { GenContext, GeneratedFile } from '../engine/types.ts';
-import { packageCommands } from './task-runner/tasks.ts';
+import { type PackageCommand, packageCommands } from './task-runner/tasks.ts';
 
 // Helpers shared by every generator area. Keep these small and boring: each
 // generator should read like the file it produces.
@@ -55,9 +55,14 @@ export const catalogDeps = (names: ReadonlyArray<string>) =>
 export const packageScripts = (
   config: ShoemakerConfig,
   extra: Readonly<Record<string, string>> = {},
+  optOut: ReadonlyArray<PackageCommand> = [],
 ) => ({
   ...(config.taskRunner === 'nx'
-    ? Rec.map(packageCommands, (argv) => Arr.join(argv, ' '))
+    ? pipe(
+        packageCommands,
+        Rec.filter((_, name) => !optOut.includes(name)),
+        Rec.map((argv) => Arr.join(argv, ' ')),
+      )
     : {}),
   ...extra,
 });
@@ -74,6 +79,8 @@ export interface WorkspacePackage {
   // Other workspace packages (unscoped names) this package depends on.
   readonly workspaceDependencies?: ReadonlyArray<string>;
   readonly exports?: Readonly<Record<string, string>>;
+  // Shared commands this package does not run (see `optOutTasks`).
+  readonly optOut?: ReadonlyArray<PackageCommand>;
   // Expo apps are not ESM packages.
   readonly module?: boolean;
   // False when the package's tsconfig extends something other than
@@ -91,6 +98,7 @@ export const workspacePackageJson = (
   const scripts: Readonly<Record<string, string>> = packageScripts(
     ctx.config,
     pkg.scripts,
+    pkg.optOut,
   );
   return {
     path: `${pkg.dir}/package.json`,
