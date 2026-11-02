@@ -162,28 +162,41 @@ describe('init + sync', () => {
     ),
   );
 
-  it.effect('serves the API from the site unless told not to', () =>
-    provide(
-      Effect.gen(function* () {
-        const apps = ['--apps', 'tanstack-start,effect-api'];
-        const served = yield* scratch();
-        yield* run(['init', '--yes', '--no-git', ...apps, served], []);
-        assert.deepStrictEqual((yield* loadConfig(served)).apps, [
-          { kind: 'tanstack-start', name: 'web', api: 'api' },
-          { kind: 'effect-api', name: 'api' },
-        ]);
+  it.effect(
+    'serves the API from the site, with a frontend package, unless told not to',
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const apps = ['--apps', 'tanstack-start,effect-api'];
+          const served = yield* scratch();
+          yield* run(['init', '--yes', '--no-git', ...apps, served], []);
+          assert.deepStrictEqual((yield* loadConfig(served)).apps, [
+            { kind: 'tanstack-start', name: 'web', api: 'api' },
+            { kind: 'effect-api', name: 'api' },
+          ]);
+          assert.deepStrictEqual((yield* loadConfig(served)).packages, [
+            { kind: 'frontend', name: 'frontend', api: 'api' },
+          ]);
 
-        const apart = yield* scratch();
-        yield* run(
-          ['init', '--yes', '--no-git', '--no-serve-api', ...apps, apart],
-          [],
-        );
-        assert.deepStrictEqual((yield* loadConfig(apart)).apps, [
-          { kind: 'tanstack-start', name: 'web' },
-          { kind: 'effect-api', name: 'api' },
-        ]);
-      }),
-    ),
+          const plain = yield* scratch();
+          yield* run(
+            ['init', '--yes', '--no-git', '--no-frontend', ...apps, plain],
+            [],
+          );
+          assert.deepStrictEqual((yield* loadConfig(plain)).packages, []);
+
+          const apart = yield* scratch();
+          yield* run(
+            ['init', '--yes', '--no-git', '--no-serve-api', ...apps, apart],
+            [],
+          );
+          assert.deepStrictEqual((yield* loadConfig(apart)).apps, [
+            { kind: 'tanstack-start', name: 'web' },
+            { kind: 'effect-api', name: 'api' },
+          ]);
+          assert.deepStrictEqual((yield* loadConfig(apart)).packages, []);
+        }),
+      ),
   );
 
   it.effect('refuses a non-empty directory without --force', () =>

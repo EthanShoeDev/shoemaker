@@ -136,6 +136,43 @@ const serveApi = (apps: ReadonlyArray<App>, serve: boolean) => {
   );
 };
 
+// What the apps question answers: the apps, and whether an API a site serves
+// also gets a frontend package of client atoms.
+interface AppsAnswer {
+  readonly apps: ReadonlyArray<App>;
+  readonly frontend: boolean;
+}
+
+// The frontend package for the API a site serves, named `frontend` unless
+// that is taken.
+const frontendPackages = (
+  apps: ReadonlyArray<App>,
+  packages: ReadonlyArray<Package>,
+): ReadonlyArray<Package> =>
+  Option.match(
+    Arr.findFirst(apps, (app) =>
+      app.kind === 'tanstack-start' && app.api !== undefined
+        ? Option.some(app.api)
+        : Option.none(),
+    ),
+    {
+      onNone: () => [],
+      onSome: (api) => [
+        {
+          name: unused(
+            'frontend',
+            new Set([
+              ...Arr.map(apps, (app) => app.name),
+              ...Arr.map(packages, (pkg) => pkg.name),
+            ]),
+          ),
+          kind: 'frontend',
+          api,
+        },
+      ],
+    },
+  );
+
 const kebab = (label: string, allowBlank: boolean) => (value: string) =>
   (allowBlank && value === '') || KEBAB.test(value)
     ? Effect.succeed(value)
@@ -154,7 +191,12 @@ const parseApps = (value: string) =>
             `<kind>[:<name>], kind one of ${Arr.join(APP_KINDS, ', ')}`,
           ),
         );
-  }).pipe(Effect.map((requested) => serveApi(nameApps(requested), true)));
+  }).pipe(
+    Effect.map((requested): AppsAnswer => ({
+      apps: serveApi(nameApps(requested), true),
+      frontend: true,
+    })),
+  );
 
 const toPackages = (names: ReadonlyArray<string>): ReadonlyArray<Package> =>
   Arr.map(names, (name) => ({ name, kind: 'library' }));
@@ -229,15 +271,34 @@ const parseExtras = (value: string) => {
   );
 };
 
+// Asked only when a site serves an API.
+const frontendPrompt = (apps: ReadonlyArray<App>) => {
+  const site = Arr.findFirst(
+    apps,
+    (app) => app.kind === 'tanstack-start' && app.api !== undefined,
+  );
+  return Option.match(site, {
+    onNone: () => Prompt.succeed<AppsAnswer>({ apps, frontend: false }),
+    onSome: (served) =>
+      Prompt.Confirm({
+        message: `Share the ${served.api ?? ''} API's client atoms in packages/frontend? (${served.name}'s loaders start them; any other frontend reads the same atoms)`,
+        initial: true,
+      }).pipe(Prompt.map((frontend): AppsAnswer => ({ apps, frontend }))),
+  });
+};
+
 // Asked only when there is a site and an API to pair.
 const servePrompt = (apps: ReadonlyArray<App>) => {
   const pair = firstSiteAndApi(apps);
   return pair === undefined
-    ? Prompt.succeed(apps)
+    ? Prompt.succeed<AppsAnswer>({ apps, frontend: false })
     : Prompt.Confirm({
         message: `Serve the ${pair.api.name} API from the ${pair.site.name} app at /api? (one origin, one deployment)`,
         initial: true,
-      }).pipe(Prompt.map((serve) => serveApi(apps, serve)));
+      }).pipe(
+        Prompt.map((serve) => serveApi(apps, serve)),
+        Prompt.flatMap(frontendPrompt),
+      );
 };
 
 const appsPrompt = Prompt.MultiSelect({
@@ -250,7 +311,7 @@ const appsPrompt = Prompt.MultiSelect({
 }).pipe(
   Prompt.flatMap((kinds) =>
     kinds.length === 0
-      ? Prompt.succeed<ReadonlyArray<App>>([])
+      ? Prompt.succeed<AppsAnswer>({ apps: [], frontend: false })
       : Prompt.all(
           Arr.map(nameApps(Arr.map(kinds, (kind) => ({ kind }))), (app) =>
             Prompt.String({
@@ -527,6 +588,12 @@ const config = {
     ),
     Flag.withDefault(true),
   ),
+  frontend: Flag.Boolean('frontend').pipe(
+    Flag.withDescription(
+      'Give the API a site serves a packages/frontend of client atoms (--no-frontend to skip)',
+    ),
+    Flag.withDefault(true),
+  ),
   git: Flag.Boolean('git').pipe(
     Flag.withDescription(
       'Run git init and commit the generated files as "init via shoemaker" (--no-git to skip)',
@@ -587,6 +654,12 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
   const name = Option.getOrElse(blankToNone(input.name), () =>
     toKebab(path.basename(root)),
   );
+  const answer = Option.getOrElse(input.apps, (): AppsAnswer => ({
+    apps: defaults.apps,
+    frontend: false,
+  }));
+  const apps = input.serveApi ? answer.apps : serveApi(answer.apps, false);
+  const libraries = Option.getOrElse(input.libraries, () => defaults.packages);
   const draft = {
     name,
     scope: Option.getOrElse(blankToNone(input.scope), () => name),
@@ -594,13 +667,11 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
       input.description,
       () => defaults.description,
     ),
-    apps: input.serveApi
-      ? Option.getOrElse(input.apps, () => defaults.apps)
-      : serveApi(
-          Option.getOrElse(input.apps, () => defaults.apps),
-          false,
-        ),
-    packages: Option.getOrElse(input.libraries, () => defaults.packages),
+    apps,
+    packages:
+      input.frontend && answer.frontend
+        ? [...libraries, ...frontendPackages(apps, libraries)]
+        : libraries,
     taskRunner: Option.getOrElse(input.taskRunner, () => defaults.taskRunner),
     secrets: Option.getOrElse(input.secrets, () => defaults.secrets),
     infra: yield* withProviders(

@@ -28,3 +28,12 @@ export const isServed = (config: ShoemakerConfig, api: App) =>
     config.apps,
     (app) => app.kind === 'tanstack-start' && app.api === api.name,
   );
+
+// The frontend package that holds an effect-api app's client atoms, if any.
+export const frontendFor = (config: ShoemakerConfig, api: App) =>
+  Option.getOrUndefined(
+    Arr.findFirst(
+      config.packages,
+      (pkg) => pkg.kind === 'frontend' && pkg.api === api.name,
+    ),
+  );

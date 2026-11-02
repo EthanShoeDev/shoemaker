@@ -10,6 +10,7 @@ import {
 
 import type { App, ShoemakerConfig } from '../../../src/config/schema.ts';
 import type { FileStrategy } from '../../../src/engine/types.ts';
+import { frontendGenerator } from '../../../src/generators/apps/frontend.ts';
 import { appGenerators } from '../../../src/generators/apps/index.ts';
 import { libraryGenerator } from '../../../src/generators/apps/library.ts';
 import {
@@ -429,5 +430,86 @@ describe('tanstack-start serving an effect-api app', () => {
 
   it.effect('emits TypeScript that parses', () =>
     assertSourcesParse(served.files),
+  );
+});
+
+describe('frontend package', () => {
+  const apps: ReadonlyArray<App> = [
+    { name: 'web', kind: 'tanstack-start', api: 'api' },
+    { name: 'api', kind: 'effect-api' },
+  ];
+  const config = sampleConfig({
+    apps,
+    packages: [{ name: 'frontend', kind: 'frontend', api: 'api' }],
+  });
+  const { contribution, byPath, file } = contribute(frontendGenerator, config);
+  const site = allApps(config);
+
+  it('emits atoms over the contract, with a test', () => {
+    assertStrategies(byPath, [
+      ['packages/frontend/package.json', 'json-merge'],
+      ['packages/frontend/tsconfig.json', 'owned'],
+      ['packages/frontend/vitest.config.ts', 'owned'],
+      ['packages/frontend/src/api-client.ts', 'seed'],
+      ['packages/frontend/src/greetings.ts', 'seed'],
+      ['packages/frontend/test/greetings.test.ts', 'seed'],
+      ['packages/frontend/README.md', 'seed'],
+    ]);
+    assert.include(
+      file('packages/frontend/src/api-client.ts').content,
+      "import { Api } from '@sample/api-contract';",
+    );
+  });
+
+  it('exports each module by path and imports no React', () => {
+    const manifest = parseJson(file('packages/frontend/package.json'));
+    assert.deepStrictEqual(manifest.exports, {
+      './*': './src/*.ts',
+      './package.json': './package.json',
+    });
+    const deps = record(manifest.dependencies);
+    assert.strictEqual(deps['@sample/api-contract'], 'workspace:*');
+    assert.notProperty(deps, 'react');
+    assert.notProperty(record(manifest.devDependencies), 'bun-types');
+  });
+
+  it('wires the site through raf-effect-atom instead of callApi', () => {
+    const paths = Arr.map(site.files, (f) => f.path);
+    assert.includeMembers(paths, [
+      'apps/web/src/api-transport.ts',
+      'apps/web/test/api-transport.test.ts',
+    ]);
+    assert.notInclude(paths, 'apps/web/src/api-client.ts');
+    assert.include(
+      site.file('apps/web/src/router.tsx').content,
+      'withApiTransport(pageApiTransport())',
+    );
+    assert.include(
+      site.file('apps/web/src/routes/__root.tsx').content,
+      "<WaterfallDetection mode='throw'>",
+    );
+    const index = site.file('apps/web/src/routes/index.tsx').content;
+    assert.include(index, "context.atoms.ensure(greeting, 'world')");
+    assert.include(index, "from '@sample/frontend/greetings'");
+  });
+
+  it('depends on the frontend package instead of the contract', () => {
+    const web = parseJson(site.file('apps/web/package.json'));
+    const deps = record(web.dependencies);
+    assert.strictEqual(deps['@sample/frontend'], 'workspace:*');
+    assert.strictEqual(deps['@sample/api'], 'workspace:*');
+    assert.notProperty(deps, '@sample/api-contract');
+    assert.strictEqual(deps['raf-effect-atom'], 'catalog:');
+  });
+
+  it('lists every dependency in the catalog', () => {
+    assertCatalogComplete(contribution);
+    for (const { contribution: app } of site.contributions) {
+      assertCatalogComplete(app);
+    }
+  });
+
+  it.effect('emits TypeScript that parses', () =>
+    assertSourcesParse([...(contribution.files ?? []), ...site.files]),
   );
 });

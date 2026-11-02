@@ -18,6 +18,12 @@ they're the setup I use for my own repos.
 - **Apps**: TanStack Start, Foldkit, Expo, Effect API and Effect CLI, plus
   library packages. The Effect API's contract is its own package, so any app
   can call it. A TanStack Start app can serve the API at `/api` and deploy it.
+- **Client data**: a site that serves the API gets `packages/frontend`, the
+  API's endpoints as Effect atoms with no React or UI, so every frontend reads
+  the same atoms. The site's route loaders start them with
+  [raf-effect-atom](https://raf-effect-atom.katt.dev), and server-rendered
+  results reach the browser without a second request. `--no-frontend` keeps
+  the plain `callApi` client instead.
 - **Tooling**: Effect 4, strict TypeScript, oxlint with every rule at error,
   oxfmt, knip and jscpd
 - **Task runner**: turbo or nx

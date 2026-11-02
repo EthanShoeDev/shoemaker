@@ -130,7 +130,8 @@ const knipEntries = (workspace: Workspace): ReadonlyArray<string> => {
     case 'effect-cli': {
       return ['src/bin.ts', 'src/main.ts'];
     }
-    case 'library': {
+    case 'library':
+    case 'frontend': {
       return [];
     }
   }

@@ -23,7 +23,10 @@ export const presets: Readonly<Record<string, ShoemakerConfig>> = {
       { name: 'web', kind: 'tanstack-start', api: 'api' },
       { name: 'api', kind: 'effect-api' },
     ],
-    packages: [{ name: 'core', kind: 'library' }],
+    packages: [
+      { name: 'core', kind: 'library' },
+      { name: 'frontend', kind: 'frontend', api: 'api' },
+    ],
     secrets: 'varlock',
     infra: {
       kind: 'alchemy',

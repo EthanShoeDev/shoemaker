@@ -7,7 +7,9 @@ import { contractName } from '../apps/mount.ts';
 export interface Workspace {
   readonly dir: string;
   readonly name: string;
-  readonly kind: ShoemakerConfig['apps'][number]['kind'] | 'library';
+  readonly kind:
+    | ShoemakerConfig['apps'][number]['kind']
+    | ShoemakerConfig['packages'][number]['kind'];
 }
 
 // Every workspace package shoemaker generates, in a stable order. Renderers that

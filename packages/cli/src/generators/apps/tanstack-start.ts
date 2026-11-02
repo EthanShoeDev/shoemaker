@@ -14,7 +14,7 @@ import {
   toolchainDevDependencies,
   vitestConfig,
 } from './common.ts';
-import { contractName, servedApi } from './mount.ts';
+import { contractName, frontendFor, servedApi } from './mount.ts';
 
 const baseDependencies = [
   '@tanstack/react-router',
@@ -93,6 +93,90 @@ declare module '@tanstack/react-router' {
 }
 `;
 
+// With a frontend package, the router owns an atom registry: one per server
+// request and one per tab, streamed from the first to the second.
+// https://raf-effect-atom.katt.dev/docs/tanstack-start
+const atomRouterSource = (
+  frontendPackage: string,
+) => `import { createRouter } from '@tanstack/react-router';
+import { Loader } from 'raf-effect-atom';
+import {
+  makeRegistry,
+  setupRouterAtoms,
+} from 'raf-effect-atom/tanstack-router';
+
+import { withApiTransport } from '${frontendPackage}/api-client';
+
+import { pageApiTransport } from './api-transport.ts';
+import { routeTree } from './routeTree.gen.ts';
+
+export const getRouter = () => {
+  // One atom registry per server request and one per tab. Loaders start atoms
+  // in it, and the server's results stream into the browser's, so the
+  // browser doesn't request them again.
+  const registry = makeRegistry({
+    initialValues: [withApiTransport(pageApiTransport())],
+  });
+  const router = createRouter({
+    routeTree,
+    context: { atoms: Loader.make(registry) },
+    scrollRestoration: true,
+    defaultPreload: 'intent',
+    // The registry is the cache: loaders always run and ask it.
+    defaultPreloadStaleTime: 0,
+  });
+  setupRouterAtoms({ registry, router });
+  return router;
+};
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
+  }
+}
+`;
+
+const rootHead = (app: App) => `  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: '${app.name}' },
+    ],
+    links: [{ rel: 'stylesheet', href: appCss }],
+  }),
+  shellComponent: RootDocument,
+});
+`;
+
+const atomRootRouteSource = (app: App) => `import {
+  HeadContent,
+  Scripts,
+  createRootRouteWithContext,
+} from '@tanstack/react-router';
+import { type Loader, WaterfallDetection } from 'raf-effect-atom';
+import type { ReactNode } from 'react';
+
+import appCss from '../styles.css?url';
+
+// In development, a component that reads an atom no loader started throws,
+// naming the atom: start every atom a page reads from its route's loader.
+const RootDocument = ({ children }: { readonly children: ReactNode }) => (
+  <html lang='en'>
+    <head>
+      <HeadContent />
+    </head>
+    <body>
+      <WaterfallDetection mode='throw'>{children}</WaterfallDetection>
+      <Scripts />
+    </body>
+  </html>
+);
+
+export const Route = createRootRouteWithContext<{
+  readonly atoms: Loader.Loader;
+}>()({
+${rootHead(app)}`;
+
 const rootRouteSource = (
   app: App,
 ) => `import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
@@ -113,17 +197,7 @@ const RootDocument = ({ children }: { readonly children: ReactNode }) => (
 );
 
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: '${app.name}' },
-    ],
-    links: [{ rel: 'stylesheet', href: appCss }],
-  }),
-  shellComponent: RootDocument,
-});
-`;
+${rootHead(app)}`;
 
 const indexRouteSource = `import { createFileRoute } from '@tanstack/react-router';
 
@@ -148,6 +222,31 @@ export const Route = createFileRoute('/')({
     callApi((api) => api.greetings.greet({ params: { name: 'world' } }), {
       signal: abortController.signal,
     }),
+  component: Home,
+});
+`;
+
+// With a frontend package, the loader starts the greeting's atom and the page
+// reads it through the handle the loader returns.
+const atomIndexRouteSource = (
+  frontendPackage: string,
+) => `import { createFileRoute } from '@tanstack/react-router';
+import { useAtomResult } from 'raf-effect-atom';
+
+import { greeting } from '${frontendPackage}/greetings';
+
+import { Welcome } from '../components/welcome.tsx';
+
+const Home = () => {
+  const result = useAtomResult(greeting, Route.useLoaderData());
+  return <Welcome message={result.value.message} />;
+};
+
+// The loader starts the atom and waits for it, and the page reads it through
+// the handle the loader returns. While the server renders, the API answers
+// in-process.
+export const Route = createFileRoute('/')({
+  loader: ({ context }) => context.atoms.ensure(greeting, 'world'),
   component: Home,
 });
 `;
@@ -252,6 +351,53 @@ export const callApi = <A, E>(
   call: (api: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>,
   options?: { readonly signal?: AbortSignal },
 ) => apiRuntime.runPromise(Effect.flatMap(makeClient, call), options);
+`;
+
+// With a frontend package, the app only picks where its atoms' requests go.
+const apiTransportSource = (
+  frontendPackage: string,
+) => `import { createIsomorphicFn } from '@tanstack/react-start';
+
+import { apiTransport } from '${frontendPackage}/api-client';
+
+import { inProcessFetch, inProcessOrigin } from './api.server.ts';
+
+// createIsomorphicFn is the compiler's environment boundary: each build keeps
+// one implementation and drops the other's imports, so the in-process
+// transport never reaches the browser. In-process while the server renders;
+// same-origin fetch to /api in the browser.
+export const pageApiTransport = createIsomorphicFn()
+  .server(() =>
+    apiTransport({ baseUrl: inProcessOrigin, fetch: inProcessFetch }),
+  )
+  .client(() => apiTransport({ baseUrl: globalThis.location.origin }));
+`;
+
+const apiTransportTestSource = (
+  frontendPackage: string,
+) => `import { assert, describe, it } from '@effect/vitest';
+import { Effect } from 'effect';
+import { AtomRegistry } from 'effect/reactivity';
+
+import { withApiTransport } from '${frontendPackage}/api-client';
+import { greeting } from '${frontendPackage}/greetings';
+
+import { pageApiTransport } from '../src/api-transport.ts';
+
+describe('pageApiTransport', () => {
+  it.effect('reaches the API in-process outside the browser', () =>
+    Effect.gen(function* () {
+      const registry = AtomRegistry.make({
+        initialValues: [withApiTransport(pageApiTransport())],
+      });
+      const { message } = yield* AtomRegistry.getResult(
+        registry,
+        greeting('Ada'),
+      );
+      assert.strictEqual(message, 'Hello, Ada!');
+    }),
+  );
+});
 `;
 
 const apiClientTestSource = `import { assert, describe, it } from '@effect/vitest';
@@ -446,20 +592,71 @@ declare module '@tanstack/react-start' {
 }
 `;
 
+// The site's files for a served API: through the frontend package's atoms
+// when the API has one, else through a `callApi` promise of its own.
+const servedFiles = (
+  dir: string,
+  apiPackage: string,
+  contract: string,
+  frontendPackage: string | undefined,
+) => [
+  seed(`${dir}/src/api.server.ts`, apiServerSource(apiPackage)),
+  seed(`${dir}/src/routes/api.$.ts`, apiRouteSource),
+  ...(frontendPackage === undefined
+    ? [
+        seed(`${dir}/src/api-client.ts`, apiClientSource(contract)),
+        seed(`${dir}/test/api-client.test.ts`, apiClientTestSource),
+      ]
+    : [
+        seed(
+          `${dir}/src/api-transport.ts`,
+          apiTransportSource(frontendPackage),
+        ),
+        seed(
+          `${dir}/test/api-transport.test.ts`,
+          apiTransportTestSource(frontendPackage),
+        ),
+      ]),
+];
+
+const readme = (
+  ctx: GenContext,
+  app: App,
+  apiPackage: string | undefined,
+  frontendPackage: string | undefined,
+) => {
+  const start = `# ${ctx.pkg(app.name)}\n\nTanStack Start app. \`bun run dev\` to develop, \`bun run build && bun run start\` to preview the production build.\n`;
+  if (apiPackage === undefined) return start;
+  const served = `\nIt serves \`${apiPackage}\` at \`/api\` (\`src/routes/api.$.ts\`) and deploys it. `;
+  return frontendPackage === undefined
+    ? `${start}${served}Loaders and components call it through \`callApi\` (\`src/api-client.ts\`): in-process while the server renders, over \`fetch\` in the browser.\n`
+    : `${start}${served}Pages read it through \`${frontendPackage}\`'s atoms: a route's loader starts them (\`context.atoms.ensure\` or \`prefetch\`, from [raf-effect-atom](https://raf-effect-atom.katt.dev)) and its component reads them with \`useAtomResult\`. The server's results stream into the browser's registry, so the browser doesn't request them again. Requests go in-process while the server renders and over \`fetch\` in the browser (\`src/api-transport.ts\`).\n`;
+};
+
 export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);
   const varlock = usesVarlockPlugin(ctx);
   const api = servedApi(ctx.config, app);
-  const apiPackage = api === undefined ? '' : ctx.pkg(api.name);
+  const apiPackage = api === undefined ? undefined : ctx.pkg(api.name);
+  const frontend = api === undefined ? undefined : frontendFor(ctx.config, api);
+  const frontendPackage =
+    frontend === undefined ? undefined : ctx.pkg(frontend.name);
   const dependencies = [
     ...baseDependencies,
     ...(api === undefined ? [] : ['effect']),
+    ...(frontend === undefined
+      ? []
+      : ['@effect/atom-react', 'raf-effect-atom']),
   ];
   const devDependencies = [
     ...baseDevDependencies,
     ...(api === undefined ? [] : ['@effect/vitest']),
     ...(varlock ? ['@varlock/vite-integration', 'varlock'] : []),
   ];
+  const workspaceDependencies =
+    api === undefined
+      ? []
+      : [api.name, frontend === undefined ? contractName(api) : frontend.name];
   return {
     files: [
       workspacePackageJson(ctx, {
@@ -473,54 +670,60 @@ export const tanstackStart = (ctx: GenContext, app: App): Contribution => {
         },
         dependencies,
         devDependencies,
-        ...(api === undefined
-          ? {}
-          : { workspaceDependencies: [api.name, contractName(api)] }),
+        workspaceDependencies,
         // varlock reads `.env.schema` from the cwd unless told otherwise; the
         // schema lives at the repo root.
         ...(varlock ? { extra: { varlock: { loadPath: '../../' } } } : {}),
       }),
       packageTsconfig(dir, {
         react: true,
-        compilerOptions: { types: ['node', 'vite/client'] },
+        // An app emits no declarations, and asking for them makes tsc reject
+        // route types it can only name through a dependency's internals
+        // (TS2883, raf-effect-atom's Loader on the router context).
+        compilerOptions: {
+          declaration: false,
+          declarationMap: false,
+          types: ['node', 'vite/client'],
+        },
       }),
       vitestConfig(dir, { mergeViteConfig: true }),
-      owned(
-        `${dir}/vite.config.ts`,
-        viteConfig(ctx, api === undefined ? undefined : apiPackage),
+      owned(`${dir}/vite.config.ts`, viteConfig(ctx, apiPackage)),
+      seed(
+        `${dir}/src/router.tsx`,
+        frontendPackage === undefined
+          ? routerSource
+          : atomRouterSource(frontendPackage),
       ),
-      seed(`${dir}/src/router.tsx`, routerSource),
       seed(
         `${dir}/src/routeTree.gen.ts`,
         api === undefined ? routeTreeSource : servedRouteTreeSource,
       ),
-      seed(`${dir}/src/routes/__root.tsx`, rootRouteSource(app)),
+      seed(
+        `${dir}/src/routes/__root.tsx`,
+        frontend === undefined
+          ? rootRouteSource(app)
+          : atomRootRouteSource(app),
+      ),
       seed(
         `${dir}/src/routes/index.tsx`,
-        api === undefined ? indexRouteSource : servedIndexRouteSource,
+        api === undefined
+          ? indexRouteSource
+          : frontendPackage === undefined
+            ? servedIndexRouteSource
+            : atomIndexRouteSource(frontendPackage),
       ),
-      ...(api === undefined
+      ...(api === undefined || apiPackage === undefined
         ? []
-        : [
-            seed(`${dir}/src/api.server.ts`, apiServerSource(apiPackage)),
-            seed(`${dir}/src/routes/api.$.ts`, apiRouteSource),
-            seed(
-              `${dir}/src/api-client.ts`,
-              apiClientSource(ctx.pkg(contractName(api))),
-            ),
-            seed(`${dir}/test/api-client.test.ts`, apiClientTestSource),
-          ]),
+        : servedFiles(
+            dir,
+            apiPackage,
+            ctx.pkg(contractName(api)),
+            frontendPackage,
+          )),
       seed(`${dir}/src/components/welcome.tsx`, welcomeSource),
       seed(`${dir}/src/styles.css`, "@import 'tailwindcss';\n"),
       seed(`${dir}/test/welcome.test.tsx`, welcomeTestSource),
-      seed(
-        `${dir}/README.md`,
-        `# ${ctx.pkg(app.name)}\n\nTanStack Start app. \`bun run dev\` to develop, \`bun run build && bun run start\` to preview the production build.\n${
-          api === undefined
-            ? ''
-            : `\nIt serves \`${apiPackage}\` at \`/api\` (\`src/routes/api.$.ts\`) and deploys it. Loaders and components call it through \`callApi\` (\`src/api-client.ts\`): in-process while the server renders, over \`fetch\` in the browser.\n`
-        }`,
-      ),
+      seed(`${dir}/README.md`, readme(ctx, app, apiPackage, frontendPackage)),
     ],
     tasks: [
       {

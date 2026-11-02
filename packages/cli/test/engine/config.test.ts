@@ -18,7 +18,10 @@ const full: ShoemakerConfig = {
     { name: 'web', kind: 'tanstack-start', api: 'api' },
     { name: 'api', kind: 'effect-api' },
   ],
-  packages: [{ name: 'domain', kind: 'library' }],
+  packages: [
+    { name: 'domain', kind: 'library' },
+    { name: 'frontend', kind: 'frontend', api: 'api' },
+  ],
   taskRunner: 'nx',
   secrets: 'secretspec',
   infra: {
@@ -123,6 +126,37 @@ describe('shoemaker.config.ts', () => {
   ] as const)('rejects %s', ([, apps, message]) =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(roundTrip({ ...full, apps }));
+      assert.include(error.message, message);
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect.each([
+    [
+      'a frontend package without an API',
+      [{ name: 'frontend', kind: 'frontend' }],
+      'a frontend package names the effect-api app it calls',
+    ],
+    [
+      'a library with an API',
+      [{ name: 'domain', kind: 'library', api: 'api' }],
+      'only a frontend package calls an API',
+    ],
+    [
+      'a frontend package for a missing API',
+      [{ name: 'frontend', kind: 'frontend', api: 'web' }],
+      'web is not an effect-api app',
+    ],
+    [
+      'two frontend packages for one API',
+      [
+        { name: 'frontend', kind: 'frontend', api: 'api' },
+        { name: 'client', kind: 'frontend', api: 'api' },
+      ],
+      'api already has a frontend package',
+    ],
+  ] as const)('rejects %s', ([, packages, message]) =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(roundTrip({ ...full, packages }));
       assert.include(error.message, message);
     }).pipe(Effect.provide(BunServices.layer)),
   );

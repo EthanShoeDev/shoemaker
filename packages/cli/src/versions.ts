@@ -141,6 +141,8 @@ export const versions = {
   '@tanstack/router-plugin': '^1.168.48',
   '@tanstack/react-query': '^5.105.0',
   '@tanstack/react-router-ssr-query': '^1.167.3',
+  // Pre-1.0: pin minor.
+  'raf-effect-atom': '~0.3.3',
 
   // foldkit (pre-1.0: pin minor)
   foldkit: '~0.169.0',

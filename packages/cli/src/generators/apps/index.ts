@@ -3,6 +3,7 @@ import { effectApiGenerator } from './effect-api.ts';
 import { effectCliGenerator } from './effect-cli.ts';
 import { expoGenerator } from './expo.ts';
 import { foldkitGenerator } from './foldkit.ts';
+import { frontendGenerator } from './frontend.ts';
 import { libraryGenerator } from './library.ts';
 import { tanstackStartGenerator } from './tanstack-start.ts';
 
@@ -13,4 +14,5 @@ export const appGenerators: ReadonlyArray<Generator> = [
   effectApiGenerator,
   effectCliGenerator,
   libraryGenerator,
+  frontendGenerator,
 ];

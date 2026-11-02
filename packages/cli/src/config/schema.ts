@@ -14,7 +14,9 @@ export const AppKind = Schema.Literals([
 ]);
 export type AppKind = typeof AppKind.Type;
 
-export const PackageKind = Schema.Literals(['library']);
+// `frontend` is client code shared by the repo's frontends: the API's
+// endpoints as Effect atoms, with no React and no UI.
+export const PackageKind = Schema.Literals(['library', 'frontend']);
 export type PackageKind = typeof PackageKind.Type;
 
 export const TaskRunner = Schema.Literals(['turbo', 'nx']);
@@ -61,6 +63,8 @@ export type App = typeof App.Type;
 export const Package = Schema.Struct({
   name: KebabName,
   kind: PackageKind,
+  // frontend only: the effect-api app whose contract its atoms call.
+  api: Schema.optionalKey(KebabName),
 });
 export type Package = typeof Package.Type;
 
@@ -139,9 +143,41 @@ const contractProblem = (config: typeof ShoemakerConfigFields.Type) => {
   });
 };
 
+// Why a package's `api` can't name what it does: a frontend package without
+// one, a library with one, a missing or non-effect-api app, or a second
+// frontend package for the same API.
+const frontendProblem = (config: typeof ShoemakerConfigFields.Type) => {
+  const apis = new Set(
+    Arr.map(
+      Arr.filter(config.apps, (app) => app.kind === 'effect-api'),
+      (app) => app.name,
+    ),
+  );
+  const claimed = new Set<string>();
+  for (const pkg of config.packages) {
+    if (pkg.kind === 'library') {
+      if (pkg.api !== undefined)
+        return `packages.${pkg.name}.api: only a frontend package calls an API`;
+      continue;
+    }
+    if (pkg.api === undefined)
+      return `packages.${pkg.name}: a frontend package names the effect-api app it calls (api)`;
+    if (!apis.has(pkg.api))
+      return `packages.${pkg.name}.api: ${pkg.api} is not an effect-api app`;
+    if (claimed.has(pkg.api))
+      return `packages.${pkg.name}.api: ${pkg.api} already has a frontend package`;
+    claimed.add(pkg.api);
+  }
+  return undefined;
+};
+
 export const ShoemakerConfig = ShoemakerConfigFields.check(
   Schema.makeFilter(
-    (config) => mountProblem(config) ?? contractProblem(config) ?? true,
+    (config) =>
+      mountProblem(config) ??
+      contractProblem(config) ??
+      frontendProblem(config) ??
+      true,
   ),
 );
 export type ShoemakerConfig = typeof ShoemakerConfig.Type;

@@ -85,6 +85,7 @@ const configLines = (config: ShoemakerConfig): ReadonlyArray<Line> => [
     Arr.map(config.packages, (pkg) => [
       prop('name', pkg.name),
       prop('kind', pkg.kind),
+      ...(pkg.api === undefined ? [] : [prop('api', pkg.api)]),
     ]),
   ),
   prop('taskRunner', config.taskRunner),
