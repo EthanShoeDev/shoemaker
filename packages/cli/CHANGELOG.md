@@ -1,5 +1,62 @@
 # shoemaker
 
+## 0.2.6
+
+### Patch Changes
+
+- [`f0238e6`](https://github.com/EthanShoeDev/shoemaker/commit/f0238e68353ceaecd1220aad8154b22cd175f899) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - TanStack Start apps get `@babel/core` `^7.29.0` again, not `^8`. With bun's
+  hoisted linker the web app's Babel lands at the root, Metro loads it, and
+  Expo's Babel 7 presets refuse it, so an Expo app beside a web app could not
+  bundle (`Requires Babel "^7.0.0-0", but was loaded with "8.0.10"`).
+  `@rolldown/plugin-babel` and the React Compiler work with either. The weekly
+  version update holds `@babel/core` there, and the e2e test now bundles every
+  Expo app with `expo export`.
+  
+  Existing repos (for a coding agent). `sync` keeps a dependency version a repo
+  raised, so it leaves `^8` in place:
+  
+  1. In the root `package.json` `workspaces.catalog`, set `@babel/core` to
+     `^7.29.0`.
+  2. Run `bun install` and confirm `node_modules/@babel/core/package.json` is
+     7.x.
+  3. If the repo has an Expo app, run
+     `bunx expo export --platform android --output-dir /tmp/expo-bundle` in it;
+     it must bundle without a Babel version error.
+
+- [`f0238e6`](https://github.com/EthanShoeDev/shoemaker/commit/f0238e68353ceaecd1220aad8154b22cd175f899) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Generated repos get newer dependency versions:
+  
+  - `effect`: 4.1.1 → 4.1.2
+  - `@effect/tsgo`: 0.63.0 → 0.64.1
+  - `@tanstack/eslint-plugin-query`: ^5.105.1 → ^5.105.3
+  - `eslint-plugin-playwright`: ^2.12.1 → ^2.12.2
+  - `vitest`: ^5.0.5 → ^5.1.0
+  - `@vitejs/plugin-react`: ^6.1.2 → ^6.2.1
+  - `@tanstack/react-query`: ^5.105.1 → ^5.105.3
+  
+  `@effect/tsgo` 0.64 adds `yield-in-call-argument` and stops reporting
+  `strict-effect-provide` at an entry point, so the library seed test now yields
+  into a const and the Effect CLI seed `bin.ts` drops its disable directive.
+  
+  Existing repos (for a coding agent). Those seeds are not rewritten by `sync`:
+  
+  1. Run `bun run shoemaker:sync`, then `bun install`. A version the repo
+     already raised past these stays as it is.
+  2. Run the repo's lint check. For each `effecttsgo(yield-in-call-argument)`
+     error, move the `yield*` into a `const` on the line before and pass the
+     const instead, e.g. `const greeting = yield* greeter.greet('Ada');`.
+  3. For each "Unused oxlint-disable directive" error on an
+     `effecttsgo/strict-effect-provide` line (usually `apps/<cli>/src/bin.ts`),
+     delete that comment line.
+  4. Run the lint check and tests again; both must pass.
+
+- [`f0238e6`](https://github.com/EthanShoeDev/shoemaker/commit/f0238e68353ceaecd1220aad8154b22cd175f899) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - `sync` writes a generated file the repo's formatter ignores exactly as
+  rendered. It used to format `apps/<app>/uniwind-types.d.ts` anyway, so the seed
+  was not the bytes Uniwind writes and the first Metro bundle changed it. The
+  seed only lands in new repos; in an existing one, the next bundle rewrites the
+  file once, and that change can be committed.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.6
+
 ## 0.2.5
 
 ### Patch Changes
