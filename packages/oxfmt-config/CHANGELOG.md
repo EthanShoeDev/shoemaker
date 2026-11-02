@@ -1,5 +1,13 @@
 # shoemaker-oxfmt-config
 
+## 0.2.5
+
+### Patch Changes
+
+- [`c1baaaf`](https://github.com/EthanShoeDev/shoemaker/commit/c1baaaf7a7753bd0dc4bfa5163176fb3fcdab883) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - The formatter and jscpd skip drizzle-kit's migration snapshots
+  (`**/migrations/*/snapshot.json`). They are generated, and each repeats most of
+  the one before, so a repo's second migration failed `jscpd:check`.
+
 ## 0.2.4
 
 No changes in this release.
