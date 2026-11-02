@@ -1,5 +1,175 @@
 # shoemaker
 
+## 0.2.4
+
+### Patch Changes
+
+- [`391ac9d`](https://github.com/EthanShoeDev/shoemaker/commit/391ac9d1cb7005adeef430b0f4d87ea909531cd3) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - An Expo app can opt into Android releases that
+  [Obtainium](https://obtainium.imranr.dev) installs and updates from:
+  `{ name: 'mobile', kind: 'expo', androidRelease: { package: 'dev.example.mobile' } }`.
+  It needs `features.changesets` and `ci: 'github'`. Merging the "chore: version
+  packages" PR then tags the app (`changeset git-tag`), and
+  `.github/workflows/release.yml` builds a signed APK with Gradle and publishes
+  it as that tag's GitHub Release.
+  
+  Every repo with an Expo app gets an `android` nix dev shell
+  (`nix develop .#android`): the default shell plus the Android SDK, NDK, CMake
+  and JDK 17 from [android-nixpkgs](https://github.com/tadfisher/android-nixpkgs),
+  pinned in `nix/android.nix` (owned) to what the Expo SDK's React Native builds
+  with. The flake gains the `android-nixpkgs` input, its binary cache and
+  `allowUnfree` (the SDK is unfree). Gradle uses the SDK's `aapt2` and downloads
+  no SDK packages, so builds work on NixOS. The new `android-dev-shell` doctor
+  check flags a flake that does not expose it.
+  
+  - `apps/<app>/android-release.ts` (owned) exports `withAndroidRelease`. It
+    sets `version` and `android.versionCode` (1.2.3 is 1002003) from
+    `package.json` and `android.package` from the config. Its config plugin
+    signs release builds with an upload key read from
+    `<APP>_ANDROID_KEYSTORE_BASE64`, `<APP>_ANDROID_KEYSTORE_PASSWORD` and
+    `<APP>_ANDROID_KEY_ALIAS`, and a release build fails if the key is
+    missing.
+  - Those variables are declared in `.env.schema` / `secretspec.toml`. The
+    workflow reads them from GitHub Actions secrets. The root `apk:<app>`
+    script loads them through the secrets manager and builds the same APK
+    locally (`build:apk` in the app). The script and the workflow both build in
+    the `android` dev shell.
+  - The new `android-release` doctor check flags an opted-in app whose
+    `app.config.ts` does not use `withAndroidRelease`, or a changesets config
+    that does not tag private packages.
+  
+  `sync` also treats a package's own `version` as a floor, like dependency
+  versions: it no longer resets a version changesets bumped back to `0.0.0`, and
+  the bump no longer makes package.json look hand-edited.
+  
+  Every Expo app's `ios` / `android` scripts are now `expo start -i` /
+  `expo start -a`. They do the same thing, but `expo prebuild` rewrites the
+  long forms to `expo run:*`, which made package.json look hand-edited.
+  
+  Existing repos with an Expo app (for a coding agent). `sync` writes
+  `nix/android.nix` but leaves the flake outside its regions alone:
+  
+  1. In `flake.nix`, replace `inputs.nixpkgs.url = ...;` with an `inputs` set
+     holding the same `nixpkgs.url` plus
+     `android-nixpkgs = { url = "github:tadfisher/android-nixpkgs"; inputs.nixpkgs.follows = "nixpkgs"; };`.
+     Add
+     `nixConfig = { extra-substituters = ["https://android-nixpkgs.cachix.org"]; extra-trusted-public-keys = ["android-nixpkgs.cachix.org-1:2lZoPmwoyTVGaNDHqa6A32tdn8Gc0aMWBRrfXN1H3dQ="]; };`.
+  2. Add `android-nixpkgs` to the `outputs` arguments. Where `forAllSystems`
+     imports nixpkgs, use
+     `overlays = [bunOverlay android-nixpkgs.overlays.default];` and add
+     `config.allowUnfree = true;`.
+  3. Make the `devShells` set `rec` and add
+     `android = import ./nix/android.nix {inherit pkgs default;};` after
+     `default`.
+  4. Run `nix flake lock`, `nix fmt`, and `nix develop .#android --command true`,
+     then commit `flake.lock`. `bunx shoemaker doctor .` runs the
+     `android-dev-shell` check.
+  
+  Then, for the app that should ship Android releases (`mobile` stands for the
+  app, `MOBILE` for its name in SCREAMING_SNAKE_CASE, `@scope` for the repo's
+  scope):
+  
+  1. Make sure `features.changesets` is `true` and `ci` is `'github'` in
+     `shoemaker.config.ts`, add
+     `androidRelease: { package: '<application id>' }` to the app's entry, and
+     run `bun run shoemaker:sync`. The application id can never change once
+     people install the app. If the app already ships to Play, use its
+     existing id.
+  2. In `apps/mobile/app.config.ts`, add
+     `import { withAndroidRelease } from './android-release.ts';`, delete
+     `version` (and any `android.package` / `android.versionCode`), and change
+     the default export to `export default withAndroidRelease(config);`.
+  3. In `.changeset/config.json`, add
+     `"privatePackages": { "version": true, "tag": true }`.
+  4. If `apps/mobile/android/` is committed (not prebuilt), stop:
+     `build:apk` runs `expo prebuild --clean`, which regenerates it. Ask the
+     user before going further.
+  5. Ask the user for the upload keystore, or have them create one with the
+     `keytool` command in the app README's "Android releases" section. Have them
+     store the three `MOBILE_ANDROID_*` values as GitHub Actions secrets and in
+     the secrets manager. Never commit the keystore.
+  6. Run `bun run shoemaker:sync`, then `bunx shoemaker doctor .` (the
+     `android-release` check must pass), `bun install`, and the repo's
+     `lint:check`, `typecheck` and `test`.
+
+- [`391ac9d`](https://github.com/EthanShoeDev/shoemaker/commit/391ac9d1cb7005adeef430b0f4d87ea909531cd3) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - `doctor`, `adopt` and `check` skip gitignored files. In a git repo they only
+  read what `git ls-files --cached --others --exclude-standard` lists, so cloned
+  reference repos (`docs/cloned-repos-as-docs/`, `.external/`) and build output
+  no longer produce findings. Outside git they read every file except
+  `node_modules`, `.git`, `dist`, `.turbo`, `.external` and `.direnv`, as before.
+  Globs go through Effect's `FileSystem.glob`, which skips those directories
+  without reading them, in place of `Bun.Glob`, which walked all of
+  `node_modules` and filtered afterwards.
+  
+  `doctor` and `adopt` now work on Windows. `Bun.Glob` returned
+  backslash-separated paths there, so every package's folder came out empty,
+  `adopt` found no apps or packages, and the doctor printed backslash paths.
+  `FileSystem.glob` and git both return `/`-separated paths, and the repo's name
+  comes from `Path.basename` instead of splitting the root on `/`.
+  
+  The `turbo-fix-uncached` check no longer flags a fix task that a package opts
+  out of with `"command": null`, since it runs nothing.
+
+- [`c1546c7`](https://github.com/EthanShoeDev/shoemaker/commit/c1546c7e82d04d561a1fce4d5411b01b0f5a007a) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Expo apps style with [Uniwind](https://uniwind.dev): Tailwind `className`s on
+  React Native components, compiled by Metro. `metro.config.ts` (owned) wraps
+  the config in `withUniwindConfig`. The app gains `uniwind` and `tailwindcss`,
+  a seeded `global.css` that the layout imports, and a seeded
+  `uniwind-types.d.ts`. The seed holds the exact bytes Uniwind writes, so
+  `className` typechecks before Metro has run, and lint and format skip the
+  file. The app's tsconfig adds `expo/types`, which declares CSS imports. Expo
+  otherwise reaches that only through the gitignored `expo-env.d.ts`. The
+  starter screen uses classes instead of `StyleSheet`.
+  
+  A repo with more than one UI app (TanStack Start, Foldkit or Expo) gets
+  `packages/theme`, a CSS-only package:
+  
+  - `tokens.css` (seed) declares each color in `@theme` and sets it under
+    `@variant light` and `@variant dark`, with shadcn/ui's names and neutral
+    values, plus the radii.
+  - `web.css` (owned) imports the tokens and defines the `light` and `dark`
+    variants the way Uniwind does on native.
+  - Web apps import `@<scope>/theme/web.css` and Expo apps import
+    `@<scope>/theme/tokens.css`, so `bg-background` is one color everywhere. A
+    `.light` or `.dark` class picks the theme; otherwise the system setting
+    does.
+  - The package opts out of `typecheck`, `test` and `oxlint`. A package task
+    can now set `command: null`, rendered as `"command": null` in its
+    `turbo.jsonc`; under nx the package gets no script or target.
+  - `theme` is a reserved name in such a repo.
+  
+  Two new doctor checks:
+  
+  - `theme-tokens` flags a stylesheet whose theme variants do not all set the
+    same variables, which Uniwind reports at bundle time. In
+    `packages/theme/tokens.css` it also flags a themed color missing from
+    `@theme` (so it has no web utility) and directives Uniwind cannot parse
+    (`@plugin`, `@source`, `@custom-variant`, `@config`, `source()`).
+  - `theme-imports` flags a Tailwind or Uniwind app that does not depend on and
+    import the theme package.
+  
+  Existing repos (for a coding agent). `sync` writes the new files, but never
+  edits the seeds that already exist:
+  
+  1. In each Expo app's `app/_layout.tsx`, add `import '../global.css';` as the
+     first import. If the app already styled with Uniwind or NativeWind from
+     another stylesheet, merge that stylesheet into `global.css` and delete it.
+  2. With more than one UI app, add `@import '@<scope>/theme/web.css';` after
+     `@import 'tailwindcss';` in each web app's `src/styles.css`. Move any
+     colors the apps already share into `packages/theme/tokens.css` under the
+     same names in both variants, and delete them from the apps.
+  3. Run `shoemaker doctor` and fix any `theme-tokens` or `theme-imports`
+     findings.
+
+- [`391ac9d`](https://github.com/EthanShoeDev/shoemaker/commit/391ac9d1cb7005adeef430b0f4d87ea909531cd3) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - `sync` no longer shortens a list in a file it merges into (`package.json`)
+  when it has no baseline for that file, as in a repo being adopted. Every entry
+  in such a file is the user's, so instead of replacing the list it reports a
+  conflict naming the entries it would drop (`/workspaces: "tools/*"`), and
+  `--force` does not override that: remove them by hand first. Adding entries,
+  and shortening a list shoemaker wrote itself, work as before. Files shoemaker
+  owns whole (`turbo.jsonc`, tsconfigs, `vitest.config.ts`) are still replaced
+  by `--force`.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.4
+
 ## 0.2.3
 
 ### Patch Changes
