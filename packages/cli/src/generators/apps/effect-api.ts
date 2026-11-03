@@ -1,6 +1,5 @@
 import type { App } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
-import { deployTarget } from '../infra/target.ts';
 import {
   owned,
   packageTsconfig,
@@ -16,12 +15,12 @@ import {
   pascalCase,
   vitestConfig,
 } from './common.ts';
-import { contractName, isServed } from './mount.ts';
+import { apiRuntimes, contractName, isServed } from './mount.ts';
 
-const dependencies = ['@effect/platform-bun', 'effect'];
+const bunDependencies = ['@effect/platform-bun'];
 const contractDependencies = ['effect'];
 const workerDependencies = ['@alchemy.run/cloudflare', 'alchemy'];
-const devDependencies = [...effectTestDevDependencies, 'tsdown'];
+const bunDevDependencies = ['tsdown'];
 
 const portKey = 'PORT';
 
@@ -186,13 +185,36 @@ export default defineConfig({
 });
 `;
 
+const readme = (
+  ctx: GenContext,
+  app: App,
+  contract: string,
+  served: boolean,
+  bun: boolean,
+) => {
+  const title = `# ${ctx.pkg(app.name)}\n\n`;
+  if (served)
+    return `${title}Implements the Effect HttpApi in \`${contract}\`, served at \`/api\` by the site that mounts it and deployed with it. \`bun run dev\` also serves it alone on \`$PORT\` (default 3000); try \`/api/health\` and \`/api/greetings/Ada\`.\n`;
+  if (!bun)
+    return `${title}Effect HttpApi for \`${contract}\`, deployed as a Cloudflare Worker by the root \`alchemy.run.ts\`. \`bun run infra:dev\` runs it locally; try \`/health\` and \`/greetings/Ada\`.\n`;
+  return `${title}Effect HttpApi server for \`${contract}\`. \`bun run dev\` serves it on \`$PORT\` (default 3000); try \`/health\` and \`/greetings/Ada\`.\n`;
+};
+
 export const effectApi = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);
   const contractDir = packageDir({ name: contractName(app) });
   const contract = ctx.pkg(contractName(app));
   const served = isServed(ctx.config, app);
-  // A served API deploys inside its site, not as a Worker of its own.
-  const worker = deployTarget(ctx.config) === 'cloudflare' && !served;
+  const { bun, worker } = apiRuntimes(ctx.config, app);
+  const dependencies = [
+    ...(bun ? bunDependencies : []),
+    'effect',
+    ...(worker ? workerDependencies : []),
+  ];
+  const devDependencies = [
+    ...effectTestDevDependencies,
+    ...(bun ? bunDevDependencies : []),
+  ];
   return {
     files: [
       workspacePackageJson(ctx, {
@@ -203,30 +225,29 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
           ...(served ? { './handlers': './src/handlers.ts' } : {}),
           ...(worker ? { './worker': './src/worker.ts' } : {}),
         },
-        scripts: {
-          dev: 'bun --watch src/bin.ts',
-          build: 'tsdown',
-          start: 'bun dist/bin.mjs',
-        },
-        dependencies: worker
-          ? [...dependencies, ...workerDependencies]
-          : dependencies,
+        scripts: bun
+          ? {
+              dev: 'bun --watch src/bin.ts',
+              build: 'tsdown',
+              start: 'bun dist/bin.mjs',
+            }
+          : {},
+        dependencies,
         devDependencies,
         workspaceDependencies: [contractName(app)],
       }),
       packageTsconfig(dir),
       vitestConfig(dir),
-      owned(`${dir}/tsdown.config.ts`, tsdownConfig),
+      ...(bun
+        ? [
+            owned(`${dir}/tsdown.config.ts`, tsdownConfig),
+            seed(`${dir}/src/bin.ts`, binSource),
+          ]
+        : []),
       seed(`${dir}/src/handlers.ts`, handlersSource(contract)),
-      seed(`${dir}/src/bin.ts`, binSource),
       ...(worker ? [seed(`${dir}/src/worker.ts`, workerSource(app))] : []),
       seed(`${dir}/test/api.test.ts`, testSource(contract)),
-      seed(
-        `${dir}/README.md`,
-        served
-          ? `# ${ctx.pkg(app.name)}\n\nImplements the Effect HttpApi in \`${contract}\`, served at \`/api\` by the site that mounts it and deployed with it. \`bun run dev\` also serves it alone on \`$PORT\` (default 3000); try \`/api/health\` and \`/api/greetings/Ada\`.\n`
-          : `# ${ctx.pkg(app.name)}\n\nEffect HttpApi server for \`${contract}\`. \`bun run dev\` serves it on \`$PORT\` (default 3000); try \`/health\` and \`/greetings/Ada\`.\n`,
-      ),
+      seed(`${dir}/README.md`, readme(ctx, app, contract, served, bun)),
       workspacePackageJson(ctx, {
         dir: contractDir,
         name: contractName(app),
@@ -243,32 +264,31 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
         `# ${contract}\n\nThe HttpApi contract for \`${ctx.pkg(app.name)}\`: its endpoints and schemas. Clients depend on this package, never on the server, so any app can call the API with \`HttpApiClient.make(Api)\`.\n`,
       ),
     ],
-    tasks: [
-      {
-        name: 'start',
-        package: ctx.pkg(app.name),
-        dependsOn: ['build'],
-        persistent: true,
-        cache: false,
-      },
-    ],
-    env: [
-      {
-        key: portKey,
-        description: 'Port the HTTP API listens on',
-        required: false,
-        sensitive: false,
-        default: '3000',
-        type: 'port',
-        tags: [app.name],
-      },
-    ],
-    catalog: catalogOf(
-      dependencies,
-      contractDependencies,
-      devDependencies,
-      worker ? workerDependencies : [],
-    ),
+    tasks: bun
+      ? [
+          {
+            name: 'start',
+            package: ctx.pkg(app.name),
+            dependsOn: ['build'],
+            persistent: true,
+            cache: false,
+          },
+        ]
+      : [],
+    env: bun
+      ? [
+          {
+            key: portKey,
+            description: 'Port the HTTP API listens on',
+            required: false,
+            sensitive: false,
+            default: '3000',
+            type: 'port',
+            tags: [app.name],
+          },
+        ]
+      : [],
+    catalog: catalogOf(dependencies, contractDependencies, devDependencies),
   };
 };
 

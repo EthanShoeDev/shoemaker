@@ -1,4 +1,4 @@
-import type { App } from '../../config/schema.ts';
+import { type App, renderingOf } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
 import {
   owned,
@@ -15,8 +15,10 @@ import {
 } from './common.ts';
 import { appStylesheet, themeDependency } from './theme.ts';
 
-// Mirrors create-foldkit-app's SPA template (base + counter example),
-// minus @foldkit/ui so the starter has no component library to unpick.
+// Mirrors create-foldkit-app's templates: `ssr` its SSG template (a server
+// entry whose listed paths are prerendered; the host renders the rest), `spa`
+// its SPA template (base + counter example). Both leave out @foldkit/ui so the
+// starter has no component library to unpick.
 const dependencies = ['@effect/platform-browser', 'effect', 'foldkit'];
 const devDependencies = [
   ...toolchainDevDependencies,
@@ -28,12 +30,37 @@ const devDependencies = [
   'vite',
 ];
 
-const viteConfig = `import { foldkit } from '@foldkit/vite-plugin';
+const spaViteConfig = `import { foldkit } from '@foldkit/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [tailwindcss(), foldkit()],
+  optimizeDeps: {
+    entries: ['src/entry.ts'],
+  },
+});
+`;
+
+// Prerendering builds each page's Request.url on the site's own origin when
+// it has one, so canonical and Open Graph URLs derived from it are right.
+const ssrViteConfig = (
+  app: App,
+) => `import { foldkit } from '@foldkit/vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [
+    tailwindcss(),
+    foldkit({
+      ssr: {
+        serverEntry: '/src/entry.server.ts',
+        clientEntry: '/src/entry.ts',
+        build: { prerender: ${app.domain === undefined ? 'true' : `{ origin: 'https://${app.domain}' }`} },
+      },
+    }),
+  ],
   optimizeDeps: {
     entries: ['src/entry.ts'],
   },
@@ -56,7 +83,7 @@ const indexHtml = (app: App) => `<!doctype html>
 
 // Imported here (as foldkit's SSR/SSG examples do) rather than linked from
 // index.html, so Vite and knip both trace the stylesheet from the entry.
-const entrySource = `import { Runtime } from 'foldkit';
+const spaEntrySource = `import { Runtime } from 'foldkit';
 
 import { Message, Model, init, update, view } from './main.ts';
 import './styles.css';
@@ -73,7 +100,7 @@ const application = Runtime.makeApplication({
 Runtime.run(application);
 `;
 
-const mainSource = `import { Schema } from 'effect';
+const spaMainSource = `import { Schema } from 'effect';
 import type { Runtime, Update } from 'foldkit';
 import type { Document, HtmlBuilder } from 'foldkit/html';
 import { defineMessageUnion } from 'foldkit/message';
@@ -148,7 +175,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
 });
 `;
 
-const storyTestSource = `import { Command, given, message, model, story } from 'foldkit/story';
+const spaStoryTestSource = `import { Command, given, message, model, story } from 'foldkit/story';
 import { describe, expect, test } from 'vitest';
 
 import { Message, type Model, update } from './main.ts';
@@ -182,7 +209,7 @@ describe('update', () => {
 `;
 
 // Namespaced so foldkit's scene \`expect\` is not mistaken for vitest's.
-const sceneTestSource = `import * as Scene from 'foldkit/scene';
+const spaSceneTestSource = `import * as Scene from 'foldkit/scene';
 import { describe, test } from 'vitest';
 
 import { type Model, update, view } from './main.ts';
@@ -202,6 +229,317 @@ describe('view', () => {
 });
 `;
 
+const routeSource = `import { Schema, pipe } from 'effect';
+import { Route } from 'foldkit';
+import { defineRouteUnion, literal } from 'foldkit/route';
+
+export const AppRoute = defineRouteUnion({
+  Home: {},
+  About: {},
+  NotFound: { path: Schema.String },
+});
+export type AppRoute = typeof AppRoute.Type;
+
+export const homeRouter = pipe(Route.root, Route.mapTo(AppRoute.Home));
+export const aboutRouter = pipe(literal('about'), Route.mapTo(AppRoute.About));
+
+const routeParser = Route.oneOf(aboutRouter, homeRouter);
+
+export const urlToAppRoute = Route.parseUrlWithFallback(
+  routeParser,
+  AppRoute.NotFound,
+);
+`;
+
+// The server entry @foldkit/vite-plugin builds: \`vite build\` writes a page
+// for each of \`prerenderPaths\`, and the deployed host renders any other
+// request with \`renderPage\`, answering unknown routes with a 404.
+const entryServerSource = `import { Effect, Option } from 'effect';
+import { Server } from 'foldkit/experimental';
+import { fromString } from 'foldkit/url';
+
+import { init, view } from './main.ts';
+import { AppRoute, urlToAppRoute } from './route.ts';
+
+const HTTP_NOT_FOUND = 404;
+
+export const renderDocument = Server.renderDocument;
+
+export const prerenderPaths: ReadonlyArray<string> = ['/', '/about'];
+
+const isNotFound = (url: string) =>
+  Option.exists(
+    Option.map(fromString(url), urlToAppRoute),
+    AppRoute.isAnyOf(['NotFound']),
+  );
+
+export const renderPage = (request: Request): Promise<Server.EntryResult> =>
+  Effect.runPromise(
+    Server.renderToString(
+      { routing: {}, init, view },
+      { url: request.url },
+    ).pipe(
+      Effect.map((application) =>
+        isNotFound(request.url)
+          ? Server.Rendered(application, { status: HTTP_NOT_FOUND })
+          : Server.Rendered(application),
+      ),
+    ),
+  );
+`;
+
+const ssrEntrySource = `import { Runtime } from 'foldkit';
+
+import { Message, Model, init, update, view } from './main.ts';
+import './styles.css';
+
+const application = Runtime.makeApplication({
+  Model,
+  init,
+  update,
+  view,
+  container: document.querySelector('#root'),
+  routing: {
+    onUrlRequest: (request) => Message.ClickedLink({ request }),
+    onUrlChange: (url) => Message.ChangedUrl({ url }),
+  },
+  devTools: { Message },
+});
+
+Runtime.hydrate(application);
+`;
+
+const ssrMainSource = (
+  app: App,
+) => `import { Effect, Schema, pipe } from 'effect';
+import { Command, type Runtime, type Update } from 'foldkit';
+import type { Document, Html, HtmlBuilder } from 'foldkit/html';
+import { defineMessageUnion } from 'foldkit/message';
+import { UrlRequest, load, pushUrl } from 'foldkit/navigation';
+import { modifyFields } from 'foldkit/struct';
+import { Url, toString as urlToString } from 'foldkit/url';
+
+import { AppRoute, aboutRouter, homeRouter, urlToAppRoute } from './route.ts';
+
+// MODEL
+
+export const Model = Schema.Struct({
+  route: AppRoute,
+  count: Schema.Finite,
+});
+export type Model = typeof Model.Type;
+
+// MESSAGE
+
+export const Message = defineMessageUnion({
+  ClickedIncrement: {},
+  ClickedLink: { request: UrlRequest },
+  ChangedUrl: { url: Url },
+  CompletedNavigateInternal: {},
+  CompletedLoadExternal: {},
+});
+export type Message = typeof Message.Type;
+
+// INIT
+
+export const init: Runtime.RoutingApplicationInit<Model, Message> = (url) => ({
+  model: { route: urlToAppRoute(url), count: 0 },
+});
+
+// COMMAND
+
+const NavigateInternal = Command.define('NavigateInternal', {
+  args: { url: Schema.String },
+  messages: [Message.CompletedNavigateInternal],
+  execute: ({ url }) =>
+    pushUrl(url).pipe(Effect.as(Message.CompletedNavigateInternal())),
+});
+
+const LoadExternal = Command.define('LoadExternal', {
+  args: { href: Schema.String },
+  messages: [Message.CompletedLoadExternal],
+  execute: ({ href }) =>
+    load(href).pipe(Effect.as(Message.CompletedLoadExternal())),
+});
+
+// UPDATE
+
+type UpdateReturn = Update.Return<Model, Message>;
+
+export const update = (model: Model, message: Message) =>
+  Message.match<UpdateReturn>(message, {
+    ClickedIncrement: () => ({
+      model: modifyFields(model, { count: (count) => count + 1 }),
+    }),
+    ClickedLink: ({ request }) =>
+      UrlRequest.match<UpdateReturn>(request, {
+        Internal: ({ url }) => ({
+          model,
+          commands: [NavigateInternal({ url: urlToString(url) })],
+        }),
+        External: ({ href }) => ({
+          model,
+          commands: [LoadExternal({ href })],
+        }),
+      }),
+    ChangedUrl: ({ url }) => ({
+      model: modifyFields(model, { route: () => urlToAppRoute(url) }),
+    }),
+    CompletedNavigateInternal: () => ({ model }),
+    CompletedLoadExternal: () => ({ model }),
+  });
+
+// VIEW
+
+const routeTitle = (route: AppRoute) =>
+  pipe(
+    AppRoute.match(route, {
+      Home: () => 'Home',
+      About: () => 'About',
+      NotFound: () => 'Not Found',
+    }),
+    (page) => \`\${page} | ${app.name}\`,
+  );
+
+const navigationView = (h: HtmlBuilder<Message>): Html =>
+  h.nav(
+    [h.Class('flex gap-4')],
+    [
+      h.a([h.Href(homeRouter()), h.Class('underline')], ['Home']),
+      h.a([h.Href(aboutRouter()), h.Class('underline')], ['About']),
+    ],
+  );
+
+const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
+  AppRoute.match(model.route, {
+    Home: () =>
+      h.section(
+        [h.Class('grid gap-4')],
+        [
+          h.h1([h.Class('text-4xl font-bold')], ['Home']),
+          h.p(
+            [],
+            ['This page was rendered during the build and hydrated in place.'],
+          ),
+          h.button(
+            [
+              h.OnClick(Message.ClickedIncrement()),
+              h.Class('w-fit bg-black px-4 py-2 text-white hover:bg-gray-700'),
+            ],
+            [\`Count: \${model.count}\`],
+          ),
+        ],
+      ),
+    About: () =>
+      h.section(
+        [h.Class('grid gap-4')],
+        [
+          h.h1([h.Class('text-4xl font-bold')], ['About']),
+          h.p([], ['The same renderPage function prerendered this page.']),
+        ],
+      ),
+    NotFound: ({ path }) =>
+      h.section(
+        [h.Class('grid gap-4')],
+        [
+          h.h1([h.Class('text-4xl font-bold')], ['Not found']),
+          h.p([], [\`Nothing lives at \${path}.\`]),
+        ],
+      ),
+  });
+
+export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
+  title: routeTitle(model.route),
+  body: h.main(
+    [h.Class('mx-auto grid min-h-screen max-w-3xl content-center gap-10 p-8')],
+    [navigationView(h), pageView(model, h)],
+  ),
+});
+`;
+
+const ssrStoryTestSource = `import { Command, given, message, model, story } from 'foldkit/story';
+import { describe, expect, test } from 'vitest';
+
+import { Message, type Model, update } from './main.ts';
+import { AppRoute } from './route.ts';
+
+const initialModel: Model = { route: AppRoute.Home(), count: 0 };
+
+describe('update', () => {
+  test('ClickedIncrement adds one to the count', () => {
+    story(
+      update,
+      given(initialModel),
+      message(Message.ClickedIncrement()),
+      Command.expectNone(),
+      model((next) => {
+        expect(next.count).toBe(1);
+      }),
+    );
+  });
+});
+`;
+
+// Namespaced so foldkit's scene \`expect\` is not mistaken for vitest's.
+const ssrSceneTestSource = `import * as Scene from 'foldkit/scene';
+import { describe, test } from 'vitest';
+
+import { type Model, update, view } from './main.ts';
+import { AppRoute } from './route.ts';
+
+const initialModel: Model = { route: AppRoute.Home(), count: 0 };
+
+describe('view', () => {
+  test('clicking the counter increments the count', () => {
+    Scene.scene(
+      { update, view },
+      Scene.given(initialModel),
+      Scene.click(Scene.role('button', { name: 'Count: 0' })),
+      Scene.expect(Scene.role('button', { name: 'Count: 1' })).toExist(),
+    );
+  });
+
+  test('an unknown path renders the not-found page', () => {
+    Scene.scene(
+      { update, view },
+      Scene.given({ ...initialModel, route: AppRoute.NotFound({ path: '/nope' }) }),
+      Scene.expect(Scene.text('Not found')).toExist(),
+    );
+  });
+});
+`;
+
+// The seeds each rendering starts from.
+const sources = (ctx: GenContext, app: App) => {
+  const dir = appDir(app);
+  return renderingOf(app) === 'ssr'
+    ? [
+        owned(`${dir}/vite.config.ts`, ssrViteConfig(app)),
+        seed(`${dir}/src/entry.ts`, ssrEntrySource),
+        seed(`${dir}/src/entry.server.ts`, entryServerSource),
+        seed(`${dir}/src/route.ts`, routeSource),
+        seed(`${dir}/src/main.ts`, ssrMainSource(app)),
+        seed(`${dir}/src/story.test.ts`, ssrStoryTestSource),
+        seed(`${dir}/src/scene.test.ts`, ssrSceneTestSource),
+        seed(
+          `${dir}/README.md`,
+          `# ${ctx.pkg(app.name)}\n\n[Foldkit](https://foldkit.dev) site. \`vite build\` prerenders the paths \`src/entry.server.ts\` lists, and the deployed host renders every other request with the same entry. \`bun run dev\` to develop.\n`,
+        ),
+      ]
+    : [
+        owned(`${dir}/vite.config.ts`, spaViteConfig),
+        seed(`${dir}/index.html`, indexHtml(app)),
+        seed(`${dir}/src/entry.ts`, spaEntrySource),
+        seed(`${dir}/src/main.ts`, spaMainSource),
+        seed(`${dir}/src/story.test.ts`, spaStoryTestSource),
+        seed(`${dir}/src/scene.test.ts`, spaSceneTestSource),
+        seed(
+          `${dir}/README.md`,
+          `# ${ctx.pkg(app.name)}\n\n[Foldkit](https://foldkit.dev) single-page app. \`bun run dev\` to develop.\n`,
+        ),
+      ];
+};
+
 export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);
   return {
@@ -212,7 +550,11 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
         scripts: {
           dev: 'vite',
           build: 'vite build',
-          start: 'vite preview',
+          // An ssr build writes the browser half to dist/client.
+          start:
+            renderingOf(app) === 'ssr'
+              ? 'vite preview --outDir dist/client'
+              : 'vite preview',
         },
         dependencies,
         devDependencies,
@@ -235,20 +577,11 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
           "server: { deps: { inline: ['foldkit', '@foldkit/devtools'] } }",
         ],
       }),
-      owned(`${dir}/vite.config.ts`, viteConfig),
-      seed(`${dir}/index.html`, indexHtml(app)),
-      seed(`${dir}/src/entry.ts`, entrySource),
-      seed(`${dir}/src/main.ts`, mainSource),
+      ...sources(ctx, app),
       seed(`${dir}/src/styles.css`, appStylesheet(ctx, 'web')),
       seed(
         `${dir}/src/vitest-setup.ts`,
         "import { setup } from 'foldkit/test/vitest';\n\nsetup();\n",
-      ),
-      seed(`${dir}/src/story.test.ts`, storyTestSource),
-      seed(`${dir}/src/scene.test.ts`, sceneTestSource),
-      seed(
-        `${dir}/README.md`,
-        `# ${ctx.pkg(app.name)}\n\n[Foldkit](https://foldkit.dev) single-page app. \`bun run dev\` to develop.\n`,
       ),
     ],
     catalog: catalogOf(dependencies, devDependencies),

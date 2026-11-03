@@ -1,4 +1,5 @@
 import { agentChecks } from './agents.ts';
+import { foldkitChecks } from './foldkit.ts';
 import { lintChecks } from './lint.ts';
 import { releaseChecks } from './release.ts';
 import { securityChecks } from './security.ts';
@@ -12,5 +13,6 @@ export const doctorChecks: ReadonlyArray<DoctorCheck> = [
   ...toolingChecks,
   ...agentChecks,
   ...releaseChecks,
+  ...foldkitChecks,
   ...themeChecks,
 ];

@@ -56,10 +56,22 @@ const cases: ReadonlyArray<{
       ['apps/site/tsconfig.json', 'owned'],
       ['apps/site/vitest.config.ts', 'owned'],
       ['apps/site/vite.config.ts', 'owned'],
+      ['apps/site/src/entry.ts', 'seed'],
+      ['apps/site/src/entry.server.ts', 'seed'],
+      ['apps/site/src/route.ts', 'seed'],
+      ['apps/site/src/main.ts', 'seed'],
+      ['apps/site/src/vitest-setup.ts', 'seed'],
+      ['apps/site/src/story.test.ts', 'seed'],
+      ['apps/site/src/scene.test.ts', 'seed'],
+    ],
+  },
+  {
+    app: { name: 'site', kind: 'foldkit', rendering: 'spa' },
+    files: [
+      ['apps/site/vite.config.ts', 'owned'],
       ['apps/site/index.html', 'seed'],
       ['apps/site/src/entry.ts', 'seed'],
       ['apps/site/src/main.ts', 'seed'],
-      ['apps/site/src/vitest-setup.ts', 'seed'],
       ['apps/site/src/story.test.ts', 'seed'],
       ['apps/site/src/scene.test.ts', 'seed'],
     ],
@@ -108,57 +120,60 @@ const cases: ReadonlyArray<{
   },
 ];
 
-describe.each(cases)('$app.kind app', ({ app, files: expected }) => {
-  const config = sampleConfig({ apps: [app] });
-  const { files, contributions, byPath, text } = allApps(config);
+describe.each(cases)(
+  '$app.kind app ($app.rendering)',
+  ({ app, files: expected }) => {
+    const config = sampleConfig({ apps: [app] });
+    const { files, contributions, byPath, text } = allApps(config);
 
-  it('emits its files with their sync strategies', () => {
-    assertStrategies(byPath, expected);
-    // An effect-api app also owns its contract package.
-    assert.isTrue(
-      Arr.every(
-        files,
-        (file) =>
-          Str.startsWith(`apps/${app.name}/`)(file.path) ||
-          (app.kind === 'effect-api' &&
-            Str.startsWith(`packages/${app.name}-contract/`)(file.path)),
-      ),
-    );
-  });
+    it('emits its files with their sync strategies', () => {
+      assertStrategies(byPath, expected);
+      // An effect-api app also owns its contract package.
+      assert.isTrue(
+        Arr.every(
+          files,
+          (file) =>
+            Str.startsWith(`apps/${app.name}/`)(file.path) ||
+            (app.kind === 'effect-api' &&
+              Str.startsWith(`packages/${app.name}-contract/`)(file.path)),
+        ),
+      );
+    });
 
-  it('lists every dependency it uses in the catalog', () => {
-    for (const { contribution } of contributions) {
-      assertCatalogComplete(contribution);
-    }
-  });
+    it('lists every dependency it uses in the catalog', () => {
+      for (const { contribution } of contributions) {
+        assertCatalogComplete(contribution);
+      }
+    });
 
-  it('configures vitest as a project named by its package.json', () => {
-    const vitest = text(
-      byPath.has(`apps/${app.name}/vitest.config.ts`)
-        ? `apps/${app.name}/vitest.config.ts`
-        : `apps/${app.name}/vitest.config.mts`,
-    );
-    assert.include(vitest, 'defineProject(');
-    assert.notInclude(vitest, 'name:');
-    // A vitest.config replaces vite.config; only Start merges it back in
-    // (foldkit follows its upstream template, which does not).
-    assert.strictEqual(
-      Str.includes("import viteConfig from './vite.config.ts'")(vitest),
-      app.kind === 'tanstack-start',
-    );
-  });
+    it('configures vitest as a project named by its package.json', () => {
+      const vitest = text(
+        byPath.has(`apps/${app.name}/vitest.config.ts`)
+          ? `apps/${app.name}/vitest.config.ts`
+          : `apps/${app.name}/vitest.config.mts`,
+      );
+      assert.include(vitest, 'defineProject(');
+      assert.notInclude(vitest, 'name:');
+      // A vitest.config replaces vite.config; only Start merges it back in
+      // (foldkit follows its upstream template, which does not).
+      assert.strictEqual(
+        Str.includes("import viteConfig from './vite.config.ts'")(vitest),
+        app.kind === 'tanstack-start',
+      );
+    });
 
-  it('leaves dev and build to the root task definitions', () => {
-    const overridden = pipe(
-      contributions,
-      Arr.flatMap(({ contribution }) => contribution.tasks ?? []),
-      Arr.filter((task) => task.name === 'dev' || task.name === 'build'),
-    );
-    assert.deepStrictEqual(overridden, []);
-  });
+    it('leaves dev and build to the root task definitions', () => {
+      const overridden = pipe(
+        contributions,
+        Arr.flatMap(({ contribution }) => contribution.tasks ?? []),
+        Arr.filter((task) => task.name === 'dev' || task.name === 'build'),
+      );
+      assert.deepStrictEqual(overridden, []);
+    });
 
-  it.effect('emits TypeScript that parses', () => assertSourcesParse(files));
-});
+    it.effect('emits TypeScript that parses', () => assertSourcesParse(files));
+  },
+);
 
 describe('library package', () => {
   const config = sampleConfig({
@@ -284,10 +299,78 @@ describe('kind specifics', () => {
 
   it('foldkit imports its stylesheet from the entry module', () => {
     const { text } = allApps(
-      sampleConfig({ apps: [{ name: 'site', kind: 'foldkit' }] }),
+      sampleConfig({
+        apps: [{ name: 'site', kind: 'foldkit', rendering: 'spa' }],
+      }),
     );
     assert.include(text('apps/site/src/entry.ts'), "import './styles.css';");
     assert.notInclude(text('apps/site/index.html'), 'styles.css');
+  });
+
+  it('foldkit prerenders by default, with no index.html', () => {
+    const { byPath, text, json } = allApps(
+      sampleConfig({ apps: [{ name: 'site', kind: 'foldkit' }] }),
+    );
+    assert.isFalse(byPath.has('apps/site/index.html'));
+    const vite = text('apps/site/vite.config.ts');
+    assert.include(vite, "serverEntry: '/src/entry.server.ts'");
+    assert.include(vite, 'build: { prerender: true }');
+    assert.include(text('apps/site/src/entry.ts'), 'Runtime.hydrate(');
+    assert.include(text('apps/site/src/entry.server.ts'), 'prerenderPaths');
+    assert.strictEqual(
+      record(json('apps/site/package.json').scripts).start,
+      'vite preview --outDir dist/client',
+    );
+  });
+
+  it("foldkit prerenders on the site's domain when it has one", () => {
+    const { text } = allApps(
+      sampleConfig({
+        apps: [{ name: 'site', kind: 'foldkit', domain: 'example.com' }],
+      }),
+    );
+    assert.include(
+      text('apps/site/vite.config.ts'),
+      "prerender: { origin: 'https://example.com' }",
+    );
+  });
+
+  it('an effect-api Worker alone has no Bun server, build or port', () => {
+    const { byPath, json, contributions } = allApps(
+      sampleConfig({
+        apps: [{ name: 'api', kind: 'effect-api', runtime: 'worker' }],
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
+      }),
+    );
+    assert.isTrue(byPath.has('apps/api/src/worker.ts'));
+    assert.isFalse(byPath.has('apps/api/src/bin.ts'));
+    assert.isFalse(byPath.has('apps/api/tsdown.config.ts'));
+    const pkg = json('apps/api/package.json');
+    assert.deepStrictEqual(record(pkg.scripts), {});
+    assert.isUndefined(record(pkg.dependencies)['@effect/platform-bun']);
+    assert.isUndefined(record(pkg.devDependencies).tsdown);
+    assert.strictEqual(
+      record(pkg.dependencies)['@alchemy.run/cloudflare'],
+      'catalog:',
+    );
+    for (const { contribution } of contributions) {
+      assert.deepStrictEqual(contribution.env ?? [], []);
+      assert.deepStrictEqual(contribution.tasks ?? [], []);
+    }
+  });
+
+  it('an effect-api Bun server on Cloudflare is no Worker', () => {
+    const { byPath, json } = allApps(
+      sampleConfig({
+        apps: [{ name: 'api', kind: 'effect-api', runtime: 'bun' }],
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
+      }),
+    );
+    assert.isTrue(byPath.has('apps/api/src/bin.ts'));
+    assert.isFalse(byPath.has('apps/api/src/worker.ts'));
+    const pkg = json('apps/api/package.json');
+    assert.isUndefined(record(pkg.exports)['./worker']);
+    assert.isUndefined(record(pkg.dependencies).alchemy);
   });
 
   it('tanstack-start wires varlock only outside Cloudflare', () => {

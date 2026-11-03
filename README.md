@@ -18,6 +18,16 @@ they're the setup I use for my own repos.
 - **Apps**: TanStack Start, Foldkit, Expo, Effect API and Effect CLI, plus
   library packages. The Effect API's contract is its own package, so any app
   can call it. A TanStack Start app can serve the API at `/api` and deploy it.
+- **Foldkit rendering**: a Foldkit app server-renders by default. `vite build`
+  prerenders the paths `src/entry.server.ts` lists, and the deployed host
+  renders every other request with the same entry. `rendering: 'spa'` makes
+  it a client-only app with an `index.html` instead. `domain: 'example.com'`
+  sets the origin pages prerender on and, on Cloudflare, binds the custom
+  domain.
+- **API runtime**: an Effect API runs as a Bun server and, when the repo
+  deploys to Cloudflare, also as a Worker. `runtime: 'worker'` makes it a
+  Worker only (no Bun entry, tsdown build or `PORT`). `runtime: 'bun'` makes
+  it a Bun server only, which is also what a container runs.
 - **Client data**: a site that serves the API gets `packages/frontend`, the
   API's endpoints as Effect atoms with no React or UI, so every frontend reads
   the same atoms. The site's route loaders start them with
@@ -75,6 +85,17 @@ never drops a list entry from a file it merges into (`package.json`): the file
 is a conflict naming the entries until you remove them by hand, and `--force`
 does not override that. Files shoemaker owns whole (`turbo.jsonc`, tsconfigs)
 are still replaced by `--force`.
+
+Delete a file shoemaker wrote and sync leaves it deleted. A starter file is
+skipped from then on. A file shoemaker owns is a conflict until you either add
+its path to `unmanaged` in `shoemaker.config.ts`, which keeps it yours, or
+restore it with `--force`.
+
+Sync moves only the dependency pins it manages. `bun run effect-versions:check`
+catches the rest of their families in `bun.lock`: every `@effect/*` package on
+the `effect` version, and every `@alchemy.run/*` and `@distilled.cloud/*`
+package on the version `alchemy` pins it to. `shoemaker check effect-versions
+--fix` moves the catalog pins that fell behind; run `bun install` after it.
 
 ## Commands
 

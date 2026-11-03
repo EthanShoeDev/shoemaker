@@ -379,6 +379,44 @@ describe('seeds', () => {
   );
 });
 
+describe('deleted owned files', () => {
+  it.effect(
+    'an owned file the user deleted is a conflict, not re-created',
+    () =>
+      Effect.gen(function* () {
+        const v1 = [file('vite.config.ts', 'export default {};\n')];
+        const first = yield* sync({}, v1, undefined);
+        const second = yield* sync({}, v1, first.lock);
+        const config = planned(second.plan, 'vite.config.ts');
+        assert.strictEqual(config.action, 'conflict');
+        assert.include(config.reason, 'unmanaged');
+        assert.isUndefined(second.disk['vite.config.ts']);
+        // The baseline survives, so it stays a conflict rather than turning new.
+        const third = yield* sync({}, v1, second.lock);
+        assert.strictEqual(
+          planned(third.plan, 'vite.config.ts').action,
+          'conflict',
+        );
+      }),
+  );
+
+  it.effect('--force restores a deleted owned file', () =>
+    Effect.gen(function* () {
+      const v1 = [file('vite.config.ts', 'export default {};\n')];
+      const first = yield* sync({}, v1, undefined);
+      const forced = yield* sync({}, v1, first.lock, ['vite.config.ts']);
+      assert.strictEqual(
+        planned(forced.plan, 'vite.config.ts').action,
+        'create',
+      );
+      assert.strictEqual(
+        read(forced.disk, 'vite.config.ts'),
+        'export default {};\n',
+      );
+    }),
+  );
+});
+
 describe('line endings', () => {
   it.effect('a CRLF checkout of an untouched owned file is unchanged', () =>
     Effect.gen(function* () {

@@ -1,6 +1,7 @@
 import { Array as Arr, Option } from 'effect';
 
 import type { App, ShoemakerConfig } from '../../config/schema.ts';
+import { deployTarget } from '../infra/target.ts';
 
 // An effect-api app's HttpApi lives in its own package,
 // `packages/<api>-contract`, so every client (a web app, a mobile app, tests)
@@ -28,6 +29,19 @@ export const isServed = (config: ShoemakerConfig, api: App) =>
     config.apps,
     (app) => app.kind === 'tanstack-start' && app.api === api.name,
   );
+
+// What an effect-api app runs as (its \`runtime\`): a Bun server, a Cloudflare
+// Worker, or by default a Bun server that is also a Worker when the repo
+// deploys to Cloudflare. A served API deploys inside its site, never as a
+// Worker of its own.
+export const apiRuntimes = (config: ShoemakerConfig, api: App) => ({
+  bun: api.runtime !== 'worker',
+  worker:
+    api.runtime === 'worker' ||
+    (api.runtime === undefined &&
+      deployTarget(config) === 'cloudflare' &&
+      !isServed(config, api)),
+});
 
 // The frontend package that holds an effect-api app's client atoms, if any.
 export const frontendFor = (config: ShoemakerConfig, api: App) =>

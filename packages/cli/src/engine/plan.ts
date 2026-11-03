@@ -356,6 +356,17 @@ const classify = Effect.fnUntraced(function* (
         reason: 'deleted by user',
       } satisfies PlannedFile;
     }
+    // Any other file shoemaker wrote and the user deleted: re-creating it
+    // silently would undo the deletion on every sync.
+    if (baseline !== undefined && !matchesAny(file.path, options.force ?? [])) {
+      return {
+        ...base,
+        after,
+        action: 'conflict',
+        reason:
+          'deleted by user: add it to `unmanaged` in shoemaker.config.ts to keep it deleted, or --force to restore it',
+      } satisfies PlannedFile;
+    }
     return { ...base, after, action: 'create' } satisfies PlannedFile;
   }
   if (file.strategy === 'seed') {

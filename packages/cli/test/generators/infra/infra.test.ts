@@ -158,6 +158,40 @@ describe('deploy targets', () => {
     assert.deepStrictEqual(contribution.tasks, []);
   });
 
+  it('deploys a server-rendered Foldkit site to AWS as a server', () => {
+    assert.include(run('aws', 'aws'), "output: 'server'");
+    const spa = contribute(
+      alchemyInfra,
+      sampleConfig({
+        apps: [{ name: 'site', kind: 'foldkit', rendering: 'spa' }],
+        infra: { kind: 'alchemy', deploy: 'aws', state: 'aws' },
+      }),
+    ).text('alchemy.run.ts');
+    assert.notInclude(spa, 'output:');
+  });
+
+  it("binds a Foldkit site's domain on Cloudflare", () => {
+    const source = contribute(
+      alchemyInfra,
+      sampleConfig({
+        apps: [{ name: 'site', kind: 'foldkit', domain: 'example.com' }],
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
+      }),
+    ).text('alchemy.run.ts');
+    assert.include(source, "domain: 'example.com'");
+  });
+
+  it('deploys no Worker for a Bun-only API', () => {
+    const source = contribute(
+      alchemyInfra,
+      sampleConfig({
+        apps: [{ name: 'api', kind: 'effect-api', runtime: 'bun' }],
+        infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
+      }),
+    ).text('alchemy.run.ts');
+    assert.notInclude(source, 'worker.ts');
+  });
+
   it('starts an empty Stack with no providers when nothing deploys', () => {
     const source = run('none', 'local');
     assert.include(source, 'providers: Layer.empty');

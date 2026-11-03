@@ -2,6 +2,8 @@ import { Array as Arr, pipe } from 'effect';
 
 import {
   hasTheme,
+  type Rendering,
+  renderingOf,
   THEME_PACKAGE,
   type ShoemakerConfig,
 } from '../../config/schema.ts';
@@ -15,6 +17,8 @@ export interface Workspace {
     | ShoemakerConfig['apps'][number]['kind']
     | ShoemakerConfig['packages'][number]['kind']
     | 'theme';
+  // foldkit apps only.
+  readonly rendering?: Rendering;
 }
 
 // Every workspace package shoemaker generates, in a stable order. Renderers that
@@ -24,6 +28,7 @@ export const workspaces = (ctx: GenContext): ReadonlyArray<Workspace> => [
     dir: `apps/${app.name}`,
     name: ctx.pkg(app.name),
     kind: app.kind,
+    ...(app.kind === 'foldkit' ? { rendering: renderingOf(app) } : {}),
   })),
   ...Arr.map(ctx.config.packages, (pkg) => ({
     dir: `packages/${pkg.name}`,

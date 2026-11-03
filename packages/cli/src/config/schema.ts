@@ -63,6 +63,23 @@ export const AndroidRelease = Schema.Struct({
 });
 export type AndroidRelease = typeof AndroidRelease.Type;
 
+// foldkit only. `ssr` (the default) builds a server entry that prerenders the
+// paths it lists at build time and renders every other request on the host;
+// `spa` renders only in the browser, from index.html.
+export const Rendering = Schema.Literals(['ssr', 'spa']);
+export type Rendering = typeof Rendering.Type;
+
+// effect-api only. `bun` is a Bun server built by tsdown (also what a
+// container runs), `worker` a Cloudflare Worker alone. Unset, the app is a
+// Bun server and, when the repo deploys to Cloudflare, a Worker too.
+export const ApiRuntime = Schema.Literals(['bun', 'worker']);
+export type ApiRuntime = typeof ApiRuntime.Type;
+
+// A bare hostname (`example.com`, `app.example.com`): no scheme, port or path.
+const Hostname = Schema.String.check(
+  Schema.isPattern(/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/u),
+);
+
 export const App = Schema.Struct({
   name: KebabName,
   kind: AppKind,
@@ -72,8 +89,15 @@ export const App = Schema.Struct({
   // expo only: every changesets release of the app becomes a GitHub Release
   // carrying a signed APK, the feed Obtainium installs and updates from.
   androidRelease: Schema.optionalKey(AndroidRelease),
+  rendering: Schema.optionalKey(Rendering),
+  // foldkit only: where the site is served. Prerendering builds each page's
+  // Request.url on this origin, and a Cloudflare deploy binds the domain.
+  domain: Schema.optionalKey(Hostname),
+  runtime: Schema.optionalKey(ApiRuntime),
 });
 export type App = typeof App.Type;
+
+export const renderingOf = (app: App) => app.rendering ?? 'ssr';
 
 export const Package = Schema.Struct({
   name: KebabName,
@@ -224,6 +248,29 @@ const androidReleaseProblem = (config: typeof ShoemakerConfigFields.Type) => {
   return undefined;
 };
 
+// Why an app's kind-specific option does not apply: rendering or domain on a
+// non-foldkit app, runtime on a non-effect-api app, or a Worker-only API that
+// nothing deploys as a Worker.
+const appOptionProblem = (config: typeof ShoemakerConfigFields.Type) => {
+  for (const app of config.apps) {
+    if (app.kind !== 'foldkit') {
+      if (app.rendering !== undefined)
+        return `apps.${app.name}.rendering: only a foldkit app chooses how it renders`;
+      if (app.domain !== undefined)
+        return `apps.${app.name}.domain: only a foldkit app takes a domain`;
+    }
+    if (app.runtime === undefined) continue;
+    if (app.kind !== 'effect-api')
+      return `apps.${app.name}.runtime: only an effect-api app chooses a runtime`;
+    if (app.runtime !== 'worker') continue;
+    if (config.infra.kind !== 'alchemy' || config.infra.deploy !== 'cloudflare')
+      return `apps.${app.name}.runtime: 'worker' needs infra.deploy 'cloudflare'`;
+    if (Arr.some(config.apps, (site) => site.api === app.name))
+      return `apps.${app.name}.runtime: a served API deploys inside its site, so it cannot be a Worker of its own`;
+  }
+  return undefined;
+};
+
 export const ShoemakerConfig = ShoemakerConfigFields.check(
   Schema.makeFilter(
     (config) =>
@@ -231,6 +278,7 @@ export const ShoemakerConfig = ShoemakerConfigFields.check(
       contractProblem(config) ??
       frontendProblem(config) ??
       androidReleaseProblem(config) ??
+      appOptionProblem(config) ??
       themeProblem(config) ??
       true,
   ),

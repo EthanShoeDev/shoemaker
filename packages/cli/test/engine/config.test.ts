@@ -22,6 +22,8 @@ const full: ShoemakerConfig = {
       kind: 'expo',
       androidRelease: { package: 'dev.listen.mobile' },
     },
+    { name: 'site', kind: 'foldkit', rendering: 'spa', domain: 'listen.dev' },
+    { name: 'worker', kind: 'effect-api', runtime: 'bun' },
   ],
   packages: [
     { name: 'domain', kind: 'library' },
@@ -161,6 +163,35 @@ describe('shoemaker.config.ts', () => {
         { name: 'api', kind: 'effect-api' },
       ],
       'theme is reserved for the design tokens',
+    ],
+    [
+      'a rendering on an app that is not foldkit',
+      [
+        { name: 'web', kind: 'tanstack-start', rendering: 'spa' },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      'only a foldkit app chooses how it renders',
+    ],
+    [
+      'a domain that is not a bare hostname',
+      [
+        { name: 'site', kind: 'foldkit', domain: 'https://listen.dev' },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      '["domain"]',
+    ],
+    [
+      'a runtime on an app that is not effect-api',
+      [
+        { name: 'cli', kind: 'effect-cli', runtime: 'bun' },
+        { name: 'api', kind: 'effect-api' },
+      ],
+      'only an effect-api app chooses a runtime',
+    ],
+    [
+      'a Worker-only API in a repo that does not deploy to Cloudflare',
+      [{ name: 'api', kind: 'effect-api', runtime: 'worker' }],
+      "'worker' needs infra.deploy 'cloudflare'",
     ],
   ] as const)('rejects %s', ([, apps, message]) =>
     Effect.gen(function* () {

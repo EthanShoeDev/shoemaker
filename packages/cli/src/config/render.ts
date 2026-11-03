@@ -85,6 +85,11 @@ const configLines = (config: ShoemakerConfig): ReadonlyArray<Line> => [
               prop('package', app.androidRelease.package),
             ]),
           ]),
+      ...(app.rendering === undefined
+        ? []
+        : [prop('rendering', app.rendering)]),
+      ...(app.domain === undefined ? [] : [prop('domain', app.domain)]),
+      ...(app.runtime === undefined ? [] : [prop('runtime', app.runtime)]),
     ]),
   ),
   objects(

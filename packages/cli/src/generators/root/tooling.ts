@@ -119,7 +119,11 @@ const knipEntries = (workspace: Workspace): ReadonlyArray<string> => {
       return ['src/router.tsx', 'src/routes/**/*.{ts,tsx}', 'src/server.ts'];
     }
     case 'foldkit': {
-      return ['src/main.ts'];
+      // With no index.html, knip sees neither entry @foldkit/vite-plugin
+      // loads by its configured path.
+      return workspace.rendering === 'ssr'
+        ? ['src/entry.ts', 'src/entry.server.ts']
+        : ['src/main.ts'];
     }
     case 'expo': {
       return ['src/app/**/*.{ts,tsx}', 'app/**/*.{ts,tsx}'];

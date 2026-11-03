@@ -1,10 +1,10 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, Record as Rec } from 'effect';
+import { Array as Arr, Effect, Option, Record as Rec } from 'effect';
 
 import { effectVersionsCheck } from '../../src/checks/effect-versions.ts';
 import { patchesCheck } from '../../src/checks/patches.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
-import { compactJsonFiles } from './helpers.ts';
+import { compactJsonFiles, pkgIn } from './helpers.ts';
 
 const lock = (resolved: Record<string, string>) =>
   `{\n  "lockfileVersion": 1,\n  "packages": {\n${Arr.join(
@@ -161,5 +161,110 @@ describe('effect-versions check across majors', () => {
           'not compared: @effect/platform@0.94.0, effect@3.22.4',
         );
       }),
+  );
+});
+
+describe('effect-versions check for alchemy', () => {
+  const lockWith = (
+    entries: Record<string, readonly [string, Record<string, string>]>,
+  ) =>
+    `{\n  "lockfileVersion": 1,\n  "packages": {\n${Arr.join(
+      Arr.map(
+        Rec.toEntries(entries),
+        ([key, [resolved, dependencies]]) =>
+          `    "${key}": ["${resolved}", "", { "dependencies": { ${Arr.join(
+            Arr.map(
+              Rec.toEntries(dependencies),
+              ([name, spec]) => `"${name}": "${spec}"`,
+            ),
+            ', ',
+          )} } }, "sha"],`,
+      ),
+      '\n',
+    )}\n  },\n}\n`;
+
+  const drifted = lockWith({
+    effect: ['effect@4.1.2', {}],
+    alchemy: [
+      'alchemy@2.0.0-beta.85',
+      { '@alchemy.run/sigil': '0.1.0-alpha.1' },
+    ],
+    '@alchemy.run/sigil': ['@alchemy.run/sigil@0.1.0-alpha.1', {}],
+    '@alchemy.run/cloudflare': [
+      '@alchemy.run/cloudflare@2.0.0-beta.85',
+      {
+        '@distilled.cloud/cloudflare': '1.0.0-rc.18',
+        alchemy: '2.0.0-beta.85',
+      },
+    ],
+    '@alchemy.run/stripe': [
+      '@alchemy.run/stripe@2.0.0-beta.80',
+      { '@distilled.cloud/stripe': '1.0.0-rc.15', alchemy: '2.0.0-beta.80' },
+    ],
+    '@distilled.cloud/cloudflare': [
+      '@distilled.cloud/cloudflare@1.0.0-rc.18',
+      {},
+    ],
+    '@distilled.cloud/stripe': ['@distilled.cloud/stripe@1.0.0-rc.15', {}],
+  });
+
+  it.effect(
+    'flags @alchemy.run and @distilled.cloud packages alchemy does not pin',
+    () =>
+      Effect.gen(function* () {
+        const result = yield* effectVersionsCheck.run(
+          makeMemoryRepo({ 'bun.lock': drifted }),
+        );
+        assert.isFalse(result.ok);
+        assert.include(
+          result.report,
+          '@alchemy.run/stripe@2.0.0-beta.80 (alchemy pins 2.0.0-beta.85)',
+        );
+        assert.include(
+          result.report,
+          '@distilled.cloud/stripe@1.0.0-rc.15 (alchemy pins 1.0.0-rc.18)',
+        );
+        // Not on alchemy's release train: alchemy pins it at its own version.
+        assert.notInclude(result.report, 'sigil');
+      }),
+  );
+
+  it.effect('moves catalog pins behind their family, and no others', () =>
+    Effect.gen(function* () {
+      const files = yield* compactJsonFiles({
+        'package.json': {
+          name: 'x',
+          workspaces: {
+            packages: [],
+            catalog: {
+              '@alchemy.run/stripe': '2.0.0-beta.80',
+              '@distilled.cloud/stripe': '1.0.0-rc.15',
+              '@effect/platform-node': '4.1.0',
+              '@effect/platform': '0.94.0',
+              '@effect/sql-pg': '^4.1.0',
+              alchemy: '2.0.0-beta.85',
+            },
+          },
+        },
+      });
+      const result = yield* effectVersionsCheck.run(
+        makeMemoryRepo({ ...files, 'bun.lock': drifted }),
+      );
+      const root = Arr.findFirst(
+        result.fixes,
+        (f) => f.path === 'package.json',
+      );
+      const { catalog } = pkgIn(
+        Option.getOrUndefined(Option.map(root, (f) => f.content ?? '')),
+      );
+      assert.deepStrictEqual(catalog, {
+        '@alchemy.run/stripe': '2.0.0-beta.85',
+        '@distilled.cloud/stripe': '1.0.0-rc.18',
+        '@effect/platform-node': '4.1.2',
+        '@effect/platform': '0.94.0',
+        '@effect/sql-pg': '^4.1.0',
+        alchemy: '2.0.0-beta.85',
+      });
+    }),
   );
 });

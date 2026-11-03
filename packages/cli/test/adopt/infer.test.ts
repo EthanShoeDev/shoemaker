@@ -1,8 +1,12 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, Order } from 'effect';
+import { Array as Arr, Effect, Option, Order } from 'effect';
 
 import { inferConfig } from '../../src/adopt/infer.ts';
-import { decodeConfig, defaultConfig } from '../../src/config/schema.ts';
+import {
+  decodeConfig,
+  defaultConfig,
+  type ShoemakerConfig,
+} from '../../src/config/schema.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
 import { compactJsonFiles } from '../checks/helpers.ts';
 
@@ -119,6 +123,37 @@ describe('inferConfig', () => {
         vscode: false,
       });
       assert.deepStrictEqual(config.nixPackages, []);
+    }),
+  );
+
+  it.effect('keeps how each app renders and runs on disk', () =>
+    Effect.gen(function* () {
+      const files = yield* repo;
+      const appOf = (config: ShoemakerConfig, name: string) =>
+        Arr.findFirst(config.apps, (app) => app.name === name);
+      const spa = yield* inferConfig(makeMemoryRepo(files));
+      assert.deepStrictEqual(Option.getOrUndefined(appOf(spa, 'blog')), {
+        name: 'blog',
+        kind: 'foldkit',
+        rendering: 'spa',
+      });
+      const rendered = yield* inferConfig(
+        makeMemoryRepo({
+          ...files,
+          'apps/blog/src/entry.server.ts': 'export {};\n',
+          'apps/api/src/worker.ts': 'export {};\n',
+        }),
+      );
+      yield* decodeConfig(rendered);
+      assert.deepStrictEqual(Option.getOrUndefined(appOf(rendered, 'blog')), {
+        name: 'blog',
+        kind: 'foldkit',
+      });
+      assert.deepStrictEqual(Option.getOrUndefined(appOf(rendered, 'api')), {
+        name: 'api',
+        kind: 'effect-api',
+        runtime: 'worker',
+      });
     }),
   );
 

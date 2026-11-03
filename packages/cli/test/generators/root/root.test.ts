@@ -222,7 +222,7 @@ describe('knip config', () => {
     const full = render(preset('full')).text('knip.ts');
     assert.match(
       full,
-      /'apps\/site': \{\n\s+entry: \['src\/main\.ts'\],\n\s+\/\/ .+\n\s+ignoreDependencies: \['@foldkit\/devtools'\],/u,
+      /'apps\/site': \{\n\s+entry: \['src\/entry\.ts', 'src\/entry\.server\.ts'\],\n\s+\/\/ .+\n\s+ignoreDependencies: \['@foldkit\/devtools'\],/u,
     );
     const web = render(preset('web')).text('knip.ts');
     assert.notInclude(web, '@foldkit/devtools');

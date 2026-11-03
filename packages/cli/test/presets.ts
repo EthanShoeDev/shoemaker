@@ -22,6 +22,7 @@ export const presets: Readonly<Record<string, ShoemakerConfig>> = {
     apps: [
       { name: 'web', kind: 'tanstack-start', api: 'api' },
       { name: 'api', kind: 'effect-api' },
+      { name: 'edge', kind: 'effect-api', runtime: 'worker' },
     ],
     packages: [
       { name: 'core', kind: 'library' },
@@ -39,7 +40,7 @@ export const presets: Readonly<Record<string, ShoemakerConfig>> = {
     ...defaultConfig('sample-full'),
     apps: [
       { name: 'web', kind: 'tanstack-start' },
-      { name: 'site', kind: 'foldkit' },
+      { name: 'site', kind: 'foldkit', domain: 'sample.dev' },
       {
         name: 'mobile',
         kind: 'expo',

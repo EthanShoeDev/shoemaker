@@ -1,14 +1,15 @@
 import { Array as Arr, String as Str } from 'effect';
 
-import type {
-  AlchemyProvider,
-  App,
-  ShoemakerConfig,
-  StateStore,
+import {
+  type AlchemyProvider,
+  type App,
+  renderingOf,
+  type ShoemakerConfig,
+  type StateStore,
 } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
 import { pascalCase } from '../apps/common.ts';
-import { contractName, isServed } from '../apps/mount.ts';
+import { apiRuntimes, contractName } from '../apps/mount.ts';
 import type { EnvVar } from '../secrets/model.ts';
 import { catalogDeps, jsonMerge, seed, withSecrets } from '../shared.ts';
 import type { TaskDef } from '../task-runner/model.ts';
@@ -67,22 +68,39 @@ const providersExpression = (providers: ReadonlyArray<AlchemyProvider>) => {
 // https://alchemy.run/cloudflare/frontend/foldkit/
 // https://alchemy.run/aws/frontend/tanstack-start/
 // https://alchemy.run/aws/frontend/foldkit/
-type Website = (id: string, dir: string) => string;
+type Website = (id: string, dir: string, app: App) => string;
 
 const website =
-  (constructor: string): Website =>
-  (id, dir) =>
-    `${constructor}('${id}', {\n      rootDir: path.resolve(import.meta.dirname, '${dir}'),\n    })`;
+  (
+    constructor: string,
+    props: (app: App) => ReadonlyArray<string> = () => [],
+  ): Website =>
+  (id, dir, app) =>
+    `${constructor}('${id}', {\n${Arr.join(
+      Arr.map(
+        [`rootDir: path.resolve(import.meta.dirname, '${dir}')`, ...props(app)],
+        (prop) => `      ${prop},\n`,
+      ),
+      '',
+    )}    })`;
 
+// Cloudflare reads the rendering from Foldkit's build; AWS defaults to a
+// client-only deploy, so a server build has to say so. A domain string binds
+// the custom domain (alchemy owns its DNS record and certificate); AWS takes a
+// router instead, so its domain stays hand-written.
 const websites: Readonly<Record<Cloud, Partial<Record<App['kind'], Website>>>> =
   {
     cloudflare: {
       'tanstack-start': website('Cloudflare.Website.Vite'),
-      foldkit: website('Cloudflare.Website.Foldkit'),
+      foldkit: website('Cloudflare.Website.Foldkit', (app) =>
+        app.domain === undefined ? [] : [`domain: '${app.domain}'`],
+      ),
     },
     aws: {
       'tanstack-start': website('AWS.Website.TanStackStart'),
-      foldkit: website('AWS.Website.Foldkit'),
+      foldkit: website('AWS.Website.Foldkit', (app) =>
+        renderingOf(app) === 'ssr' ? ["output: 'server'"] : [],
+      ),
     },
   };
 
@@ -91,12 +109,10 @@ const websites: Readonly<Record<Cloud, Partial<Record<App['kind'], Website>>>> =
 // a cycle, as every package already depends on the root.
 // https://alchemy.run/cloudflare/compute/workers/
 const workerApps = (config: ShoemakerConfig) =>
-  deployTarget(config) === 'cloudflare'
-    ? Arr.filter(
-        config.apps,
-        (app) => app.kind === 'effect-api' && !isServed(config, app),
-      )
-    : [];
+  Arr.filter(
+    config.apps,
+    (app) => app.kind === 'effect-api' && apiRuntimes(config, app).worker,
+  );
 
 type Deployed =
   | { readonly app: App; readonly kind: 'website'; readonly statement: string }
@@ -115,7 +131,7 @@ const deployed = (config: ShoemakerConfig): ReadonlyArray<Deployed> => {
           {
             app,
             kind: 'website',
-            statement: declare(pascalCase(app.name), `apps/${app.name}`),
+            statement: declare(pascalCase(app.name), `apps/${app.name}`, app),
           },
         ];
   });

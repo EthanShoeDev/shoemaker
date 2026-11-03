@@ -180,6 +180,29 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
   };
 });
 
+// What sync would otherwise get wrong about an app already on disk: a foldkit
+// app with no server entry is a SPA, and an effect-api app that lacks a Bun
+// entry or a Worker on Cloudflare runs as the one it has.
+const appOptionsOf = Effect.fnUntraced(function* (
+  repo: Repo,
+  app: App,
+  deploy: { readonly cloudflare: boolean; readonly served: boolean },
+) {
+  const dir = `apps/${app.name}`;
+  if (app.kind === 'foldkit') {
+    return (yield* repo.exists(`${dir}/src/entry.server.ts`))
+      ? app
+      : { ...app, rendering: 'spa' as const };
+  }
+  if (app.kind !== 'effect-api' || !deploy.cloudflare || deploy.served)
+    return app;
+  const bun = yield* repo.exists(`${dir}/src/bin.ts`);
+  const worker = yield* repo.exists(`${dir}/src/worker.ts`);
+  if (worker && !bun) return { ...app, runtime: 'worker' as const };
+  if (bun && !worker) return { ...app, runtime: 'bun' as const };
+  return app;
+});
+
 const repoName = (repo: Repo, manifest: Manifest | undefined) => {
   const raw = manifest?.pkg.name;
   if (raw === undefined) return kebab(repo.name);
@@ -228,12 +251,19 @@ export const inferConfig = (
       ),
     );
 
-    const apps = yield* Effect.forEach(found, ({ app, manifest }) =>
+    const infra = yield* inferInfra(repo);
+    const served = yield* Effect.forEach(found, ({ app, manifest }) =>
       app.kind === 'tanstack-start'
         ? Effect.map(servedApiOf(repo, manifest, found), (api) =>
             api === undefined ? app : { ...app, api },
           )
         : Effect.succeed(app),
+    );
+    const apps = yield* Effect.forEach(served, (app) =>
+      appOptionsOf(repo, app, {
+        cloudflare: infra.kind === 'alchemy' && infra.deploy === 'cloudflare',
+        served: Arr.some(served, (site) => site.api === app.name),
+      }),
     );
 
     const taskRunner =
@@ -260,7 +290,7 @@ export const inferConfig = (
       ),
       taskRunner,
       secrets,
-      infra: yield* inferInfra(repo),
+      infra,
       ci: workflows.length > 0 ? 'github' : 'none',
       features: {
         changesets:
