@@ -1,5 +1,68 @@
 # shoemaker
 
+## 0.2.7
+
+### Patch Changes
+
+- [`a226fe2`](https://github.com/EthanShoeDev/shoemaker/commit/a226fe236a753aa3fb6e1d69676515b87b270cdc) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - alchemy and the `@alchemy.run/*` providers move to `2.0.0-beta.85`. In it,
+  `AWS.state()` keeps state in a DynamoDB table (`alchemy-state`) instead of the
+  S3 bucket, and refuses to deploy a stage that is still in S3 until
+  `alchemy state migrate` moves it. `Cloudflare.state()` and
+  `Alchemy.localState()` are unchanged. The `init` wizard now says a DynamoDB
+  table is created for AWS state.
+  
+  Existing repos with `state: AWS.state()` (for a coding agent). `sync` moves
+  the pin, after which `infra:deploy` stops with "Stage '…' is still in the S3
+  state store":
+  
+  1. Run `bunx shoemaker sync`, then `bun install`, and confirm
+     `node_modules/alchemy/package.json` is `2.0.0-beta.85`.
+  2. Run `bun run typecheck`. beta.85 also moved GitHub `Ruleset` rules to
+     top-level props, `Test.make` into `@alchemy.run/test`, and
+     `Cloudflare.state({ name })` to `Cloudflare.state({ workerName })`; fix any
+     hand-written code that uses them.
+  3. Stop and ask the user before going further: the next step touches the real
+     state store. With their permission, they run
+     `bunx alchemy state migrate` from the repo root once no deploy is in flight
+     (it migrates every stage, copies records to DynamoDB and fences the S3
+     copy, never deleting it; rerun it for any stage it reports `blocked`).
+     To stay on S3 instead, set `state: AWS.state({ backend: 's3' })` in
+     `alchemy.run.ts`.
+
+- [`a9fd328`](https://github.com/EthanShoeDev/shoemaker/commit/a9fd3287655b47dd2f3440d5e5fd0a05ba4efcce) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Repos with the agents feature get a `.mcp.json` of project MCP servers. When
+  the alchemy Stack registers the Cloudflare provider, it holds Cloudflare's
+  observability server (`https://observability.mcp.cloudflare.com/mcp`), which
+  signs in with OAuth, so no credential is committed. Sync merges its servers
+  into the file, so servers added by hand stay. `doctor` reports a repo that
+  depends on `@alchemy.run/cloudflare` or `wrangler` without that server.
+  
+  An existing repo picks it up on the next `sync`. If it already has a
+  `.mcp.json`, sync reports it as untracked; `bunx shoemaker sync --force
+  .mcp.json` merges the server in and keeps the others.
+
+- [`a226fe2`](https://github.com/EthanShoeDev/shoemaker/commit/a226fe236a753aa3fb6e1d69676515b87b270cdc) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Generated repos get newer dependency versions:
+  
+  - `oxfmt`: 0.75.0 → 0.76.0
+  - `tsdown`: ^0.23.4 → ^0.23.5
+  - `tailwindcss`, `@tailwindcss/vite`: ^4.3.3 → ^4.3.4
+  - `expo`: ~58.0.22 → ~58.0.23, with the native module ranges SDK 58.0.23
+    pins (`expo-router` ~58.0.30, `expo-constants` ~58.0.15, `expo-linking`
+    ~58.0.16, `react-native-safe-area-context` ~5.11.1)
+  
+  `oxlint` and `@oxlint/plugins` stay at 1.90.0: `@effect/tsgo` 0.64.1 supports
+  oxlint up to 1.90.0, and `effect-tsgo patch --oxlint` (the `prepare` script)
+  fails `bun install` on 1.91.0. The weekly version update now holds oxlint
+  until `@effect/tsgo` lists a newer one.
+  
+  `flake.nix` escapes `${` in the repo description, which Nix would otherwise
+  read as an interpolation, and `secretspec.toml` escapes every control
+  character TOML requires (DEL was left raw).
+  
+  Existing repos: `bun run shoemaker:sync`, then `bun install`. A version the
+  repo already raised past these stays as it is.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.7
+
 ## 0.2.6
 
 ### Patch Changes
