@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-oxfmt-config",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Shared oxfmt options and defineShoemakerFormat() for oxfmt.config.ts",
   "license": "MIT",
   "repository": {
