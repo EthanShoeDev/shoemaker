@@ -6,8 +6,8 @@ import { canonicalJson, ownedProjection } from '../../src/engine/json.ts';
 import { type Lock, parseLock, renderLock } from '../../src/engine/lock.ts';
 import { makePlan, nextLock, type Plan } from '../../src/engine/plan.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
-import type { FileStrategy, GeneratedFile } from '../../src/engine/types.ts';
-import { json, region } from '../../src/generators/shared.ts';
+import { GeneratedFile } from '../../src/engine/types.ts';
+import { jsonMerge, region } from '../../src/generators/shared.ts';
 
 // Regression tests for ways a sync could overwrite or lose a user's work, or
 // report shoemaker's own output as a hand edit.
@@ -15,8 +15,8 @@ import { json, region } from '../../src/generators/shared.ts';
 const file = (
   path: string,
   content: string,
-  strategy: FileStrategy = 'owned',
-): GeneratedFile => ({ path, content, strategy });
+  strategy: 'owned' | 'seed' | 'managed' = 'owned',
+) => GeneratedFile.Text({ path, content, strategy });
 
 const planned = (plan: Plan, path: string) => {
   const found = Option.getOrUndefined(
@@ -47,7 +47,9 @@ const sync = (
       if (p.action === 'create' || p.action === 'update')
         after[p.path] = p.after;
     }
-    const next = yield* parseLock(renderLock(nextLock(lock, plan, '0.0.0')));
+    const written = yield* nextLock(lock, plan, '0.0.0');
+    const text = yield* renderLock(written);
+    const next = yield* parseLock(text);
     return { plan, disk: after, lock: next };
   });
 
@@ -56,14 +58,10 @@ const read = (disk: Readonly<Record<string, string>>, path: string) =>
 
 describe('dependency versions are a floor', () => {
   const generated = (script: string, version: string) =>
-    file(
-      'package.json',
-      json({
-        scripts: { test: script },
-        workspaces: { catalog: { 'shoemaker-oxlint-config': version } },
-      }),
-      'json-merge',
-    );
+    jsonMerge('package.json', {
+      scripts: { test: script },
+      workspaces: { catalog: { 'shoemaker-oxlint-config': version } },
+    });
 
   it.effect('a raised version survives a sync that changes the file', () =>
     Effect.gen(function* () {
@@ -131,17 +129,9 @@ describe('dependency versions are a floor', () => {
 describe('owned key / region set changes between versions', () => {
   it.effect('json-merge: a newly owned key is an update, not a conflict', () =>
     Effect.gen(function* () {
-      const v1 = [
-        file('package.json', json({ scripts: { a: 'x' } }), 'json-merge'),
-      ];
+      const v1 = [jsonMerge('package.json', { scripts: { a: 'x' } })];
       const first = yield* sync({}, v1, undefined);
-      const v2 = [
-        file(
-          'package.json',
-          json({ scripts: { a: 'x', b: 'y' } }),
-          'json-merge',
-        ),
-      ];
+      const v2 = [jsonMerge('package.json', { scripts: { a: 'x', b: 'y' } })];
       const second = yield* sync(first.disk, v2, first.lock);
       assert.strictEqual(planned(second.plan, 'package.json').action, 'update');
       assert.include(read(second.disk, 'package.json'), '"b": "y"');
@@ -152,9 +142,7 @@ describe('owned key / region set changes between versions', () => {
     'json-merge: a hand edit of a key owned at baseline still conflicts',
     () =>
       Effect.gen(function* () {
-        const v1 = [
-          file('package.json', json({ scripts: { a: 'x' } }), 'json-merge'),
-        ];
+        const v1 = [jsonMerge('package.json', { scripts: { a: 'x' } })];
         const first = yield* sync({}, v1, undefined);
         const edited = {
           'package.json': Str.replace(
@@ -162,13 +150,7 @@ describe('owned key / region set changes between versions', () => {
             '"mine"',
           )(read(first.disk, 'package.json')),
         };
-        const v2 = [
-          file(
-            'package.json',
-            json({ scripts: { a: 'x', b: 'y' } }),
-            'json-merge',
-          ),
-        ];
+        const v2 = [jsonMerge('package.json', { scripts: { a: 'x', b: 'y' } })];
         const second = yield* sync(edited, v2, first.lock);
         assert.strictEqual(
           planned(second.plan, 'package.json').action,
@@ -237,28 +219,20 @@ describe('owned key / region set changes between versions', () => {
     'a lock without recorded sets falls back to the generated set',
     () =>
       Effect.gen(function* () {
-        const generated = file(
-          'package.json',
-          json({ scripts: { a: 'x' } }),
-          'json-merge',
-        );
+        const generated = jsonMerge('package.json', { scripts: { a: 'x' } });
         const disk = {
           'package.json': '{\n  "scripts": {\n    "a": "x"\n  }\n}\n',
         };
+        const canonical = yield* canonicalJson(
+          ownedProjection({ scripts: { a: 'x' } }, { scripts: { a: 'x' } }),
+        );
         // What a lock written before owned sets were recorded holds.
         const legacy: Lock = {
           cliVersion: '0.0.0',
           files: {
             'package.json': {
               strategy: 'json-merge',
-              sha256: sha256(
-                canonicalJson(
-                  ownedProjection(
-                    { scripts: { a: 'x' } },
-                    { scripts: { a: 'x' } },
-                  ),
-                ),
-              ),
+              sha256: sha256(canonical),
             },
           },
         };
@@ -268,11 +242,7 @@ describe('owned key / region set changes between versions', () => {
           'unchanged',
         );
         assert.isDefined(same.lock.files['package.json']?.owned);
-        const changed = file(
-          'package.json',
-          json({ scripts: { a: 'z' } }),
-          'json-merge',
-        );
+        const changed = jsonMerge('package.json', { scripts: { a: 'z' } });
         const updated = yield* sync(disk, [changed], legacy);
         assert.strictEqual(
           planned(updated.plan, 'package.json').action,
@@ -458,7 +428,7 @@ describe('line endings', () => {
 
   it.effect('a CRLF json-merge file is updated without a false conflict', () =>
     Effect.gen(function* () {
-      const v1 = [file('package.json', json({ name: 'x' }), 'json-merge')];
+      const v1 = [jsonMerge('package.json', { name: 'x' })];
       const first = yield* sync({}, v1, undefined);
       const crlf = {
         'package.json': Str.replaceAll(
@@ -466,9 +436,7 @@ describe('line endings', () => {
           '\r\n',
         )(read(first.disk, 'package.json')),
       };
-      const v2 = [
-        file('package.json', json({ name: 'x', type: 'module' }), 'json-merge'),
-      ];
+      const v2 = [jsonMerge('package.json', { name: 'x', type: 'module' })];
       const second = yield* sync(crlf, v2, first.lock);
       assert.strictEqual(planned(second.plan, 'package.json').action, 'update');
       assert.strictEqual(

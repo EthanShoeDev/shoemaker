@@ -30,7 +30,11 @@ import {
   replaceRegions,
 } from './regions.ts';
 import type { Repo } from './repo.ts';
-import type { FileStrategy, GeneratedFile } from './types.ts';
+import {
+  type FileStrategy,
+  GeneratedFile,
+  type RenderedFile,
+} from './types.ts';
 
 // - create: missing on disk.
 // - update: differs, and disk still matches the lock baseline (safe).
@@ -58,7 +62,7 @@ export interface PlannedFile {
   // What shoemaker writes (for conflict/untracked: what it would write).
   readonly after: string;
   readonly executable: boolean;
-  readonly generated: GeneratedFile;
+  readonly generated: RenderedFile;
   readonly reason?: string;
   // A conflict/untracked file `--force` turned into an update.
   readonly forced?: boolean;
@@ -94,7 +98,7 @@ const regionOptions = (path: string) => ({ fences: isMarkdown(path) });
 // owned key pointers (json-merge) of `file`. The lock records it, so a later
 // generator that owns more (or fewer) keys or regions does not make the file
 // look hand-edited.
-export const ownedSet = (file: GeneratedFile) => {
+export const ownedSet = (file: RenderedFile) => {
   switch (file.strategy) {
     case 'owned':
     case 'seed': {
@@ -104,7 +108,7 @@ export const ownedSet = (file: GeneratedFile) => {
       return regionIds(toLf(file.content), regionOptions(file.path));
     }
     case 'json-merge': {
-      return ownedPointers(parseJsonObject(file.content) ?? {});
+      return ownedPointers(file.json);
     }
   }
 };
@@ -113,13 +117,21 @@ export const ownedSet = (file: GeneratedFile) => {
 // generated file the set is derived from.
 export type Scope =
   | { readonly owned: ReadonlyArray<string> }
-  | { readonly generated: string };
+  | { readonly generated: RenderedFile };
+
+// The owned-key tree a json-merge fingerprint projects the file onto.
+const shapeOfScope = (scope: Scope) => {
+  if ('owned' in scope) return shapeOf(scope.owned);
+  return GeneratedFile.$is('Merge')(scope.generated)
+    ? scope.generated.json
+    : {};
+};
 
 // What the lock records per strategy, so hand edits can be told apart from
 // shoemaker's own writes: the whole file for owned/seed, only the region bodies
 // for managed, only the owned keys for json-merge, minus their dependency
 // and package versions (a repo may raise those; see keepRaisedVersions).
-export const fingerprint = (
+export const fingerprint = Effect.fnUntraced(function* (
   strategy: FileStrategy,
   path: string,
   content: string,
@@ -127,7 +139,7 @@ export const fingerprint = (
   // `dependencies`: the package's own version unmasked; `exact`: nothing
   // masked. Older locks hashed that way.
   versions: 'masked' | 'dependencies' | 'exact' = 'masked',
-) => {
+) {
   const text = toLf(content);
   switch (strategy) {
     case 'owned':
@@ -135,51 +147,48 @@ export const fingerprint = (
       return sha256(text);
     }
     case 'managed': {
-      const options = regionOptions(path);
+      const bodies = regionBodies(text, regionOptions(path));
       const ids =
-        'owned' in scope
-          ? scope.owned
-          : regionIds(toLf(scope.generated), options);
-      const bodies = regionBodies(text, options);
-      return sha256(
-        canonicalJson(Arr.map(ids, (id) => [id, bodies.get(id) ?? null])),
+        'owned' in scope ? scope.owned : (ownedSet(scope.generated) ?? []);
+      const canonical = yield* canonicalJson(
+        Arr.map(ids, (id) => [id, bodies.get(id) ?? null]),
       );
+      return sha256(canonical);
     }
     case 'json-merge': {
       const existing = parseJsonObject(text);
-      const shape =
-        'owned' in scope
-          ? shapeOf(scope.owned)
-          : (parseJsonObject(scope.generated) ?? {});
       if (existing === undefined) return sha256(text);
-      const projection = ownedProjection(existing, shape);
-      return sha256(
-        canonicalJson(
-          versions === 'exact'
-            ? projection
-            : maskVersions(projection, { own: versions === 'masked' }),
-        ),
+      const projection = ownedProjection(existing, shapeOfScope(scope));
+      const canonical = yield* canonicalJson(
+        versions === 'exact'
+          ? projection
+          : maskVersions(projection, { own: versions === 'masked' }),
       );
+      return sha256(canonical);
     }
   }
-};
+});
 
-const scopeOf = (file: GeneratedFile, baseline: LockEntry | undefined) =>
+const scopeOf = (file: RenderedFile, baseline: LockEntry | undefined) =>
   baseline?.owned !== undefined && baseline.strategy === file.strategy
     ? { owned: baseline.owned }
-    : { generated: file.content };
+    : { generated: file };
 
 // The baseline for `written`, as shoemaker wrote it from `file`.
-export const lockEntry = (file: GeneratedFile, written: string): LockEntry => {
+export const lockEntry = Effect.fnUntraced(function* (
+  file: RenderedFile,
+  written: string,
+) {
   const owned = ownedSet(file);
+  const sha = yield* fingerprint(file.strategy, file.path, written, {
+    owned: owned ?? [],
+  });
   return {
     strategy: file.strategy,
-    sha256: fingerprint(file.strategy, file.path, written, {
-      owned: owned ?? [],
-    }),
+    sha256: sha,
     ...(owned === undefined ? {} : { owned }),
-  };
-};
+  } satisfies LockEntry;
+});
 
 interface Desired {
   readonly after: string;
@@ -187,21 +196,25 @@ interface Desired {
   readonly problem?: string;
 }
 
+const renderFormatted = Effect.fnUntraced(function* (
+  path: string,
+  value: unknown,
+) {
+  const text = yield* renderJson(value);
+  return yield* formatContent(path, text);
+});
+
 const desired = Effect.fnUntraced(function* (
-  file: GeneratedFile,
+  file: RenderedFile,
   disk: string | undefined,
   baseline: LockEntry | undefined,
 ) {
   if (disk === undefined) {
-    return {
-      after:
-        file.strategy === 'json-merge'
-          ? yield* formatContent(
-              file.path,
-              renderJson(parseJsonObject(file.content) ?? {}),
-            )
-          : file.content,
-    } satisfies Desired;
+    if (file.strategy !== 'json-merge') {
+      return { after: file.content } satisfies Desired;
+    }
+    const after = yield* renderFormatted(file.path, file.json);
+    return { after } satisfies Desired;
   }
   const crlf = usesCrlf(disk);
   switch (file.strategy) {
@@ -243,25 +256,16 @@ const desired = Effect.fnUntraced(function* (
           } satisfies Desired);
     }
     case 'json-merge': {
-      const owned = parseJsonObject(file.content) ?? {};
       const existing = parseJsonObject(disk);
       if (existing === undefined) {
-        return {
-          after: yield* formatContent(file.path, renderJson(owned)),
-          problem: 'not a JSON object',
-        } satisfies Desired;
+        const after = yield* renderFormatted(file.path, file.json);
+        return { after, problem: 'not a JSON object' } satisfies Desired;
       }
-      return {
-        after: withEol(
-          yield* formatContent(
-            file.path,
-            renderJson(
-              mergeJson(existing, keepRaisedVersions(owned, existing)),
-            ),
-          ),
-          crlf,
-        ),
-      } satisfies Desired;
+      const merged = yield* renderFormatted(
+        file.path,
+        mergeJson(existing, keepRaisedVersions(file.json, existing)),
+      );
+      return { after: withEol(merged, crlf) } satisfies Desired;
     }
   }
 });
@@ -298,7 +302,7 @@ const blocker = (
 // instead of shortening the list, even under --force. Owned files are
 // shoemaker's whole, so --force replacing them is the point.
 const droppedByAdoption = (
-  file: GeneratedFile,
+  file: RenderedFile,
   disk: string,
   after: string,
   baseline: LockEntry | undefined,
@@ -313,15 +317,21 @@ const droppedByAdoption = (
 
 const SHOWN = 3;
 
-const droppedReason = (dropped: ReadonlyArray<string>) => {
-  const shown = Arr.join(dropped.slice(0, SHOWN), ', ');
+const droppedReason = Effect.fnUntraced(function* (
+  dropped: ReadonlyArray<{ readonly pointer: string; readonly entry: unknown }>,
+) {
+  const shown = yield* Effect.forEach(
+    dropped.slice(0, SHOWN),
+    ({ pointer, entry }) =>
+      Effect.map(canonicalJson(entry), (text) => `${pointer}: ${text}`),
+  );
   const more =
     dropped.length > SHOWN ? ` and ${dropped.length - SHOWN} more` : '';
-  return `would drop list entries shoemaker did not write (${shown}${more}); --force never drops them, so remove them by hand first`;
-};
+  return `would drop list entries shoemaker did not write (${Arr.join(shown, ', ')}${more}); --force never drops them, so remove them by hand first`;
+});
 
 const classify = Effect.fnUntraced(function* (
-  file: GeneratedFile,
+  file: RenderedFile,
   repo: Repo,
   lock: Lock | undefined,
   options: PlanOptions,
@@ -332,7 +342,7 @@ const classify = Effect.fnUntraced(function* (
     path: file.path,
     strategy: file.strategy,
     before: disk,
-    executable: file.executable === true,
+    executable: GeneratedFile.$is('Text')(file) && file.executable === true,
     generated: file,
   };
   const { after, problem } = yield* desired(file, disk, baseline);
@@ -356,25 +366,24 @@ const classify = Effect.fnUntraced(function* (
   }
   const dropped = droppedByAdoption(file, disk, after, baseline);
   if (dropped.length > 0) {
+    const reason = yield* droppedReason(dropped);
     return {
       ...base,
       after,
       action: 'conflict',
-      reason: droppedReason(dropped),
+      reason,
     } satisfies PlannedFile;
   }
   const scope = scopeOf(file, baseline);
-  const blocked = blocker(problem, baseline, [
-    fingerprint(file.strategy, file.path, disk, scope),
-    // Locks written before versions were masked hashed them exactly, and
-    // before the package version was masked, hashed it exactly.
-    ...(file.strategy === 'json-merge'
-      ? [
-          fingerprint(file.strategy, file.path, disk, scope, 'dependencies'),
-          fingerprint(file.strategy, file.path, disk, scope, 'exact'),
-        ]
-      : []),
-  ]);
+  // Locks written before versions were masked hashed them exactly, and
+  // before the package version was masked, hashed it exactly.
+  const current = yield* Effect.forEach(
+    file.strategy === 'json-merge'
+      ? (['masked', 'dependencies', 'exact'] as const)
+      : (['masked'] as const),
+    (versions) => fingerprint(file.strategy, file.path, disk, scope, versions),
+  );
+  const blocked = blocker(problem, baseline, current);
   if (blocked === undefined) {
     return { ...base, after, action: 'update' } satisfies PlannedFile;
   }
@@ -418,11 +427,11 @@ export const isBlocked = (file: PlannedFile) =>
 // baseline; blocked files keep whatever baseline they had. A skipped seed
 // keeps the baseline of what shoemaker wrote and gets none otherwise: content
 // the user wrote is never recorded as shoemaker's.
-export const nextLock = (
+export const nextLock = Effect.fnUntraced(function* (
   previous: Lock | undefined,
   plan: Plan,
   cliVersion: string,
-): Lock => {
+) {
   const files: Record<string, LockEntry> = {};
   for (const file of plan.files) {
     const old = previous?.files[file.path];
@@ -436,10 +445,7 @@ export const nextLock = (
       if (old !== undefined) files[file.path] = old;
       continue;
     }
-    files[file.path] = lockEntry(file.generated, file.after);
+    files[file.path] = yield* lockEntry(file.generated, file.after);
   }
-  return {
-    cliVersion,
-    files,
-  };
-};
+  return { cliVersion, files } satisfies Lock;
+});

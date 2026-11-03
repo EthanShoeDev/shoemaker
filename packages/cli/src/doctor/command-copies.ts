@@ -48,7 +48,8 @@ const wordsOf = (script: string) =>
 // after the shared one changes.
 export const commandCopies = Effect.fnUntraced(function* (repo: Repo) {
   const workspace = yield* readWorkspace(repo);
-  const turbo = decodeJsonc(TurboJsonc, yield* repo.read('turbo.jsonc'));
+  const turboSource = yield* repo.read('turbo.jsonc');
+  const turbo = decodeJsonc(TurboJsonc, turboSource);
   if (workspace === undefined || Option.isNone(turbo)) return [];
   const commands = new Map(
     Arr.flatMap(Rec.toEntries(turbo.value.tasks ?? {}), ([name, task]) => {

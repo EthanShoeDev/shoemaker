@@ -2,7 +2,7 @@ import { Array as Arr } from 'effect';
 
 import { type App, hasTheme } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
-import { json, owned, seed, workspacePackageJson } from '../shared.ts';
+import { owned, ownedJson, seed, workspacePackageJson } from '../shared.ts';
 import {
   appDir,
   catalogOf,
@@ -151,30 +151,27 @@ describe('greeting', () => {
 // otherwise reaches it only through expo-env.d.ts, which `expo start` writes
 // and git ignores, so a fresh checkout would fail typecheck.
 const tsconfig = (dir: string) =>
-  owned(
-    `${dir}/tsconfig.json`,
-    json({
-      extends: 'expo/tsconfig.base',
-      compilerOptions: {
-        strict: true,
-        exactOptionalPropertyTypes: true,
-        noUncheckedIndexedAccess: true,
-        noImplicitOverride: true,
-        noUnusedLocals: true,
-        noFallthroughCasesInSwitch: true,
-        verbatimModuleSyntax: true,
-        allowImportingTsExtensions: true,
-        types: ['node', 'expo/types'],
-      },
-      include: [
-        '**/*.ts',
-        '**/*.tsx',
-        '*.mts',
-        '.expo/types/**/*.ts',
-        'expo-env.d.ts',
-      ],
-    }),
-  );
+  ownedJson(`${dir}/tsconfig.json`, {
+    extends: 'expo/tsconfig.base',
+    compilerOptions: {
+      strict: true,
+      exactOptionalPropertyTypes: true,
+      noUncheckedIndexedAccess: true,
+      noImplicitOverride: true,
+      noUnusedLocals: true,
+      noFallthroughCasesInSwitch: true,
+      verbatimModuleSyntax: true,
+      allowImportingTsExtensions: true,
+      types: ['node', 'expo/types'],
+    },
+    include: [
+      '**/*.ts',
+      '**/*.tsx',
+      '*.mts',
+      '.expo/types/**/*.ts',
+      'expo-env.d.ts',
+    ],
+  });
 
 export const expoApp = (ctx: GenContext, app: App): Contribution => {
   const dir = appDir(app);

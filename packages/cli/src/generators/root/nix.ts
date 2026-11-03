@@ -1,4 +1,11 @@
-import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
+import {
+  Array as Arr,
+  Order,
+  pipe,
+  Record as Rec,
+  type Schema,
+  String as Str,
+} from 'effect';
 
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
@@ -7,7 +14,20 @@ import {
   androidToolchain,
   nixpkgsLock,
 } from '../../versions.ts';
-import { hasApp, managed, owned, seed } from '../shared.ts';
+import { hasApp, managed, owned, seedJson } from '../shared.ts';
+
+// A Nix double-quoted string: backslash, quote and `${` (which would start an
+// interpolation) escaped, and the escapes Nix has for control characters.
+const nixString = (text: string) =>
+  `"${pipe(
+    text,
+    Str.replaceAll('\\', String.raw`\\`),
+    Str.replaceAll('"', String.raw`\"`),
+    Str.replaceAll('${', String.raw`\${`),
+    Str.replaceAll('\n', String.raw`\n`),
+    Str.replaceAll('\r', String.raw`\r`),
+    Str.replaceAll('\t', String.raw`\t`),
+  )}"`;
 
 // Prebuilt bun release archives for the version in `packageManager`
 // (package-json.ts) and the CI setup action. nixpkgs lags bun releases, so
@@ -176,7 +196,7 @@ export const flake: Renderer = (ctx, aggregate) => {
       : `${ctx.config.name}: ${ctx.config.description}`;
   const android = hasAndroid(ctx.config);
   const content = `{
-  description = ${JSON.stringify(description)};
+  description = ${nixString(description)};
 ${android ? ANDROID_INPUTS : '\n  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";\n'}
   outputs = ${android ? '{\n    nixpkgs,\n    android-nixpkgs,\n    ...\n  }' : '{nixpkgs, ...}'}: let
 ${nixRegion('bun', bunOverlay(), '    ')}
@@ -235,43 +255,38 @@ const nixpkgsNode = {
   },
 };
 
-const sortKeys = (nodes: Readonly<Record<string, unknown>>) =>
+const sortKeys = (nodes: Readonly<Record<string, Schema.Json>>) =>
   Rec.fromEntries(
-    Arr.map(
-      Arr.sort(Rec.keys(nodes), Str.Order),
-      (key) => [key, nodes[key]] as const,
+    Arr.sort(
+      Rec.toEntries(nodes),
+      Order.mapInput(Str.Order, ([key]: readonly [string, Schema.Json]) => key),
     ),
   );
 
-const flakeLock = (android: boolean) =>
-  `${JSON.stringify(
-    {
-      // Keys sorted, as nix writes them.
-      nodes: sortKeys(
-        android
-          ? {
-              ...androidLockNodes,
-              nixpkgs: nixpkgsNode,
-              root: {
-                inputs: {
-                  'android-nixpkgs': 'android-nixpkgs',
-                  nixpkgs: 'nixpkgs',
-                },
-              },
-            }
-          : { nixpkgs: nixpkgsNode, root: { inputs: { nixpkgs: 'nixpkgs' } } },
-      ),
-      root: 'root',
-      version: 7,
-    },
-    null,
-    2,
-  )}\n`;
+const flakeLock = (android: boolean) => ({
+  // Keys sorted, as nix writes them.
+  nodes: sortKeys(
+    android
+      ? {
+          ...androidLockNodes,
+          nixpkgs: nixpkgsNode,
+          root: {
+            inputs: {
+              'android-nixpkgs': 'android-nixpkgs',
+              nixpkgs: 'nixpkgs',
+            },
+          },
+        }
+      : { nixpkgs: nixpkgsNode, root: { inputs: { nixpkgs: 'nixpkgs' } } },
+  ),
+  root: 'root',
+  version: 7,
+});
 
 export const nixFiles: Generator = (ctx) => ({
   files: [
     owned('.envrc', 'use flake\n'),
-    seed('flake.lock', flakeLock(hasAndroid(ctx.config))),
+    seedJson('flake.lock', flakeLock(hasAndroid(ctx.config))),
     ...(hasAndroid(ctx.config) ? [owned('nix/android.nix', androidNix)] : []),
   ],
   gitignore: ['.direnv', 'result', 'result-*'],

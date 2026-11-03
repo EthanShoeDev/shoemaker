@@ -31,6 +31,8 @@ export default defineConfig(
           'effecttsgo/prefer-effect-record': 'off',
           // Native string methods are all there is without effect/String.
           'effecttsgo/prefer-effect-string': 'off',
+          // JSON.parse is all there is without effect/Schema.
+          'effecttsgo/global-json': 'off',
         },
       },
       {

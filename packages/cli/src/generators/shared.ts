@@ -1,31 +1,46 @@
-import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
+import {
+  Array as Arr,
+  pipe,
+  Record as Rec,
+  type Schema,
+  String as Str,
+} from 'effect';
 
 import type { ShoemakerConfig } from '../config/schema.ts';
-import type { GenContext, GeneratedFile } from '../engine/types.ts';
+import { type GenContext, GeneratedFile } from '../engine/types.ts';
+import type { Jsonc } from './task-runner/jsonc.ts';
 import { type PackageCommand, packageCommands } from './task-runner/tasks.ts';
 
 // Helpers shared by every generator area. Keep these small and boring: each
 // generator should read like the file it produces.
 
-export const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+export const owned = (path: string, content: string) =>
+  GeneratedFile.Text({ path, strategy: 'owned', content });
 
-export const owned = (path: string, content: string): GeneratedFile => ({
-  path,
-  content,
-  strategy: 'owned',
-});
+export const seed = (path: string, content: string) =>
+  GeneratedFile.Text({ path, strategy: 'seed', content });
 
-export const seed = (path: string, content: string): GeneratedFile => ({
-  path,
-  content,
-  strategy: 'seed',
-});
+export const managed = (path: string, content: string) =>
+  GeneratedFile.Text({ path, strategy: 'managed', content });
 
-export const managed = (path: string, content: string): GeneratedFile => ({
-  path,
-  content,
-  strategy: 'managed',
-});
+export const ownedJson = (path: string, json: Schema.JsonObject) =>
+  GeneratedFile.Json({ path, strategy: 'owned', json });
+
+export const seedJson = (path: string, json: Schema.JsonObject) =>
+  GeneratedFile.Json({ path, strategy: 'seed', json });
+
+// turbo.jsonc takes trailing commas; `.json` files (nx, .vscode) do not.
+export const ownedJsonc = (path: string, jsonc: Jsonc) =>
+  GeneratedFile.Jsonc({
+    path,
+    strategy: 'owned',
+    jsonc,
+    trailingCommas: !Str.endsWith('.json')(path),
+  });
+
+// Keys shoemaker owns in a JSON file the user also edits (package.json).
+export const jsonMerge = (path: string, json: Schema.JsonObject) =>
+  GeneratedFile.Merge({ path, strategy: 'json-merge', json });
 
 // A managed region. `comment` is the line-comment token of the file type
 // (`//`, `#`, or `<!--` for markdown, which closes with `-->`).
@@ -86,7 +101,7 @@ export interface WorkspacePackage {
   // False when the package's tsconfig extends something other than
   // shoemaker-typescript-config (Expo extends expo/tsconfig.base).
   readonly sharedTsconfig?: boolean;
-  readonly extra?: Readonly<Record<string, unknown>>;
+  readonly extra?: Readonly<Record<string, Schema.Json>>;
 }
 
 // package.json for a workspace package, as a json-merge file so later syncs
@@ -94,45 +109,37 @@ export interface WorkspacePackage {
 export const workspacePackageJson = (
   ctx: GenContext,
   pkg: WorkspacePackage,
-): GeneratedFile => {
+) => {
   const scripts: Readonly<Record<string, string>> = packageScripts(
     ctx.config,
     pkg.scripts,
     pkg.optOut,
   );
-  return {
-    path: `${pkg.dir}/package.json`,
-    strategy: 'json-merge',
-    content: json({
-      name: ctx.pkg(pkg.name),
-      version: '0.0.0',
-      private: true,
-      ...(pkg.module === false ? {} : { type: 'module' }),
-      ...(pkg.description === undefined
-        ? {}
-        : { description: pkg.description }),
-      ...(pkg.exports === undefined
-        ? {}
-        : { exports: { ...pkg.exports, './package.json': './package.json' } }),
-      ...(Rec.isEmptyRecord(scripts) ? {} : { scripts }),
-      dependencies: {
-        ...Rec.fromEntries(
-          Arr.map(
-            Arr.sort(pkg.workspaceDependencies ?? [], Str.Order),
-            (name) => [ctx.pkg(name), 'workspace:*'] as const,
-          ),
+  return jsonMerge(`${pkg.dir}/package.json`, {
+    name: ctx.pkg(pkg.name),
+    version: '0.0.0',
+    private: true,
+    ...(pkg.module === false ? {} : { type: 'module' }),
+    ...(pkg.description === undefined ? {} : { description: pkg.description }),
+    ...(pkg.exports === undefined
+      ? {}
+      : { exports: { ...pkg.exports, './package.json': './package.json' } }),
+    ...(Rec.isEmptyRecord(scripts) ? {} : { scripts }),
+    dependencies: {
+      ...Rec.fromEntries(
+        Arr.map(
+          Arr.sort(pkg.workspaceDependencies ?? [], Str.Order),
+          (name) => [ctx.pkg(name), 'workspace:*'] as const,
         ),
-        ...catalogDeps(pkg.dependencies ?? []),
-      },
-      devDependencies: catalogDeps([
-        ...(pkg.sharedTsconfig === false
-          ? []
-          : ['shoemaker-typescript-config']),
-        ...(pkg.devDependencies ?? []),
-      ]),
-      ...pkg.extra,
-    }),
-  };
+      ),
+      ...catalogDeps(pkg.dependencies ?? []),
+    },
+    devDependencies: catalogDeps([
+      ...(pkg.sharedTsconfig === false ? [] : ['shoemaker-typescript-config']),
+      ...(pkg.devDependencies ?? []),
+    ]),
+    ...pkg.extra,
+  });
 };
 
 // Per-package tsconfig extending the shared base.
@@ -140,22 +147,19 @@ export const packageTsconfig = (
   dir: string,
   options: {
     readonly react?: boolean;
-    readonly compilerOptions?: Readonly<Record<string, unknown>>;
+    readonly compilerOptions?: Schema.JsonObject;
     readonly include?: ReadonlyArray<string>;
   } = {},
-): GeneratedFile =>
-  owned(
-    `${dir}/tsconfig.json`,
-    json({
-      extends: `shoemaker-typescript-config/${
-        options.react === true ? 'tsconfig.react.json' : 'tsconfig.base.json'
-      }`,
-      ...(options.compilerOptions === undefined
-        ? {}
-        : { compilerOptions: options.compilerOptions }),
-      include: options.include ?? ['src/**/*', 'test/**/*', '*.ts'],
-    }),
-  );
+) =>
+  ownedJson(`${dir}/tsconfig.json`, {
+    extends: `shoemaker-typescript-config/${
+      options.react === true ? 'tsconfig.react.json' : 'tsconfig.base.json'
+    }`,
+    ...(options.compilerOptions === undefined
+      ? {}
+      : { compilerOptions: options.compilerOptions }),
+    include: options.include ?? ['src/**/*', 'test/**/*', '*.ts'],
+  });
 
 // Wrap a command so it runs with the repo's env/secrets loaded.
 export const withSecrets = (

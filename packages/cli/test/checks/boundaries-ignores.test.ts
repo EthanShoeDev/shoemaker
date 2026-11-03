@@ -7,26 +7,21 @@ import {
 } from '../../src/checks/lint-ignores.ts';
 import { packageBoundariesCheck } from '../../src/checks/package-boundaries.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
+import { compactJsonFiles } from './helpers.ts';
 
 describe('package-boundaries check', () => {
-  const files = (webDeps: Record<string, string>) => ({
-    'package.json': JSON.stringify({
-      name: 'demo',
-      workspaces: ['apps/*', 'packages/*'],
-    }),
-    'apps/api/package.json': JSON.stringify({ name: '@demo/api' }),
-    'apps/web/package.json': JSON.stringify({
-      name: '@demo/web',
-      dependencies: webDeps,
-    }),
-    'packages/lib/package.json': JSON.stringify({ name: '@demo/lib' }),
-  });
+  const files = (webDeps: Record<string, string>) =>
+    compactJsonFiles({
+      'package.json': { name: 'demo', workspaces: ['apps/*', 'packages/*'] },
+      'apps/api/package.json': { name: '@demo/api' },
+      'apps/web/package.json': { name: '@demo/web', dependencies: webDeps },
+      'packages/lib/package.json': { name: '@demo/lib' },
+    });
 
   it.effect('passes when apps are leaves', () =>
     Effect.gen(function* () {
-      const result = yield* packageBoundariesCheck.run(
-        makeMemoryRepo(files({ '@demo/lib': 'workspace:*' })),
-      );
+      const leaves = yield* files({ '@demo/lib': 'workspace:*' });
+      const result = yield* packageBoundariesCheck.run(makeMemoryRepo(leaves));
       assert.isTrue(result.ok);
       assert.include(result.report, '4 packages, 2 apps');
     }),
@@ -34,9 +29,8 @@ describe('package-boundaries check', () => {
 
   it.effect('fails when anything depends on an app', () =>
     Effect.gen(function* () {
-      const result = yield* packageBoundariesCheck.run(
-        makeMemoryRepo(files({ '@demo/api': 'workspace:*' })),
-      );
+      const onApp = yield* files({ '@demo/api': 'workspace:*' });
+      const result = yield* packageBoundariesCheck.run(makeMemoryRepo(onApp));
       assert.isFalse(result.ok);
       assert.include(
         result.report,
@@ -47,14 +41,12 @@ describe('package-boundaries check', () => {
 
   it.effect('lets a site depend on the API it mounts at /api', () =>
     Effect.gen(function* () {
+      const site = yield* files({
+        '@demo/api': 'workspace:*',
+        '@tanstack/react-start': 'catalog:',
+      });
       const result = yield* packageBoundariesCheck.run(
-        makeMemoryRepo({
-          ...files({
-            '@demo/api': 'workspace:*',
-            '@tanstack/react-start': 'catalog:',
-          }),
-          'apps/web/src/routes/api.$.ts': '',
-        }),
+        makeMemoryRepo({ ...site, 'apps/web/src/routes/api.$.ts': '' }),
       );
       assert.isTrue(result.ok);
       assert.include(
@@ -66,14 +58,11 @@ describe('package-boundaries check', () => {
 
   it.effect('still fails a site without an /api route', () =>
     Effect.gen(function* () {
-      const result = yield* packageBoundariesCheck.run(
-        makeMemoryRepo(
-          files({
-            '@demo/api': 'workspace:*',
-            '@tanstack/react-start': 'catalog:',
-          }),
-        ),
-      );
+      const site = yield* files({
+        '@demo/api': 'workspace:*',
+        '@tanstack/react-start': 'catalog:',
+      });
+      const result = yield* packageBoundariesCheck.run(makeMemoryRepo(site));
       assert.isFalse(result.ok);
     }),
   );

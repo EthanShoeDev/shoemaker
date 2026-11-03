@@ -15,10 +15,9 @@ import {
   assertSourcesParse,
   assertStrategies,
   contribute,
-  parseJson,
-  record,
   sampleConfig,
 } from '../apps/helpers.ts';
+import { record } from '../files.ts';
 
 const apps: ReadonlyArray<App> = [
   { name: 'web', kind: 'tanstack-start' },
@@ -31,8 +30,7 @@ const withInfra = (deploy: DeployTarget, state: StateStore) =>
   sampleConfig({ apps, infra: { kind: 'alchemy', deploy, state } });
 
 const run = (deploy: DeployTarget, state: StateStore) =>
-  contribute(alchemyInfra, withInfra(deploy, state)).file('alchemy.run.ts')
-    .content;
+  contribute(alchemyInfra, withInfra(deploy, state)).text('alchemy.run.ts');
 
 const combos: ReadonlyArray<readonly [DeployTarget, StateStore]> = [
   ['cloudflare', 'local'],
@@ -44,7 +42,7 @@ const combos: ReadonlyArray<readonly [DeployTarget, StateStore]> = [
 describe.each(combos)(
   'alchemy infra (deploy %s, state %s)',
   (deploy, state) => {
-    const { contribution, files, byPath, file } = contribute(
+    const { contribution, files, byPath, json } = contribute(
       alchemyInfra,
       withInfra(deploy, state),
     );
@@ -60,7 +58,7 @@ describe.each(combos)(
     });
 
     it('wraps the root infra scripts with the secrets manager', () => {
-      const scripts = record(parseJson(file('package.json')).scripts);
+      const scripts = record(json('package.json').scripts);
       assert.deepStrictEqual(scripts, {
         'infra:dev': 'varlock run -- alchemy dev',
         'infra:plan': 'varlock run -- alchemy plan',
@@ -87,7 +85,7 @@ describe.each(combos)(
 
 describe('infra scripts under secretspec', () => {
   it('routes the CLI through a plain alchemy script knip can trace', () => {
-    const { file } = contribute(
+    const { json } = contribute(
       alchemyInfra,
       sampleConfig({
         apps,
@@ -95,7 +93,7 @@ describe('infra scripts under secretspec', () => {
         infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
       }),
     );
-    const scripts = record(parseJson(file('package.json')).scripts);
+    const scripts = record(json('package.json').scripts);
     const via = (verb: string) =>
       `secretspec run --profile development -- bun run alchemy ${verb}`;
     assert.deepStrictEqual(scripts, {
@@ -124,10 +122,8 @@ describe('deploy targets', () => {
   });
 
   it("installs the Stack's imports at the root, where alchemy runs", () => {
-    const { file } = contribute(alchemyInfra, withInfra('cloudflare', 'local'));
-    const devDependencies = record(
-      parseJson(file('package.json')).devDependencies,
-    );
+    const { json } = contribute(alchemyInfra, withInfra('cloudflare', 'local'));
+    const devDependencies = record(json('package.json').devDependencies);
     assert.strictEqual(devDependencies['@alchemy.run/cloudflare'], 'catalog:');
     assert.isUndefined(devDependencies['@sample/api']);
   });
@@ -204,29 +200,27 @@ describe('providers', () => {
     );
 
   it('registers GitHub alone, with no cloud', () => {
-    const { file } = withProviders('none', ['github']);
-    const source = file('alchemy.run.ts').content;
+    const { text, json } = withProviders('none', ['github']);
+    const source = text('alchemy.run.ts');
     assert.include(source, "import * as GitHub from '@alchemy.run/github';");
     assert.include(source, 'providers: GitHub.providers()');
     assert.include(source, 'Effect.succeed({})');
     assert.notInclude(source, 'Layer');
-    const devDependencies = record(
-      parseJson(file('package.json')).devDependencies,
-    );
+    const devDependencies = record(json('package.json').devDependencies);
     assert.property(devDependencies, '@alchemy.run/github');
     assert.notProperty(devDependencies, '@alchemy.run/cloudflare');
   });
 
   it('registers none at all', () => {
-    const source = withProviders('none', []).file('alchemy.run.ts').content;
+    const source = withProviders('none', []).text('alchemy.run.ts');
     assert.include(source, 'providers: Layer.empty');
     assert.notInclude(source, '@alchemy.run/');
   });
 
   it("always includes the deploy target's provider", () => {
-    const source = withProviders('cloudflare', ['github']).file(
+    const source = withProviders('cloudflare', ['github']).text(
       'alchemy.run.ts',
-    ).content;
+    );
     assert.include(
       source,
       'providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers())',
@@ -235,9 +229,9 @@ describe('providers', () => {
   });
 
   it('breaks a long provider list the way oxfmt does', () => {
-    const source = withProviders('aws', ['cloudflare', 'github']).file(
+    const source = withProviders('aws', ['cloudflare', 'github']).text(
       'alchemy.run.ts',
-    ).content;
+    );
     assert.include(
       source,
       '    providers: Layer.mergeAll(\n      AWS.providers(),\n      Cloudflare.providers(),\n      GitHub.providers(),\n    ),',
@@ -265,7 +259,7 @@ describe('a served API', () => {
         ],
         infra: { kind: 'alchemy', deploy: 'cloudflare', state: 'local' },
       }),
-    ).file('alchemy.run.ts').content;
+    ).text('alchemy.run.ts');
     assert.include(source, "Cloudflare.Website.Vite('Web'");
     assert.notInclude(source, 'worker.ts');
   });

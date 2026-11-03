@@ -15,9 +15,10 @@ const readRepo = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const root = path.resolve(import.meta.dirname, '../../..');
-  const config = yield* Schema.decodeEffect(ChangesetConfig)(
-    yield* fs.readFileString(path.join(root, '.changeset/config.json')),
+  const configText = yield* fs.readFileString(
+    path.join(root, '.changeset/config.json'),
   );
+  const config = yield* Schema.decodeEffect(ChangesetConfig)(configText);
   const dirs = yield* fs.readDirectory(path.join(root, 'packages'));
   const manifests = yield* Effect.forEach(dirs, (dir) =>
     Effect.flatMap(

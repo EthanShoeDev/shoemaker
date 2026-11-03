@@ -4,8 +4,7 @@ import { Array as Arr, Effect, Record as Rec } from 'effect';
 import { effectVersionsCheck } from '../../src/checks/effect-versions.ts';
 import { patchesCheck } from '../../src/checks/patches.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
-
-const json = (value: unknown) => JSON.stringify(value);
+import { compactJsonFiles } from './helpers.ts';
 
 const lock = (resolved: Record<string, string>) =>
   `{\n  "lockfileVersion": 1,\n  "packages": {\n${Arr.join(
@@ -64,25 +63,34 @@ const patch = (file: string, added: string) =>
   `diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n@@ -1 +1 @@\n-old\n+${added}\n`;
 
 describe('patches check', () => {
-  const base = {
-    'package.json': json({
-      patchedDependencies: { 'expo-audio@57.0.3': 'patches/expo-audio.patch' },
-    }),
-    'patches/expo-audio.patch': patch(
-      'build/index.js',
-      'const MAX_RATE = 4.0;',
-    ),
-    'bun.lock': lock({}),
-  };
+  // The repo with expo-audio@`version` installed.
+  const base = Effect.fnUntraced(function* (version: string) {
+    const manifests = yield* compactJsonFiles({
+      'package.json': {
+        patchedDependencies: {
+          'expo-audio@57.0.3': 'patches/expo-audio.patch',
+        },
+      },
+      'node_modules/expo-audio/package.json': { version },
+    });
+    return {
+      ...manifests,
+      'patches/expo-audio.patch': patch(
+        'build/index.js',
+        'const MAX_RATE = 4.0;',
+      ),
+      'bun.lock': lock({}),
+    };
+  });
 
   it.effect(
     'passes when the installed version matches and the patch text is present',
     () =>
       Effect.gen(function* () {
+        const installed = yield* base('57.0.3');
         const result = yield* patchesCheck.run(
           makeMemoryRepo({
-            ...base,
-            'node_modules/expo-audio/package.json': json({ version: '57.0.3' }),
+            ...installed,
             'node_modules/expo-audio/build/index.js':
               'x\nconst MAX_RATE = 4.0;\n',
           }),
@@ -95,12 +103,8 @@ describe('patches check', () => {
     'fails when bun re-resolved the dependency (patch silently skipped)',
     () =>
       Effect.gen(function* () {
-        const result = yield* patchesCheck.run(
-          makeMemoryRepo({
-            ...base,
-            'node_modules/expo-audio/package.json': json({ version: '57.0.4' }),
-          }),
-        );
+        const installed = yield* base('57.0.4');
+        const result = yield* patchesCheck.run(makeMemoryRepo(installed));
         assert.isFalse(result.ok);
         assert.include(result.report, 'installed version is 57.0.4');
       }),
@@ -110,11 +114,11 @@ describe('patches check', () => {
     'fails when the patched lines are missing, and warns about orphan patches',
     () =>
       Effect.gen(function* () {
+        const installed = yield* base('57.0.3');
         const result = yield* patchesCheck.run(
           makeMemoryRepo({
-            ...base,
+            ...installed,
             'patches/howler.patch': patch('a.js', 'something long enough'),
-            'node_modules/expo-audio/package.json': json({ version: '57.0.3' }),
             'node_modules/expo-audio/build/index.js': 'const MAX_RATE = 2.0;\n',
           }),
         );

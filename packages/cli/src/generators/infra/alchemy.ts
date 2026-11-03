@@ -10,7 +10,7 @@ import type { Contribution, GenContext } from '../../engine/types.ts';
 import { pascalCase } from '../apps/common.ts';
 import { contractName, isServed } from '../apps/mount.ts';
 import type { EnvVar } from '../secrets/model.ts';
-import { catalogDeps, json, seed, withSecrets } from '../shared.ts';
+import { catalogDeps, jsonMerge, seed, withSecrets } from '../shared.ts';
 import type { TaskDef } from '../task-runner/model.ts';
 import { alchemyProviders, deployTarget, PROVIDERS } from './target.ts';
 
@@ -279,14 +279,10 @@ export const alchemyInfra = (ctx: GenContext): Contribution => {
   return {
     files: [
       seed('alchemy.run.ts', runSource(config, state)),
-      {
-        path: 'package.json',
-        strategy: 'json-merge',
-        content: json({
-          scripts: infraScripts(config),
-          devDependencies: catalogDeps(devDependencies),
-        }),
-      },
+      jsonMerge('package.json', {
+        scripts: infraScripts(config),
+        devDependencies: catalogDeps(devDependencies),
+      }),
     ],
     tasks: rootTasks(config),
     env,

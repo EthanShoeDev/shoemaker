@@ -27,7 +27,8 @@ const writeTrace = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const now = yield* Clock.currentTimeMillis;
   const filename = Option.getOrElse(output, () => `trace-${now}.json`);
-  yield* fs.writeFileString(filename, yield* encodeTraceExport(data));
+  const encoded = yield* encodeTraceExport(data);
+  yield* fs.writeFileString(filename, encoded);
   yield* Console.log(`\nTrace exported to ${filename}`);
 });
 
@@ -72,7 +73,8 @@ const replayCommand = Command.make(
   },
   Effect.fnUntraced(function* ({ file }) {
     const fs = yield* FileSystem.FileSystem;
-    const data = yield* decodeTraceExport(yield* fs.readFileString(file));
+    const contents = yield* fs.readFileString(file);
+    const data = yield* decodeTraceExport(contents);
 
     yield* Console.log(`Replaying trace from ${file}`);
     yield* Console.log(`Service: ${data.serviceName}`);
@@ -99,7 +101,6 @@ const spanoptic = Command.make('spanoptic', {}, () =>
 Command.run(spanoptic, { version: '0.0.1' }).pipe(
   // Effect logs would paint over the TUI; traceVisualize captures its own.
   Effect.provideService(References.MinimumLogLevel, 'None'),
-  // oxlint-disable-next-line effecttsgo/strict-effect-provide -- this is the entry point
   Effect.provide(BunServices.layer),
   BunRuntime.runMain,
 );

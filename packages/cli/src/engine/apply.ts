@@ -81,8 +81,13 @@ export const removeFile = Effect.fnUntraced(function* (
   if (exists) yield* fs.remove(target);
 });
 
-export const writeLock = (root: string, lock: Lock) =>
-  writeFile(root, LOCK_PATH, renderLock(lock));
+export const writeLock = Effect.fnUntraced(function* (
+  root: string,
+  lock: Lock,
+) {
+  const text = yield* renderLock(lock);
+  yield* writeFile(root, LOCK_PATH, text);
+});
 
 // Writes every create/update in the plan. The caller writes the lock.
 export const applyPlan = Effect.fnUntraced(function* (

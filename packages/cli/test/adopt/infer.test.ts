@@ -4,80 +4,86 @@ import { Array as Arr, Effect, Order } from 'effect';
 import { inferConfig } from '../../src/adopt/infer.ts';
 import { decodeConfig, defaultConfig } from '../../src/config/schema.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
+import { compactJsonFiles } from '../checks/helpers.ts';
 
-const json = (value: unknown) => JSON.stringify(value);
-
-const repo = {
-  'package.json': json({
-    name: '@listening/monorepo',
-    description: 'Listen to anything',
-    workspaces: { packages: ['apps/*', 'packages/*', 'packages/config/*'] },
+const repo = Effect.map(
+  compactJsonFiles({
+    'package.json': {
+      name: '@listening/monorepo',
+      description: 'Listen to anything',
+      workspaces: { packages: ['apps/*', 'packages/*', 'packages/config/*'] },
+    },
+    'apps/web/package.json': {
+      name: '@listening/web',
+      dependencies: { '@tanstack/react-start': 'catalog:' },
+    },
+    'apps/blog/package.json': {
+      name: '@listening/blog',
+      dependencies: { foldkit: 'catalog:' },
+    },
+    'apps/mobile/package.json': {
+      name: '@listening/mobile',
+      dependencies: { expo: 'catalog:' },
+    },
+    'apps/api/package.json': {
+      name: '@listening/api',
+      dependencies: { effect: 'catalog:', '@effect/platform-bun': 'catalog:' },
+    },
+    'apps/tool/package.json': {
+      name: '@listening/tool',
+      bin: { tool: './src/bin.ts' },
+      dependencies: { effect: 'catalog:' },
+    },
+    'apps/desktop/package.json': {
+      name: '@listening/desktop',
+      dependencies: { electron: '^1' },
+    },
+    'packages/domain/package.json': {
+      name: '@listening/domain',
+      exports: { '.': './src/index.ts' },
+    },
+    'packages/env/package.json': {
+      name: '@listening/env',
+      exports: { '.': './src/index.ts' },
+    },
+    'packages/oxlint-plugins/package.json': {
+      name: '@listening/oxlint-plugins',
+      exports: { '.': './src/index.ts' },
+    },
+    'packages/config/typescript-config/package.json': {
+      name: '@listening/typescript-config',
+      exports: { '.': './x.json' },
+    },
+    'packages/no-src/package.json': {
+      name: '@listening/no-src',
+      exports: { '.': './index.js' },
+    },
   }),
-  'apps/web/package.json': json({
-    name: '@listening/web',
-    dependencies: { '@tanstack/react-start': 'catalog:' },
+  (manifests) => ({
+    ...manifests,
+    'apps/api/src/main.ts':
+      "import { HttpApiBuilder } from 'effect/http-api';\n",
+    'apps/tool/src/bin.ts': "import { Command } from 'effect/cli';\n",
+    'packages/domain/src/index.ts': 'export {};\n',
+    'packages/env/src/index.ts': '',
+    'packages/oxlint-plugins/src/index.ts': '',
+    'turbo.jsonc': '{}',
+    '.env.schema': '',
+    'alchemy.run.ts':
+      "import * as Cloudflare from 'alchemy/Cloudflare';\nexport default Stack('x', { state: Cloudflare.state() });\n",
+    'packages/infra/src/aws.ts': "import * as AWS from 'alchemy/AWS';\n",
+    '.github/workflows/ci.yml': '',
+    '.changeset/config.json': '{}',
+    'AGENTS.md': '',
   }),
-  'apps/blog/package.json': json({
-    name: '@listening/blog',
-    dependencies: { foldkit: 'catalog:' },
-  }),
-  'apps/mobile/package.json': json({
-    name: '@listening/mobile',
-    dependencies: { expo: 'catalog:' },
-  }),
-  'apps/api/package.json': json({
-    name: '@listening/api',
-    dependencies: { effect: 'catalog:', '@effect/platform-bun': 'catalog:' },
-  }),
-  'apps/api/src/main.ts': "import { HttpApiBuilder } from 'effect/http-api';\n",
-  'apps/tool/package.json': json({
-    name: '@listening/tool',
-    bin: { tool: './src/bin.ts' },
-    dependencies: { effect: 'catalog:' },
-  }),
-  'apps/tool/src/bin.ts': "import { Command } from 'effect/cli';\n",
-  'apps/desktop/package.json': json({
-    name: '@listening/desktop',
-    dependencies: { electron: '^1' },
-  }),
-  'packages/domain/package.json': json({
-    name: '@listening/domain',
-    exports: { '.': './src/index.ts' },
-  }),
-  'packages/domain/src/index.ts': 'export {};\n',
-  'packages/env/package.json': json({
-    name: '@listening/env',
-    exports: { '.': './src/index.ts' },
-  }),
-  'packages/env/src/index.ts': '',
-  'packages/oxlint-plugins/package.json': json({
-    name: '@listening/oxlint-plugins',
-    exports: { '.': './src/index.ts' },
-  }),
-  'packages/oxlint-plugins/src/index.ts': '',
-  'packages/config/typescript-config/package.json': json({
-    name: '@listening/typescript-config',
-    exports: { '.': './x.json' },
-  }),
-  'packages/no-src/package.json': json({
-    name: '@listening/no-src',
-    exports: { '.': './index.js' },
-  }),
-  'turbo.jsonc': '{}',
-  '.env.schema': '',
-  'alchemy.run.ts':
-    "import * as Cloudflare from 'alchemy/Cloudflare';\nexport default Stack('x', { state: Cloudflare.state() });\n",
-  'packages/infra/src/aws.ts': "import * as AWS from 'alchemy/AWS';\n",
-  '.github/workflows/ci.yml': '',
-  '.changeset/config.json': '{}',
-  'AGENTS.md': '',
-};
+);
 
 describe('inferConfig', () => {
   it.effect('infers name, scope, apps, libraries and repo features', () =>
     Effect.gen(function* () {
+      const files = yield* repo;
       const config = yield* inferConfig(
-        makeMemoryRepo(repo, '/home/me/listening-astro'),
+        makeMemoryRepo(files, '/home/me/listening-astro'),
       );
       yield* decodeConfig(config);
       assert.strictEqual(config.name, 'listening');
@@ -118,10 +124,13 @@ describe('inferConfig', () => {
 
   it.effect('detects nx, secretspec and the absence of infra/ci', () =>
     Effect.gen(function* () {
+      const manifests = yield* compactJsonFiles({
+        'package.json': { name: 'My_Project', workspaces: ['apps/*'] },
+        'apps/web/package.json': { name: '@mp/web' },
+      });
       const config = yield* inferConfig(
         makeMemoryRepo({
-          'package.json': json({ name: 'My_Project', workspaces: ['apps/*'] }),
-          'apps/web/package.json': json({ name: '@mp/web' }),
+          ...manifests,
           'nx.json': '{}',
           'apps/web/secretspec.toml': '',
           '.vscode/settings.json': '{}',
@@ -139,9 +148,12 @@ describe('inferConfig', () => {
 
   it.effect('lists the GitHub provider, which deploys nothing', () =>
     Effect.gen(function* () {
+      const manifests = yield* compactJsonFiles({
+        'package.json': { name: 'gh-only' },
+      });
       const config = yield* inferConfig(
         makeMemoryRepo({
-          'package.json': json({ name: 'gh-only' }),
+          ...manifests,
           'alchemy.run.ts':
             "import * as GitHub from '@alchemy.run/github';\nexport default Alchemy.Stack('x', { providers: GitHub.providers() });\n",
         }),
@@ -158,24 +170,27 @@ describe('inferConfig', () => {
 
   it.effect('sees a site that serves an effect-api app at /api', () =>
     Effect.gen(function* () {
+      const manifests = yield* compactJsonFiles({
+        'package.json': { name: 'shop', workspaces: ['apps/*'] },
+        'apps/web/package.json': {
+          name: '@shop/web',
+          dependencies: {
+            '@shop/api': 'workspace:*',
+            '@tanstack/react-start': 'catalog:',
+          },
+        },
+        'apps/api/package.json': {
+          name: '@shop/api',
+          dependencies: {
+            '@effect/platform-bun': 'catalog:',
+            effect: 'catalog:',
+          },
+        },
+      });
       const config = yield* inferConfig(
         makeMemoryRepo({
-          'package.json': json({ name: 'shop', workspaces: ['apps/*'] }),
-          'apps/web/package.json': json({
-            name: '@shop/web',
-            dependencies: {
-              '@shop/api': 'workspace:*',
-              '@tanstack/react-start': 'catalog:',
-            },
-          }),
+          ...manifests,
           'apps/web/src/routes/api.$.ts': '',
-          'apps/api/package.json': json({
-            name: '@shop/api',
-            dependencies: {
-              '@effect/platform-bun': 'catalog:',
-              effect: 'catalog:',
-            },
-          }),
           'apps/api/src/handlers.ts': 'HttpApiBuilder.group(Api)',
         }),
       );
@@ -189,25 +204,25 @@ describe('inferConfig', () => {
 
   it.effect("takes an API's contract package as part of the API", () =>
     Effect.gen(function* () {
+      const manifests = yield* compactJsonFiles({
+        'package.json': { name: 'shop', workspaces: ['apps/*', 'packages/*'] },
+        'apps/api/package.json': {
+          name: '@shop/api',
+          dependencies: {
+            '@effect/platform-bun': 'catalog:',
+            '@shop/api-contract': 'workspace:*',
+            effect: 'catalog:',
+          },
+        },
+        'packages/api-contract/package.json': {
+          name: '@shop/api-contract',
+          exports: { '.': './src/index.ts' },
+        },
+      });
       const config = yield* inferConfig(
         makeMemoryRepo({
-          'package.json': json({
-            name: 'shop',
-            workspaces: ['apps/*', 'packages/*'],
-          }),
-          'apps/api/package.json': json({
-            name: '@shop/api',
-            dependencies: {
-              '@effect/platform-bun': 'catalog:',
-              '@shop/api-contract': 'workspace:*',
-              effect: 'catalog:',
-            },
-          }),
+          ...manifests,
           'apps/api/src/handlers.ts': 'HttpApiBuilder.group(Api)',
-          'packages/api-contract/package.json': json({
-            name: '@shop/api-contract',
-            exports: { '.': './src/index.ts' },
-          }),
           'packages/api-contract/src/index.ts': 'HttpApi.make("api")',
         }),
       );

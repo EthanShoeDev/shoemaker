@@ -4,7 +4,7 @@ import { Array as Arr, Effect, Record as Rec, String as Str } from 'effect';
 import { themeImports, themeTokens } from '../../src/doctor/theme.ts';
 import { sampleConfig } from '../generators/apps/helpers.ts';
 import { render } from '../generators/root/fixtures.ts';
-import { failures, json, runCheck } from './helpers.ts';
+import { failures, jsonFiles, runCheck } from './helpers.ts';
 
 const generated = render(
   sampleConfig({
@@ -14,7 +14,7 @@ const generated = render(
     ],
   }),
 );
-const tokens = generated.file('packages/theme/tokens.css').content;
+const tokens = generated.text('packages/theme/tokens.css');
 
 const messages = (found: ReadonlyArray<{ readonly message: string }>) =>
   Arr.map(found, (f) => f.message);
@@ -22,12 +22,10 @@ const messages = (found: ReadonlyArray<{ readonly message: string }>) =>
 describe('theme-tokens doctor check', () => {
   it.effect('says nothing for a repo without themes', () =>
     Effect.gen(function* () {
-      assert.deepStrictEqual(
-        yield* runCheck(themeTokens, {
-          'apps/web/src/styles.css': "@import 'tailwindcss';\n",
-        }),
-        [],
-      );
+      const tailwindOnlyFailures = yield* runCheck(themeTokens, {
+        'apps/web/src/styles.css': "@import 'tailwindcss';\n",
+      });
+      assert.deepStrictEqual(tailwindOnlyFailures, []);
     }),
   );
 
@@ -49,12 +47,12 @@ describe('theme-tokens doctor check', () => {
         /(@variant dark \{[^}]*?)\s*--color-ring: [^;]*;/u,
         '$1',
       )(tokens);
-      assert.deepStrictEqual(
-        messages(
-          yield* failures(themeTokens, { 'packages/theme/tokens.css': broken }),
-        ),
-        ['packages/theme/tokens.css: theme dark is missing --color-ring'],
-      );
+      const brokenTokenFailures = yield* failures(themeTokens, {
+        'packages/theme/tokens.css': broken,
+      });
+      assert.deepStrictEqual(messages(brokenTokenFailures), [
+        'packages/theme/tokens.css: theme dark is missing --color-ring',
+      ]);
     }),
   );
 
@@ -68,12 +66,12 @@ describe('theme-tokens doctor check', () => {
   }
 }
 `;
-      assert.deepStrictEqual(
-        messages(
-          yield* failures(themeTokens, { 'apps/mobile/src/global.css': sheet }),
-        ),
-        ['apps/mobile/src/global.css: theme dark is missing --color-text'],
-      );
+      const mobileSheetFailures = yield* failures(themeTokens, {
+        'apps/mobile/src/global.css': sheet,
+      });
+      assert.deepStrictEqual(messages(mobileSheetFailures), [
+        'apps/mobile/src/global.css: theme dark is missing --color-text',
+      ]);
     }),
   );
 
@@ -83,64 +81,62 @@ describe('theme-tokens doctor check', () => {
       Effect.gen(function* () {
         const broken = `@plugin '@tailwindcss/typography';
 ${Str.replace('--color-ring: unset;', '')(tokens)}`;
-        assert.deepStrictEqual(
-          messages(
-            yield* failures(themeTokens, {
-              'packages/theme/tokens.css': broken,
-            }),
-          ),
-          [
-            'packages/theme/tokens.css: --color-ring not declared in @theme',
-            'packages/theme/tokens.css uses @plugin, which Uniwind cannot parse',
-          ],
-        );
+        const brokenPluginFailures = yield* failures(themeTokens, {
+          'packages/theme/tokens.css': broken,
+        });
+        assert.deepStrictEqual(messages(brokenPluginFailures), [
+          'packages/theme/tokens.css: --color-ring not declared in @theme',
+          'packages/theme/tokens.css uses @plugin, which Uniwind cannot parse',
+        ]);
       }),
   );
 });
 
-const workspace = (
+const workspace = Effect.fnUntraced(function* (
   apps: Readonly<Record<string, { deps: Record<string, string>; css: string }>>,
-) => ({
-  'package.json': json({
-    name: 'sample',
-    workspaces: ['apps/*', 'packages/*'],
-  }),
-  'packages/theme/package.json': json({ name: '@sample/theme' }),
-  ...Rec.fromEntries(
-    Arr.flatMap(Rec.toEntries(apps), ([name, app]) => [
-      [
+) {
+  const manifests = yield* jsonFiles({
+    'package.json': { name: 'sample', workspaces: ['apps/*', 'packages/*'] },
+    'packages/theme/package.json': { name: '@sample/theme' },
+    ...Rec.fromEntries(
+      Arr.map(Rec.toEntries(apps), ([name, app]) => [
         `apps/${name}/package.json`,
-        json({ name: `@sample/${name}`, dependencies: app.deps }),
-      ] as const,
-      [`apps/${name}/src/styles.css`, app.css] as const,
-    ]),
-  ),
+        { name: `@sample/${name}`, dependencies: app.deps },
+      ]),
+    ),
+  });
+  return {
+    ...manifests,
+    ...Rec.fromEntries(
+      Arr.map(Rec.toEntries(apps), ([name, app]) => [
+        `apps/${name}/src/styles.css`,
+        app.css,
+      ]),
+    ),
+  };
 });
 
 describe('theme-imports doctor check', () => {
   it.effect('says nothing without a theme package', () =>
     Effect.gen(function* () {
-      assert.deepStrictEqual(
-        yield* runCheck(themeImports, {
-          'package.json': json({ name: 'sample', workspaces: ['apps/*'] }),
-        }),
-        [],
-      );
+      const files = yield* jsonFiles({
+        'package.json': { name: 'sample', workspaces: ['apps/*'] },
+      });
+      const workspaceImportFailures = yield* runCheck(themeImports, files);
+      assert.deepStrictEqual(workspaceImportFailures, []);
     }),
   );
 
   it.effect('passes apps that import the theme', () =>
     Effect.gen(function* () {
-      const findings = yield* runCheck(
-        themeImports,
-        workspace({
-          web: {
-            deps: { tailwindcss: 'catalog:', '@sample/theme': 'workspace:*' },
-            css: "@import 'tailwindcss';\n@import '@sample/theme/web.css';\n",
-          },
-          api: { deps: { effect: 'catalog:' }, css: '' },
-        }),
-      );
+      const files = yield* workspace({
+        web: {
+          deps: { tailwindcss: 'catalog:', '@sample/theme': 'workspace:*' },
+          css: "@import 'tailwindcss';\n@import '@sample/theme/web.css';\n",
+        },
+        api: { deps: { effect: 'catalog:' }, css: '' },
+      });
+      const findings = yield* runCheck(themeImports, files);
       assert.deepStrictEqual(
         Arr.map(findings, (f) => [f.ok, f.message]),
         [[true, '1 app share @sample/theme']],
@@ -150,15 +146,13 @@ describe('theme-imports doctor check', () => {
 
   it.effect('flags a styled app that skips the theme', () =>
     Effect.gen(function* () {
-      const found = yield* failures(
-        themeImports,
-        workspace({
-          mobile: {
-            deps: { uniwind: 'catalog:' },
-            css: "@import 'tailwindcss';\n@import 'uniwind';\n",
-          },
-        }),
-      );
+      const files = yield* workspace({
+        mobile: {
+          deps: { uniwind: 'catalog:' },
+          css: "@import 'tailwindcss';\n@import 'uniwind';\n",
+        },
+      });
+      const found = yield* failures(themeImports, files);
       assert.deepStrictEqual(messages(found), [
         'apps/mobile does not use the shared theme (@sample/theme)',
       ]);

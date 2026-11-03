@@ -11,7 +11,7 @@ import {
   secretKind,
   secretsManager,
 } from '../../src/doctor/security.ts';
-import { failures, json, runCheck } from './helpers.ts';
+import { failures, jsonFiles, runCheck } from './helpers.ts';
 
 const TOKEN = 'abcDEF123456ghiJKL789';
 
@@ -46,16 +46,17 @@ describe('security doctor checks', () => {
 
   it.effect('mcp-secrets fails on a committed token without printing it', () =>
     Effect.gen(function* () {
-      const found = yield* failures(mcpSecrets, {
-        '.mcp.json': json({
+      const files = yield* jsonFiles({
+        '.mcp.json': {
           mcpServers: {
             betterstack: {
               type: 'http',
               headers: { Authorization: `Bearer ${TOKEN}` },
             },
           },
-        }),
+        },
       });
+      const found = yield* failures(mcpSecrets, files);
       assert.lengthOf(found, 1);
       assert.include(found[0]?.message ?? '', 'SECURITY: .mcp.json');
       assert.include(
@@ -74,48 +75,41 @@ describe('security doctor checks', () => {
 
   it.effect('mcp-secrets passes when the file is gitignored or clean', () =>
     Effect.gen(function* () {
-      const tokenFile = json({
-        mcpServers: { x: { headers: { Authorization: `Bearer ${TOKEN}` } } },
+      const tokenFile = yield* jsonFiles({
+        '.mcp.json': {
+          mcpServers: { x: { headers: { Authorization: `Bearer ${TOKEN}` } } },
+        },
       });
-      assert.lengthOf(
-        yield* failures(mcpSecrets, {
-          '.mcp.json': tokenFile,
-          '.gitignore': '.mcp.json\n',
-        }),
-        0,
-      );
-      assert.lengthOf(
-        yield* failures(mcpSecrets, {
-          '.mcp.json': json({
-            mcpServers: { x: { command: 'bunx', args: ['mcp'] } },
-          }),
-        }),
-        0,
-      );
+      const ignoredTokenFailures = yield* failures(mcpSecrets, {
+        ...tokenFile,
+        '.gitignore': '.mcp.json\n',
+      });
+      assert.lengthOf(ignoredTokenFailures, 0);
+      const tokenless = yield* jsonFiles({
+        '.mcp.json': {
+          mcpServers: { x: { command: 'bunx', args: ['mcp'] } },
+        },
+      });
+      const tokenlessFailures = yield* failures(mcpSecrets, tokenless);
+      assert.lengthOf(tokenlessFailures, 0);
     }),
   );
 
   it.effect('secrets-manager is required once the repo reads env', () =>
     Effect.gen(function* () {
-      assert.lengthOf(
-        yield* failures(secretsManager, {
-          'apps/api/src/main.ts': 'process.env.PORT',
-        }),
-        1,
-      );
-      assert.lengthOf(
-        yield* failures(secretsManager, {
-          'apps/api/src/main.ts': 'process.env.PORT',
-          'secretspec.toml': '',
-        }),
-        0,
-      );
-      assert.lengthOf(
-        yield* failures(secretsManager, {
-          'apps/api/src/main.ts': 'export {}',
-        }),
-        0,
-      );
+      const missingManagerFailures = yield* failures(secretsManager, {
+        'apps/api/src/main.ts': 'process.env.PORT',
+      });
+      assert.lengthOf(missingManagerFailures, 1);
+      const withManagerFailures = yield* failures(secretsManager, {
+        'apps/api/src/main.ts': 'process.env.PORT',
+        'secretspec.toml': '',
+      });
+      assert.lengthOf(withManagerFailures, 0);
+      const noEnvFailures = yield* failures(secretsManager, {
+        'apps/api/src/main.ts': 'export {}',
+      });
+      assert.lengthOf(noEnvFailures, 0);
     }),
   );
 
@@ -134,12 +128,10 @@ describe('security doctor checks', () => {
         '2 raw process.env/Bun.env reads in 1 file(s): apps/api/src/main.ts (2)',
       );
       // Without varlock, raw access is not a finding.
-      assert.lengthOf(
-        yield* failures(rawEnvAccess, {
-          'apps/api/src/main.ts': 'process.env.A',
-        }),
-        0,
-      );
+      const rawEnvFailures = yield* failures(rawEnvAccess, {
+        'apps/api/src/main.ts': 'process.env.A',
+      });
+      assert.lengthOf(rawEnvFailures, 0);
     }),
   );
 });
@@ -165,31 +157,40 @@ describe('agents doctor check', () => {
     'cloudflare-observability-mcp wants the server only where Workers deploy',
     () =>
       Effect.gen(function* () {
-        const pkg = (deps: Record<string, string>) =>
-          json({ name: 'x', devDependencies: deps });
-        assert.lengthOf(
-          yield* runCheck(cloudflareObservabilityMcp, {
-            'package.json': pkg({ '@alchemy.run/aws': '2.0.0' }),
-          }),
-          0,
-        );
-        const missing = yield* failures(cloudflareObservabilityMcp, {
-          'package.json': pkg({ wrangler: '4.0.0' }),
-          '.mcp.json': json({ mcpServers: { other: { type: 'http' } } }),
+        const pkg = (deps: Record<string, string>) => ({
+          name: 'x',
+          devDependencies: deps,
         });
+        const aws = yield* jsonFiles({
+          'package.json': pkg({ '@alchemy.run/aws': '2.0.0' }),
+        });
+        const awsObservabilityFailures = yield* runCheck(
+          cloudflareObservabilityMcp,
+          aws,
+        );
+        assert.lengthOf(awsObservabilityFailures, 0);
+        const otherServer = yield* jsonFiles({
+          'package.json': pkg({ wrangler: '4.0.0' }),
+          '.mcp.json': { mcpServers: { other: { type: 'http' } } },
+        });
+        const missing = yield* failures(
+          cloudflareObservabilityMcp,
+          otherServer,
+        );
         assert.lengthOf(missing, 1);
         assert.strictEqual(missing[0]?.path, '.mcp.json');
-        const found = yield* runCheck(cloudflareObservabilityMcp, {
+        const cloudflare = yield* jsonFiles({
           'package.json': pkg({ '@alchemy.run/cloudflare': '2.0.0' }),
-          '.mcp.json': json({
+          '.mcp.json': {
             mcpServers: {
               cf: {
                 type: 'http',
                 url: 'https://observability.mcp.cloudflare.com/mcp',
               },
             },
-          }),
+          },
         });
+        const found = yield* runCheck(cloudflareObservabilityMcp, cloudflare);
         assert.isTrue(found.length === 1 && found[0]?.ok === true);
       }),
   );

@@ -2,8 +2,8 @@ import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
 
 import type { GeneratedFile, Renderer } from '../../engine/types.ts';
 import { workspaces } from '../root/workspaces.ts';
-import { hasApp, owned } from '../shared.ts';
-import { commented, type Jsonc, jsonc } from './jsonc.ts';
+import { hasApp, ownedJsonc } from '../shared.ts';
+import { commented, type Jsonc } from './jsonc.ts';
 import type { TaskDef } from './model.ts';
 import { mergeTasks, taskKey } from './refs.ts';
 
@@ -93,45 +93,42 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
   );
   const github = ctx.config.ci === 'github';
 
-  const root = owned(
-    'turbo.jsonc',
-    jsonc({
-      $schema: schemaFrom('.'),
-      ui: 'tui',
-      futureFlags: {
-        experimentalTaskCommand: commands
-          ? commented(
-              'Task `command` is experimental; it lets every package share one\ndefinition of a leaf command instead of a copied script.',
-              true,
-            )
-          : undefined,
-        affectedUsingTaskInputs: commented(
-          '`--affected` selects only the tasks whose `inputs` match the diff,\nnot every task in a changed package.',
-          true,
-        ),
-        githubActionsRemoteBaseRefFallback: github
-          ? commented(
-              'actions/checkout leaves the PR base only as `origin/<base>`; without\nthis `--affected` cannot resolve it and runs every task.',
-              true,
-            )
-          : undefined,
-      },
-      cacheMaxSize: commented(
-        'Bounds the local cache, which CI also restores between runs.',
-        '2GB',
+  const root = ownedJsonc('turbo.jsonc', {
+    $schema: schemaFrom('.'),
+    ui: 'tui',
+    futureFlags: {
+      experimentalTaskCommand: commands
+        ? commented(
+            'Task `command` is experimental; it lets every package share one\ndefinition of a leaf command instead of a copied script.',
+            true,
+          )
+        : undefined,
+      affectedUsingTaskInputs: commented(
+        '`--affected` selects only the tasks whose `inputs` match the diff,\nnot every task in a changed package.',
+        true,
       ),
-      globalPassThroughEnv: commented(
-        "Declared vars are read at run time (ports, deploy stages, secrets), not\nbaked into outputs, so they reach tasks without keying the cache. Vite's\nbuild-time VITE_* vars are hashed by turbo's framework inference. NIX_*\npasses through by default.",
-        ['TMPDIR', ...declaredEnv],
-      ),
-      globalEnv: readsEnv ? ['APP_ENV'] : undefined,
-      globalDependencies: [
-        ...(hasApp(ctx.config, 'expo') ? ['bunfig.toml'] : []),
-        'patches/**',
-      ],
-      tasks: commented(HEADER, tasksObject(ordered, taskKey)),
-    }),
-  );
+      githubActionsRemoteBaseRefFallback: github
+        ? commented(
+            'actions/checkout leaves the PR base only as `origin/<base>`; without\nthis `--affected` cannot resolve it and runs every task.',
+            true,
+          )
+        : undefined,
+    },
+    cacheMaxSize: commented(
+      'Bounds the local cache, which CI also restores between runs.',
+      '2GB',
+    ),
+    globalPassThroughEnv: commented(
+      "Declared vars are read at run time (ports, deploy stages, secrets), not\nbaked into outputs, so they reach tasks without keying the cache. Vite's\nbuild-time VITE_* vars are hashed by turbo's framework inference. NIX_*\npasses through by default.",
+      ['TMPDIR', ...declaredEnv],
+    ),
+    globalEnv: readsEnv ? ['APP_ENV'] : undefined,
+    globalDependencies: [
+      ...(hasApp(ctx.config, 'expo') ? ['bunfig.toml'] : []),
+      'patches/**',
+    ],
+    tasks: commented(HEADER, tasksObject(ordered, taskKey)),
+  });
 
   const dirs = new Map(
     Arr.map(workspaces(ctx), (w) => [w.name, w.dir] as const),
@@ -147,14 +144,11 @@ export const turboRenderer: Renderer = (ctx, aggregate) => {
       throw new Error(`Task override for unknown workspace package ${pkg}`);
     }
     overrides.push(
-      owned(
-        `${dir}/turbo.jsonc`,
-        jsonc({
-          $schema: schemaFrom(dir),
-          extends: ['//'],
-          tasks: tasksObject(pkgTasks, (task) => task.name),
-        }),
-      ),
+      ownedJsonc(`${dir}/turbo.jsonc`, {
+        $schema: schemaFrom(dir),
+        extends: ['//'],
+        tasks: tasksObject(pkgTasks, (task) => task.name),
+      }),
     );
   }
   return [root, ...overrides];

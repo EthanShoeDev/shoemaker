@@ -7,7 +7,7 @@ import type {
   Generator,
 } from '../../engine/types.ts';
 import type { EnvVar } from '../secrets/model.ts';
-import { owned, withSecrets } from '../shared.ts';
+import { jsonMerge, owned, withSecrets } from '../shared.ts';
 import { appDir } from './common.ts';
 
 // Opted-in Expo apps (`androidRelease`) ship every changesets release as a
@@ -217,19 +217,15 @@ export const androidRelease = (
   return {
     files: [
       owned(`${dir}/android-release.ts`, androidReleaseSource(app, release)),
-      {
-        path: 'package.json',
-        strategy: 'json-merge',
-        content: `${JSON.stringify({
-          scripts: {
-            [`apk:${app.name}`]: `nix develop .#android --command ${withSecrets(
-              ctx.config,
-              `bun run --cwd ${dir} build:apk`,
-              'production',
-            )}`,
-          },
-        })}\n`,
-      },
+      jsonMerge('package.json', {
+        scripts: {
+          [`apk:${app.name}`]: `nix develop .#android --command ${withSecrets(
+            ctx.config,
+            `bun run --cwd ${dir} build:apk`,
+            'production',
+          )}`,
+        },
+      }),
     ],
     env: signingEnv(app),
     gitignore: [`${dir}/android/`],

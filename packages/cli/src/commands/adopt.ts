@@ -20,7 +20,8 @@ export const runAdopt = Effect.fnUntraced(function* (input: {
       `${root} already has ${CONFIG_PATH}. Run \`shoemaker sync\`, or pass --force to re-infer it.`,
     );
   }
-  const config = yield* inferConfig(yield* makeRepo(root));
+  const repo = yield* makeRepo(root);
+  const config = yield* inferConfig(repo);
   yield* writeFile(root, CONFIG_PATH, renderConfigFile(config));
   yield* Console.log(
     `${s.green('Wrote')} ${CONFIG_PATH} (inferred). Review it, then sync.\n\n${s.bold('What sync would change:')}`,

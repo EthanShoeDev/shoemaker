@@ -2,7 +2,6 @@ import { assert, describe, it } from '@effect/vitest';
 import {
   Array as Arr,
   Effect,
-  Option,
   pipe,
   Record as Rec,
   String as Str,
@@ -13,13 +12,12 @@ import type { FileStrategy } from '../../../src/engine/types.ts';
 import { frontendGenerator } from '../../../src/generators/apps/frontend.ts';
 import { appGenerators } from '../../../src/generators/apps/index.ts';
 import { libraryGenerator } from '../../../src/generators/apps/library.ts';
+import { lookup, record } from '../files.ts';
 import {
   assertCatalogComplete,
   assertSourcesParse,
   assertStrategies,
   contribute,
-  parseJson,
-  record,
   sampleConfig,
 } from './helpers.ts';
 
@@ -28,12 +26,7 @@ const allApps = (config: ShoemakerConfig) => {
     contribute(generator, config),
   );
   const files = Arr.flatMap(contributions, (c) => c.files);
-  const file = (path: string) =>
-    pipe(
-      Arr.findFirst(files, (candidate) => candidate.path === path),
-      Option.getOrThrowWith(() => new Error(`${path} was not generated`)),
-    );
-  return { files, file, contributions };
+  return { files, contributions, ...lookup(files) };
 };
 
 const cases: ReadonlyArray<{
@@ -117,8 +110,7 @@ const cases: ReadonlyArray<{
 
 describe.each(cases)('$app.kind app', ({ app, files: expected }) => {
   const config = sampleConfig({ apps: [app] });
-  const { files, contributions } = allApps(config);
-  const byPath = new Map(Arr.map(files, (file) => [file.path, file] as const));
+  const { files, contributions, byPath, text } = allApps(config);
 
   it('emits its files with their sync strategies', () => {
     assertStrategies(byPath, expected);
@@ -141,17 +133,17 @@ describe.each(cases)('$app.kind app', ({ app, files: expected }) => {
   });
 
   it('configures vitest as a project named by its package.json', () => {
-    const vitest =
-      byPath.get(`apps/${app.name}/vitest.config.ts`) ??
-      byPath.get(`apps/${app.name}/vitest.config.mts`);
-    assert.include(vitest?.content, 'defineProject(');
-    assert.notInclude(vitest?.content, 'name:');
+    const vitest = text(
+      byPath.has(`apps/${app.name}/vitest.config.ts`)
+        ? `apps/${app.name}/vitest.config.ts`
+        : `apps/${app.name}/vitest.config.mts`,
+    );
+    assert.include(vitest, 'defineProject(');
+    assert.notInclude(vitest, 'name:');
     // A vitest.config replaces vite.config; only Start merges it back in
     // (foldkit follows its upstream template, which does not).
     assert.strictEqual(
-      Str.includes("import viteConfig from './vite.config.ts'")(
-        vitest?.content ?? '',
-      ),
+      Str.includes("import viteConfig from './vite.config.ts'")(vitest),
       app.kind === 'tanstack-start',
     );
   });
@@ -172,7 +164,7 @@ describe('library package', () => {
   const config = sampleConfig({
     packages: [{ name: 'core', kind: 'library' }],
   });
-  const { contribution, byPath, file } = contribute(libraryGenerator, config);
+  const { contribution, byPath, json } = contribute(libraryGenerator, config);
 
   it('emits a source-exporting package with a test', () => {
     assertStrategies(byPath, [
@@ -182,7 +174,7 @@ describe('library package', () => {
       ['packages/core/src/index.ts', 'seed'],
       ['packages/core/test/index.test.ts', 'seed'],
     ]);
-    const manifest = parseJson(file('packages/core/package.json'));
+    const manifest = json('packages/core/package.json');
     assert.deepStrictEqual(manifest.exports, {
       '.': './src/index.ts',
       './package.json': './package.json',
@@ -204,35 +196,35 @@ describe('kind specifics', () => {
     const config = sampleConfig({
       apps: [{ name: 'api', kind: 'effect-api' }],
     });
-    const { contributions, file } = allApps(config);
+    const { contributions, text, json } = allApps(config);
     const env = Arr.flatMap(
       contributions,
       ({ contribution }) => contribution.env ?? [],
     );
     assert.deepInclude(env[0], { key: 'PORT', default: '3000', type: 'port' });
-    assert.include(file('apps/api/src/bin.ts').content, "Config.Port('PORT')");
-    const manifest = parseJson(file('apps/api/package.json'));
+    assert.include(text('apps/api/src/bin.ts'), "Config.Port('PORT')");
+    const manifest = json('apps/api/package.json');
     assert.isUndefined(record(manifest.dependencies)['@sample/env']);
   });
 
   it('effect-api keeps its HttpApi in a contract package clients share', () => {
-    const { file } = allApps(
+    const { text, json } = allApps(
       sampleConfig({ apps: [{ name: 'api', kind: 'effect-api' }] }),
     );
-    const contract = parseJson(file('packages/api-contract/package.json'));
+    const contract = json('packages/api-contract/package.json');
     assert.strictEqual(contract.name, '@sample/api-contract');
     assert.deepStrictEqual(Rec.keys(record(contract.dependencies)), ['effect']);
     assert.include(
-      file('packages/api-contract/src/index.ts').content,
+      text('packages/api-contract/src/index.ts'),
       "export class Api extends HttpApi.make('api')",
     );
-    const api = parseJson(file('apps/api/package.json'));
+    const api = json('apps/api/package.json');
     assert.strictEqual(
       record(api.dependencies)['@sample/api-contract'],
       'workspace:*',
     );
     assert.include(
-      file('apps/api/src/handlers.ts').content,
+      text('apps/api/src/handlers.ts'),
       "import { Api } from '@sample/api-contract';",
     );
   });
@@ -253,62 +245,55 @@ describe('kind specifics', () => {
   });
 
   it('effect-cli exposes a bin', () => {
-    const { file } = allApps(
+    const { json } = allApps(
       sampleConfig({ apps: [{ name: 'tool', kind: 'effect-cli' }] }),
     );
-    const manifest = parseJson(file('apps/tool/package.json'));
+    const manifest = json('apps/tool/package.json');
     assert.deepStrictEqual(manifest.bin, { tool: './src/bin.ts' });
   });
 
   it('expo is CommonJS and extends Expo’s tsconfig', () => {
-    const { file } = allApps(
+    const { text, json } = allApps(
       sampleConfig({ apps: [{ name: 'mobile', kind: 'expo' }] }),
     );
-    const read = (path: string) => parseJson(file(path));
-    const manifest = read('apps/mobile/package.json');
+    const manifest = json('apps/mobile/package.json');
     assert.isUndefined(manifest.type);
     assert.strictEqual(manifest.main, 'expo-router/entry');
-    const tsconfig = read('apps/mobile/tsconfig.json');
+    const tsconfig = json('apps/mobile/tsconfig.json');
     assert.strictEqual(tsconfig.extends, 'expo/tsconfig.base');
     assert.notProperty(
       record(manifest.devDependencies),
       'shoemaker-typescript-config',
     );
     // ESM config in a CommonJS package: `.mts`, and typechecked.
-    assert.include(
-      file('apps/mobile/vitest.config.mts').content,
-      'vitest/config',
-    );
+    assert.include(text('apps/mobile/vitest.config.mts'), 'vitest/config');
     assert.include(tsconfig.include, '*.mts');
   });
 
   it('expo depends on what its app.config.ts turns on', () => {
-    const { file } = allApps(
+    const { text, json } = allApps(
       sampleConfig({ apps: [{ name: 'mobile', kind: 'expo' }] }),
     );
-    const manifest = parseJson(file('apps/mobile/package.json'));
+    const manifest = json('apps/mobile/package.json');
     assert.property(record(manifest.dependencies), 'expo-system-ui');
     assert.include(
-      file('apps/mobile/app.config.ts').content,
+      text('apps/mobile/app.config.ts'),
       'updates: { enabled: false }',
     );
   });
 
   it('foldkit imports its stylesheet from the entry module', () => {
-    const { file } = allApps(
+    const { text } = allApps(
       sampleConfig({ apps: [{ name: 'site', kind: 'foldkit' }] }),
     );
-    assert.include(
-      file('apps/site/src/entry.ts').content,
-      "import './styles.css';",
-    );
-    assert.notInclude(file('apps/site/index.html').content, 'styles.css');
+    assert.include(text('apps/site/src/entry.ts'), "import './styles.css';");
+    assert.notInclude(text('apps/site/index.html'), 'styles.css');
   });
 
   it('tanstack-start wires varlock only outside Cloudflare', () => {
     const apps: ReadonlyArray<App> = [{ name: 'web', kind: 'tanstack-start' }];
     const vite = (config: ShoemakerConfig) =>
-      allApps(config).file('apps/web/vite.config.ts').content;
+      allApps(config).text('apps/web/vite.config.ts');
     assert.include(vite(sampleConfig({ apps })), 'varlockVitePlugin()');
     assert.notInclude(
       vite(sampleConfig({ apps, secrets: 'secretspec' })),
@@ -358,52 +343,49 @@ describe('tanstack-start serving an effect-api app', () => {
       'apps/web/test/api-client.test.ts',
     ]);
     assert.include(
-      served.file('apps/web/src/routes/api.$.ts').content,
+      served.text('apps/web/src/routes/api.$.ts'),
       "createFileRoute('/api/$')",
     );
     assert.include(
-      served.file('apps/web/src/routeTree.gen.ts').content,
+      served.text('apps/web/src/routeTree.gen.ts'),
       "'/api/$': typeof ApiSplatRoute",
     );
     assert.include(
-      served.file('packages/api-contract/src/index.ts').content,
+      served.text('packages/api-contract/src/index.ts'),
       ".prefix('/api')",
     );
   });
 
   it('picks the transport at the compiler boundary', () => {
-    const client = served.file('apps/web/src/api-client.ts').content;
+    const client = served.text('apps/web/src/api-client.ts');
     assert.include(client, 'createIsomorphicFn()');
     assert.include(client, "from './api.server.ts'");
     assert.include(client, "import { Api } from '@sample/api-contract';");
-    assert.include(
-      served.file('apps/web/src/routes/index.tsx').content,
-      'callApi(',
-    );
+    assert.include(served.text('apps/web/src/routes/index.tsx'), 'callApi(');
   });
 
   it("denies the API's handlers in the browser bundle", () => {
     assert.include(
-      served.file('apps/web/vite.config.ts').content,
+      served.text('apps/web/vite.config.ts'),
       "client: { specifiers: ['@sample/api/handlers'] }",
     );
   });
 
   it('depends on the contract, and on the API package for its handlers', () => {
-    const web = parseJson(served.file('apps/web/package.json'));
+    const web = served.json('apps/web/package.json');
     assert.strictEqual(record(web.dependencies)['@sample/api'], 'workspace:*');
     assert.strictEqual(
       record(web.dependencies)['@sample/api-contract'],
       'workspace:*',
     );
-    const api = parseJson(served.file('apps/api/package.json'));
+    const api = served.json('apps/api/package.json');
     assert.strictEqual(record(api.exports)['./handlers'], './src/handlers.ts');
   });
 
   it('deploys the API inside the site, with no Worker of its own', () => {
     const paths = Arr.map(served.files, (f) => f.path);
     assert.notInclude(paths, 'apps/api/src/worker.ts');
-    const api = parseJson(served.file('apps/api/package.json'));
+    const api = served.json('apps/api/package.json');
     assert.notProperty(record(api.dependencies), '@alchemy.run/cloudflare');
   });
 
@@ -419,11 +401,11 @@ describe('tanstack-start serving an effect-api app', () => {
     const paths = Arr.map(plain.files, (f) => f.path);
     assert.notInclude(paths, 'apps/web/src/api-client.ts');
     assert.notInclude(
-      plain.file('packages/api-contract/src/index.ts').content,
+      plain.text('packages/api-contract/src/index.ts'),
       'prefix',
     );
     assert.notInclude(
-      plain.file('apps/web/vite.config.ts').content,
+      plain.text('apps/web/vite.config.ts'),
       'importProtection',
     );
   });
@@ -442,7 +424,10 @@ describe('frontend package', () => {
     apps,
     packages: [{ name: 'frontend', kind: 'frontend', api: 'api' }],
   });
-  const { contribution, byPath, file } = contribute(frontendGenerator, config);
+  const { contribution, byPath, text, json } = contribute(
+    frontendGenerator,
+    config,
+  );
   const site = allApps(config);
 
   it('emits atoms over the contract, with a test', () => {
@@ -456,13 +441,13 @@ describe('frontend package', () => {
       ['packages/frontend/README.md', 'seed'],
     ]);
     assert.include(
-      file('packages/frontend/src/api-client.ts').content,
+      text('packages/frontend/src/api-client.ts'),
       "import { Api } from '@sample/api-contract';",
     );
   });
 
   it('exports each module by path and imports no React', () => {
-    const manifest = parseJson(file('packages/frontend/package.json'));
+    const manifest = json('packages/frontend/package.json');
     assert.deepStrictEqual(manifest.exports, {
       './*': './src/*.ts',
       './package.json': './package.json',
@@ -481,20 +466,20 @@ describe('frontend package', () => {
     ]);
     assert.notInclude(paths, 'apps/web/src/api-client.ts');
     assert.include(
-      site.file('apps/web/src/router.tsx').content,
+      site.text('apps/web/src/router.tsx'),
       'withApiTransport(pageApiTransport())',
     );
     assert.include(
-      site.file('apps/web/src/routes/__root.tsx').content,
+      site.text('apps/web/src/routes/__root.tsx'),
       "<WaterfallDetection mode='throw'>",
     );
-    const index = site.file('apps/web/src/routes/index.tsx').content;
+    const index = site.text('apps/web/src/routes/index.tsx');
     assert.include(index, "context.atoms.ensure(greeting, 'world')");
     assert.include(index, "from '@sample/frontend/greetings'");
   });
 
   it('depends on the frontend package instead of the contract', () => {
-    const web = parseJson(site.file('apps/web/package.json'));
+    const web = site.json('apps/web/package.json');
     const deps = record(web.dependencies);
     assert.strictEqual(deps['@sample/frontend'], 'workspace:*');
     assert.strictEqual(deps['@sample/api'], 'workspace:*');

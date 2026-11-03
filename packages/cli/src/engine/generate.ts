@@ -1,19 +1,13 @@
-import {
-  Array as Arr,
-  Predicate,
-  Record as Rec,
-  Schema,
-  String as Str,
-} from 'effect';
+import { Array as Arr, Record as Rec, Schema, String as Str } from 'effect';
 
 import type { ShoemakerConfig } from '../config/schema.ts';
 import { generators, renderers } from '../generators/index.ts';
 import { versionOf } from '../versions.ts';
 import { matchesAny } from './glob.ts';
-import type {
-  Aggregate,
-  Contribution,
-  GenContext,
+import {
+  type Aggregate,
+  type Contribution,
+  type GenContext,
   GeneratedFile,
 } from './types.ts';
 
@@ -32,28 +26,18 @@ export const makeContext = (
   version: (name) => options.versionOverrides?.[name] ?? versionOf(name),
 });
 
-const isPlainObject = Predicate.isObject;
-
-// oxlint-disable-next-line effecttsgo/schema-sync -- generate() is pure and synchronous; it only parses JSON its own generators emitted, so a failure is a generator bug.
-const decodeJsonObject = Schema.decodeUnknownSync(
-  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
-);
+const isJsonObject = Schema.is(Schema.JsonObject);
 
 // Objects merge key by key; anything else (arrays included) is replaced.
 export const deepMerge = (
-  base: Record<string, unknown>,
-  patch: Record<string, unknown>,
-): Record<string, unknown> => {
-  const out: Record<string, unknown> = { ...base };
-  for (const [key, value] of Rec.toEntries(patch)) {
-    const existing = out[key];
-    out[key] =
-      isPlainObject(existing) && isPlainObject(value)
-        ? deepMerge(existing, value)
-        : value;
-  }
-  return out;
-};
+  base: Schema.JsonObject,
+  patch: Schema.JsonObject,
+): Schema.JsonObject =>
+  Rec.union(base, patch, (existing, value) =>
+    isJsonObject(existing) && isJsonObject(value)
+      ? deepMerge(existing, value)
+      : value,
+  );
 
 const uniq = (values: ReadonlyArray<string>) => [...new Set(values)];
 
@@ -85,19 +69,12 @@ const mergeFiles = (
     if (existing === undefined) {
       byPath.set(file.path, file);
     } else if (
-      existing.strategy === 'json-merge' &&
-      file.strategy === 'json-merge'
+      GeneratedFile.$is('Merge')(existing) &&
+      GeneratedFile.$is('Merge')(file)
     ) {
       byPath.set(file.path, {
         ...existing,
-        content: `${JSON.stringify(
-          deepMerge(
-            decodeJsonObject(existing.content),
-            decodeJsonObject(file.content),
-          ),
-          null,
-          2,
-        )}\n`,
+        json: deepMerge(existing.json, file.json),
       });
     } else {
       throw new Error(`Two generators emitted ${file.path}`);

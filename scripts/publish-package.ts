@@ -43,7 +43,8 @@ const program = Effect.gen(function* () {
   const dir = yield* fs.makeTempDirectoryScoped();
   const tarball = path.join(dir, 'package.tgz');
   yield* run('bun', ['pm', 'pack', '--filename', tarball], { cwd });
-  const npm = path.join(yield* repoRoot, 'node_modules', '.bin', 'npm');
+  const root = yield* repoRoot;
+  const npm = path.join(root, 'node_modules', '.bin', 'npm');
   yield* runInherit(npm, ['publish', tarball, '--access', 'public'], {
     cwd: dir,
   });

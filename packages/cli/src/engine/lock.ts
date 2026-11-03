@@ -58,29 +58,17 @@ const byPath = Order.mapInput(
   ([path]: readonly [string, LockEntry]) => path,
 );
 
-// Sorted keys so the lock diffs cleanly.
+const LockText = Schema.fromJsonString(Lock, { space: 2 });
+
+// Files sorted by path so the lock diffs cleanly.
 export const renderLock = (lock: Lock) =>
-  `${JSON.stringify(
-    {
-      cliVersion: lock.cliVersion,
-      files: Rec.fromEntries(
-        Arr.map(
-          Arr.sort(Rec.toEntries(lock.files), byPath),
-          ([path, entry]) =>
-            [
-              path,
-              {
-                sha256: entry.sha256,
-                strategy: entry.strategy,
-                ...(entry.owned === undefined ? {} : { owned: entry.owned }),
-              },
-            ] as const,
-        ),
-      ),
-    },
-    null,
-    2,
-  )}\n`;
+  Effect.map(
+    Schema.encodeEffect(LockText)({
+      ...lock,
+      files: Rec.fromEntries(Arr.sort(Rec.toEntries(lock.files), byPath)),
+    }),
+    (text) => `${text}\n`,
+  );
 
 export const readLock = Effect.fnUntraced(function* (repo: Repo) {
   const text = yield* repo.read(LOCK_PATH);

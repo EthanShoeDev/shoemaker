@@ -1,29 +1,37 @@
 import { assert, describe, it } from '@effect/vitest';
 import {
   Array as Arr,
+  Effect,
   pipe,
   Predicate,
   Record as Rec,
+  type Schema,
   String as Str,
 } from 'effect';
-import { type ParseError, parse } from 'jsonc-parser';
 
 import type { ShoemakerConfig } from '../../../src/config/schema.ts';
 import { isFixTask } from '../../../src/doctor/tooling.ts';
+import { parseJsonObject } from '../../../src/engine/json.ts';
 import type { GeneratedFile } from '../../../src/engine/types.ts';
 import { parseRef } from '../../../src/generators/task-runner/refs.ts';
 import { packageCommands } from '../../../src/generators/task-runner/tasks.ts';
-import { parseJson, preset, record, render } from '../root/fixtures.ts';
+import { jsonOf, printed, record, stringOf } from '../files.ts';
+import { preset, render } from '../root/fixtures.ts';
 
 const strings = (value: unknown) =>
   Arr.isArray(value) ? Arr.filter(value, Predicate.isString) : [];
 
-const parseJsonc = (content: string) => {
-  const errors: Array<ParseError> = [];
-  const value: unknown = parse(content, errors, { allowTrailingComma: true });
-  assert.deepStrictEqual(errors, []);
-  return record(value);
-};
+// Each file's printed text parses back to the value it was printed from.
+const assertParses = (files: ReadonlyArray<GeneratedFile>) =>
+  Effect.forEach(
+    files,
+    Effect.fnUntraced(function* (file) {
+      const text = yield* printed(file);
+      const parsed: unknown = parseJsonObject(text);
+      assert.deepStrictEqual(parsed, jsonOf(file), file.path);
+    }),
+    { discard: true },
+  );
 
 const withRunner = (
   config: ShoemakerConfig,
@@ -36,7 +44,7 @@ const workspaceScripts = (files: ReadonlyArray<GeneratedFile>) =>
     Arr.filter((f) =>
       /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(f.path),
     ),
-    Arr.map((f) => [f.path, record(parseJson(f).scripts)] as const),
+    Arr.map((f) => [f.path, record(record(jsonOf(f)).scripts)] as const),
   );
 
 const configs = [
@@ -46,8 +54,8 @@ const configs = [
 ] as const;
 
 describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
-  const { files, byPath, file } = render(withRunner(base, 'turbo'));
-  const tasks = record(parseJsonc(file('turbo.jsonc').content).tasks);
+  const { files, byPath, file, json } = render(withRunner(base, 'turbo'));
+  const tasks = record(json('turbo.jsonc').tasks);
   const overrides = new Map(
     pipe(
       files,
@@ -56,8 +64,8 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
       ),
       Arr.map((f) => {
         const dir = Str.replace(/\/turbo\.jsonc$/u, '')(f.path);
-        const name = record(parseJson(file(`${dir}/package.json`))).name;
-        return [String(name), parseJsonc(f.content)] as const;
+        const name = json(`${dir}/package.json`).name;
+        return [stringOf(name), record(jsonOf(f))] as const;
       }),
     ),
   );
@@ -67,7 +75,7 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
     Arr.filter((f) =>
       /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(f.path),
     ),
-    Arr.map((f) => String(record(parseJson(f)).name)),
+    Arr.map((f) => stringOf(record(jsonOf(f)).name)),
   );
 
   const defined = (ref: string) => {
@@ -82,19 +90,25 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
     return parsed.task in tasks;
   };
 
-  it('parses and has the shared settings', () => {
-    const turbo = parseJsonc(file('turbo.jsonc').content);
-    assert.strictEqual(turbo.ui, 'tui');
-    // turbo passes NIX_* through by default; declared vars never key the
-    // cache, only APP_ENV does.
-    assert.notInclude(strings(turbo.globalPassThroughEnv), 'NIX_*');
-    assert.include(strings(turbo.globalPassThroughEnv), 'TMPDIR');
-    assert.isTrue(
-      Arr.every(strings(turbo.globalEnv), (key) => key === 'APP_ENV'),
-    );
-    assert.include(file('turbo.jsonc').content, '// Task-inheritance pattern:');
-    assert.isFalse(byPath.has('nx.json'));
-  });
+  it.effect('parses and has the shared settings', () =>
+    Effect.gen(function* () {
+      yield* assertParses(
+        Arr.filter(files, (f) => Str.endsWith('turbo.jsonc')(f.path)),
+      );
+      const turbo = json('turbo.jsonc');
+      assert.strictEqual(turbo.ui, 'tui');
+      // turbo passes NIX_* through by default; declared vars never key the
+      // cache, only APP_ENV does.
+      assert.notInclude(strings(turbo.globalPassThroughEnv), 'NIX_*');
+      assert.include(strings(turbo.globalPassThroughEnv), 'TMPDIR');
+      assert.isTrue(
+        Arr.every(strings(turbo.globalEnv), (key) => key === 'APP_ENV'),
+      );
+      const printedTurbo = yield* printed(file('turbo.jsonc'));
+      assert.include(printedTurbo, '// Task-inheritance pattern:');
+      assert.isFalse(byPath.has('nx.json'));
+    }),
+  );
 
   it('only references defined tasks', () => {
     const all = [
@@ -134,7 +148,7 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
   });
 
   it('defines shared leaf commands once, run through bun', () => {
-    const turbo = parseJsonc(file('turbo.jsonc').content);
+    const turbo = json('turbo.jsonc');
     assert.deepInclude(record(turbo.futureFlags), {
       experimentalTaskCommand: true,
       affectedUsingTaskInputs: true,
@@ -192,16 +206,16 @@ describe.each(configs)('turbo.jsonc (%s preset)', (_name, base) => {
 
 describe.each(configs)('nx.json (%s preset)', (_name, base) => {
   const config = withRunner(base, 'nx');
-  const { files, byPath, file } = render(config);
-  const nx = parseJson(file('nx.json'));
+  const { files, byPath, file, json } = render(config);
+  const nx = json('nx.json');
   const defaults = record(nx.targetDefaults);
   const projectFiles = Arr.filter(files, (f) =>
     Str.endsWith('project.json')(f.path),
   );
   const projects = new Map(
     Arr.map(projectFiles, (f) => {
-      const project = parseJson(f);
-      return [String(project.name), record(project.targets)] as const;
+      const project = record(jsonOf(f));
+      return [stringOf(project.name), record(project.targets)] as const;
     }),
   );
 
@@ -212,18 +226,24 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
         /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(f.path),
       ),
       Arr.map((f) => {
-        const manifest = record(parseJson(f));
-        return [String(manifest.name), record(manifest.scripts)] as const;
+        const manifest = record(jsonOf(f));
+        return [stringOf(manifest.name), record(manifest.scripts)] as const;
       }),
     ),
   );
 
-  it('parses and is shaped like nx 24 config', () => {
-    assert.strictEqual(nx.$schema, './node_modules/nx/schemas/nx-schema.json');
-    assert.isTrue(Arr.isArray(record(nx.namedInputs).default));
-    assert.isFalse('transit' in defaults);
-    assert.isFalse(byPath.has('turbo.jsonc'));
-  });
+  it.effect('parses and is shaped like nx 24 config', () =>
+    Effect.gen(function* () {
+      yield* assertParses([file('nx.json'), ...projectFiles]);
+      assert.strictEqual(
+        nx.$schema,
+        './node_modules/nx/schemas/nx-schema.json',
+      );
+      assert.isTrue(Arr.isArray(record(nx.namedInputs).default));
+      assert.isFalse('transit' in defaults);
+      assert.isFalse(byPath.has('turbo.jsonc'));
+    }),
+  );
 
   it('gives every workspace and the root a project.json', () => {
     const manifests = pipe(
@@ -238,11 +258,14 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
   });
 
   it('only depends on targets that exist', () => {
-    const rootScripts = record(parseJson(file('package.json')).scripts);
+    const rootScripts = record(json('package.json').scripts);
     const rootTargets = projects.get(config.name) ?? {};
-    const check = (target: unknown, inRoot: boolean) => {
-      const deps: unknown = record(target).dependsOn;
-      for (const dep of Arr.isArray(deps) ? deps : []) {
+    const check = (target: Schema.Json | undefined, inRoot: boolean) => {
+      const dependsOn = record(target).dependsOn;
+      const deps = Arr.isArray<Schema.Json | undefined>(dependsOn)
+        ? dependsOn
+        : [];
+      for (const dep of deps) {
         if (Predicate.isString(dep)) {
           assert.isTrue(
             inRoot ? dep in rootTargets : dep in defaults,
@@ -251,7 +274,7 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
           continue;
         }
         const entry = record(dep);
-        const name = String(entry.target);
+        const name = stringOf(entry.target);
         if (entry.dependencies === true) {
           assert.isTrue(name in defaults, `^${name}`);
         } else {
@@ -279,22 +302,25 @@ describe.each(configs)('nx.json (%s preset)', (_name, base) => {
     }
   });
 
-  it('keeps shared leaf commands as package scripts', () => {
-    assert.notInclude(file('nx.json').content, '"command"');
-    for (const [path, scripts] of workspaceScripts(files)) {
-      // The CSS-only theme package opts out of them.
-      if (path === 'packages/theme/package.json') {
-        assert.deepStrictEqual(Rec.keys(scripts), ['clean'], path);
-        assert.notProperty(
-          record(parseJson(file('packages/theme/project.json'))).targets,
-          'typecheck',
-        );
-        continue;
+  it.effect('keeps shared leaf commands as package scripts', () =>
+    Effect.gen(function* () {
+      const printedNx = yield* printed(file('nx.json'));
+      assert.notInclude(printedNx, '"command"');
+      for (const [path, scripts] of workspaceScripts(files)) {
+        // The CSS-only theme package opts out of them.
+        if (path === 'packages/theme/package.json') {
+          assert.deepStrictEqual(Rec.keys(scripts), ['clean'], path);
+          assert.notProperty(
+            json('packages/theme/project.json').targets,
+            'typecheck',
+          );
+          continue;
+        }
+        assert.strictEqual(scripts.typecheck, 'tsc --noEmit', path);
+        assert.isDefined(scripts.test, path);
       }
-      assert.strictEqual(scripts.typecheck, 'tsc --noEmit', path);
-      assert.isDefined(scripts.test, path);
-    }
-  });
+    }),
+  );
 
   it('models aggregates as nx:noop and stubs them in every project', () => {
     assert.strictEqual(record(defaults['lint:check']).executor, 'nx:noop');

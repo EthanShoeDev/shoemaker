@@ -98,7 +98,8 @@ export const oxlintSharedConfig: DoctorCheck = {
   run: Effect.fnUntraced(function* (repo) {
     const source = yield* oxlintTs(repo);
     if (source === undefined) {
-      const rc = decodeJsonc(OxlintRc, yield* repo.read('.oxlintrc.json'));
+      const rcSource = yield* repo.read('.oxlintrc.json');
+      const rc = decodeJsonc(OxlintRc, rcSource);
       const missing = Arr.filter(
         CATEGORIES,
         (c) => Option.getOrUndefined(rc)?.categories?.[c] !== 'error',
@@ -167,9 +168,8 @@ export const oxlintNoWarn: DoctorCheck = {
   run: Effect.fnUntraced(function* (repo) {
     const findings: Array<Finding> = [];
     for (const path of yield* globAll(repo, OXLINT_RC)) {
-      const rc = Option.getOrUndefined(
-        decodeJsonc(OxlintRc, yield* repo.read(path)),
-      );
+      const rcSource = yield* repo.read(path);
+      const rc = Option.getOrUndefined(decodeJsonc(OxlintRc, rcSource));
       const rules = [
         rc?.rules,
         ...Arr.map(rc?.overrides ?? [], (o) => o.rules),
@@ -230,7 +230,8 @@ export const oxlintUnusedDirectives: DoctorCheck = {
     ) {
       return [pass("reportUnusedDisableDirectives: 'error'")];
     }
-    const viaCli = Arr.some(scriptsOf(yield* manifestsOf(repo)), (s) =>
+    const manifests = yield* manifestsOf(repo);
+    const viaCli = Arr.some(scriptsOf(manifests), (s) =>
       Str.includes('--report-unused-disable-directives-severity=error')(
         s.command,
       ),
@@ -256,8 +257,9 @@ export const oxlintCliFlags: DoctorCheck = {
   description:
     'Type-aware settings live in oxlint options, not in --type-aware/--type-check CLI flags',
   run: Effect.fnUntraced(function* (repo) {
+    const manifests = yield* manifestsOf(repo);
     const flagged = Arr.filter(
-      scriptsOf(yield* manifestsOf(repo)),
+      scriptsOf(manifests),
       (s) => invokes(s.command, 'oxlint') && TYPE_AWARE_FLAGS.test(s.command),
     );
     if (flagged.length === 0)
@@ -328,7 +330,8 @@ export const oxfmtSortImports: DoctorCheck = {
           ];
     }
     for (const path of ['.oxfmtrc.jsonc', '.oxfmtrc.json']) {
-      const rc = decodeJsonc(OxfmtRc, yield* repo.read(path));
+      const rcSource = yield* repo.read(path);
+      const rc = decodeJsonc(OxfmtRc, rcSource);
       if (Option.isSome(rc)) {
         const enabled = Arr.some(
           [rc.value.sortImports, rc.value.experimentalSortImports],

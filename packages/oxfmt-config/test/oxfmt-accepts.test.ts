@@ -57,12 +57,12 @@ layer(services)((it) => {
       );
 
       expect(Number(status), `${stdout}${stderr}`).toBe(0);
-      expect(yield* fs.readFileString(path.join(dir, 'probe.ts'))).toBe(
+      const probe = yield* fs.readFileString(path.join(dir, 'probe.ts'));
+      expect(probe).toBe(
         "import { a } from 'alpha';\nimport { z } from 'zeta';\nexport const v = [a, z];\n",
       );
-      expect(yield* fs.readFileString(path.join(dir, 'notes.md'))).toBe(
-        '* untouched\n',
-      );
+      const notes = yield* fs.readFileString(path.join(dir, 'notes.md'));
+      expect(notes).toBe('* untouched\n');
     }),
   );
 });

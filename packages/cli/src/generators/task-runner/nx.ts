@@ -2,8 +2,8 @@ import { Array as Arr, pipe, Record as Rec, String as Str } from 'effect';
 
 import type { GeneratedFile, Renderer } from '../../engine/types.ts';
 import { workspaces } from '../root/workspaces.ts';
-import { owned } from '../shared.ts';
-import { type Jsonc, jsonc } from './jsonc.ts';
+import { ownedJsonc } from '../shared.ts';
+import type { Jsonc } from './jsonc.ts';
 import type { TaskDef } from './model.ts';
 import { isAggregate, mergeTasks, parseRef } from './refs.ts';
 
@@ -21,8 +21,6 @@ type NxDependsOn =
   | { readonly target: string; readonly projects: ReadonlyArray<string> };
 
 const TRANSIT = 'transit';
-const NX_JSON = { json: true };
-
 const mapDependsOn = (
   refs: ReadonlyArray<string>,
   rootProject: string,
@@ -120,44 +118,32 @@ export const nxRenderer: Renderer = (ctx, aggregate) => {
     Arr.map((task) => task.name),
   );
 
-  const nxJson = owned(
-    'nx.json',
-    jsonc(
-      {
-        $schema: './node_modules/nx/schemas/nx-schema.json',
-        neverConnectToCloud: true,
-        analytics: false,
-        namedInputs: {
-          default: ['{projectRoot}/**/*', 'sharedGlobals'],
-          sharedGlobals: [
-            '{workspaceRoot}/bunfig.toml',
-            '{workspaceRoot}/patches/**/*',
-            { env: 'APP_ENV' },
-          ],
-          production: [
-            'default',
-            '!{projectRoot}/**/*.md',
-            '!{projectRoot}/test/**/*',
-            '!{projectRoot}/**/*.test.ts',
-          ],
-        },
-        targetDefaults: targets(shared, rootProject),
-      },
-      NX_JSON,
-    ),
-  );
+  const nxJson = ownedJsonc('nx.json', {
+    $schema: './node_modules/nx/schemas/nx-schema.json',
+    neverConnectToCloud: true,
+    analytics: false,
+    namedInputs: {
+      default: ['{projectRoot}/**/*', 'sharedGlobals'],
+      sharedGlobals: [
+        '{workspaceRoot}/bunfig.toml',
+        '{workspaceRoot}/patches/**/*',
+        { env: 'APP_ENV' },
+      ],
+      production: [
+        'default',
+        '!{projectRoot}/**/*.md',
+        '!{projectRoot}/test/**/*',
+        '!{projectRoot}/**/*.test.ts',
+      ],
+    },
+    targetDefaults: targets(shared, rootProject),
+  });
 
-  const rootJson = owned(
-    'project.json',
-    jsonc(
-      {
-        $schema: './node_modules/nx/schemas/project-schema.json',
-        name: rootProject,
-        targets: targets(rootTasks, rootProject),
-      },
-      NX_JSON,
-    ),
-  );
+  const rootJson = ownedJsonc('project.json', {
+    $schema: './node_modules/nx/schemas/project-schema.json',
+    name: rootProject,
+    targets: targets(rootTasks, rootProject),
+  });
 
   const byPackage = Map.groupBy(
     Arr.filter(tasks, (task) => task.package !== undefined),
@@ -170,29 +156,21 @@ export const nxRenderer: Renderer = (ctx, aggregate) => {
     }
   }
   const projects: ReadonlyArray<GeneratedFile> = Arr.map(known, (workspace) =>
-    owned(
-      `${workspace.dir}/project.json`,
-      jsonc(
-        {
-          $schema: '../../node_modules/nx/schemas/project-schema.json',
-          name: workspace.name,
-          targets: {
-            ...Rec.fromEntries(
-              Arr.map(aggregates, (name) => [name, {}] as const),
-            ),
-            // An opted-out task has no script, so nx has no target to run.
-            ...targets(
-              Arr.filter(
-                byPackage.get(workspace.name) ?? [],
-                (task) => task.command !== null,
-              ),
-              rootProject,
-            ),
-          },
-        },
-        NX_JSON,
-      ),
-    ),
+    ownedJsonc(`${workspace.dir}/project.json`, {
+      $schema: '../../node_modules/nx/schemas/project-schema.json',
+      name: workspace.name,
+      targets: {
+        ...Rec.fromEntries(Arr.map(aggregates, (name) => [name, {}] as const)),
+        // An opted-out task has no script, so nx has no target to run.
+        ...targets(
+          Arr.filter(
+            byPackage.get(workspace.name) ?? [],
+            (task) => task.command !== null,
+          ),
+          rootProject,
+        ),
+      },
+    }),
   );
   return [nxJson, rootJson, ...projects];
 };

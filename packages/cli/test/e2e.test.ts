@@ -38,9 +38,10 @@ const layout = Effect.gen(function* () {
   // `bun --bun vitest` puts a `node` -> bun shim first on PATH. The samples run
   // under the real node, as they do for users: under bun, oxlint's config host
   // truncates the `oxlint --rules --format json` output it parses.
+  const inheritedPath = yield* Config.String('PATH');
   const PATH = Arr.join(
     Arr.filter(
-      Str.split(yield* Config.String('PATH'), ':'),
+      Str.split(inheritedPath, ':'),
       (dir) => !Str.includes('/bun-node-')(dir),
     ),
     ':',
@@ -73,7 +74,8 @@ const checkPreset = Effect.fnUntraced(function* (name: string) {
   const { out, PATH, cli, overridesFile } = yield* layout;
   const config = presets[name];
   if (config === undefined) return;
-  const overrides = stringRecord(yield* readJsonObject(overridesFile));
+  const overridesJson = yield* readJsonObject(overridesFile);
+  const overrides = stringRecord(overridesJson);
   const env = { PATH, SHOEMAKER_VERSION_OVERRIDES: overridesFile };
   const dir = path.join(out, name);
 

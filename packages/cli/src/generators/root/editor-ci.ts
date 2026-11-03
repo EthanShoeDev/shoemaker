@@ -2,8 +2,7 @@ import { Array as Arr } from 'effect';
 
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator } from '../../engine/types.ts';
-import { hasApp, json, owned, seed } from '../shared.ts';
-import { jsonc } from '../task-runner/jsonc.ts';
+import { hasApp, owned, ownedJsonc, seed, seedJson } from '../shared.ts';
 
 const vscodeSettings = (config: ShoemakerConfig) => ({
   'editor.formatOnSave': true,
@@ -57,14 +56,10 @@ export const vscode: Generator = (ctx) =>
   ctx.config.features.vscode
     ? {
         files: [
-          owned(
-            '.vscode/settings.json',
-            jsonc(vscodeSettings(ctx.config), { json: true }),
-          ),
-          owned(
-            '.vscode/extensions.json',
-            jsonc({ recommendations: extensions(ctx.config) }, { json: true }),
-          ),
+          ownedJsonc('.vscode/settings.json', vscodeSettings(ctx.config)),
+          ownedJsonc('.vscode/extensions.json', {
+            recommendations: extensions(ctx.config),
+          }),
         ],
       }
     : {};
@@ -189,30 +184,27 @@ export const changesets: Generator = (ctx) =>
   ctx.config.features.changesets
     ? {
         files: [
-          seed(
-            '.changeset/config.json',
-            json({
-              changelog: [
-                '@changesets/changelog-github',
-                { repo: `EthanShoeDev/${ctx.config.name}` },
-              ],
-              commit: false,
-              fixed: [],
-              linked: [],
-              access: 'restricted',
-              baseBranch: 'main',
-              updateInternalDependencies: 'patch',
-              ignore: [],
-              // Apps are private packages; an Android release starts from
-              // the tag `changeset tag` gives its new version.
-              ...(Arr.some(
-                ctx.config.apps,
-                (app) => app.androidRelease !== undefined,
-              )
-                ? { privatePackages: { version: true, tag: true } }
-                : {}),
-            }),
-          ),
+          seedJson('.changeset/config.json', {
+            changelog: [
+              '@changesets/changelog-github',
+              { repo: `EthanShoeDev/${ctx.config.name}` },
+            ],
+            commit: false,
+            fixed: [],
+            linked: [],
+            access: 'restricted',
+            baseBranch: 'main',
+            updateInternalDependencies: 'patch',
+            ignore: [],
+            // Apps are private packages; an Android release starts from
+            // the tag `changeset tag` gives its new version.
+            ...(Arr.some(
+              ctx.config.apps,
+              (app) => app.androidRelease !== undefined,
+            )
+              ? { privatePackages: { version: true, tag: true } }
+              : {}),
+          }),
           seed('.changeset/README.md', CHANGESET_README),
         ],
       }

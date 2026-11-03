@@ -2,31 +2,31 @@ import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Effect } from 'effect';
 
 import { androidDevShell, androidRelease } from '../../src/doctor/release.ts';
-import { failures, json, runCheck } from './helpers.ts';
+import { failures, jsonFiles, runCheck } from './helpers.ts';
 
 const helper = { 'apps/mobile/android-release.ts': 'export {};\n' };
 const wrapped = {
   'apps/mobile/app.config.ts': 'export default withAndroidRelease(config);\n',
 };
-const tagging = {
-  '.changeset/config.json': json({
-    privatePackages: { version: true, tag: true },
-  }),
-};
+const tagging = jsonFiles({
+  '.changeset/config.json': { privatePackages: { version: true, tag: true } },
+});
 
 describe('android-release doctor check', () => {
   it.effect('says nothing for a repo without Android releases', () =>
     Effect.gen(function* () {
-      assert.deepStrictEqual(yield* runCheck(androidRelease, {}), []);
+      const androidReleaseFailures = yield* runCheck(androidRelease, {});
+      assert.deepStrictEqual(androidReleaseFailures, []);
     }),
   );
 
   it.effect('passes when the seeds are wired up', () =>
     Effect.gen(function* () {
+      const tagged = yield* tagging;
       const findings = yield* runCheck(androidRelease, {
         ...helper,
         ...wrapped,
-        ...tagging,
+        ...tagged,
       });
       assert.deepStrictEqual(
         Arr.map(findings, (f) => [f.ok, f.message]),
@@ -37,10 +37,13 @@ describe('android-release doctor check', () => {
 
   it.effect('flags stale seeds', () =>
     Effect.gen(function* () {
+      const restricted = yield* jsonFiles({
+        '.changeset/config.json': { access: 'restricted' },
+      });
       const found = yield* failures(androidRelease, {
         ...helper,
         'apps/mobile/app.config.ts': 'export default config;\n',
-        '.changeset/config.json': json({ access: 'restricted' }),
+        ...restricted,
       });
       assert.deepStrictEqual(
         Arr.map(found, (f) => f.path),
@@ -68,7 +71,8 @@ describe('android-dev-shell doctor check', () => {
           'overlays = [bunOverlay android-nixpkgs.overlays.default];\nandroid = import ./nix/android.nix {inherit pkgs default;};\n',
       });
       assert.deepStrictEqual(wired, []);
-      assert.deepStrictEqual(yield* runCheck(androidDevShell, {}), []);
+      const androidDevShellFailures = yield* runCheck(androidDevShell, {});
+      assert.deepStrictEqual(androidDevShellFailures, []);
     }),
   );
 });

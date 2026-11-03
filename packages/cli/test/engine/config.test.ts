@@ -61,11 +61,10 @@ const roundTrip = (config: ShoemakerConfig) =>
 describe('shoemaker.config.ts', () => {
   it.effect('render -> load round-trips', () =>
     Effect.gen(function* () {
-      assert.deepStrictEqual(yield* roundTrip(full), full);
-      assert.deepStrictEqual(
-        yield* roundTrip(defaultConfig('x')),
-        defaultConfig('x'),
-      );
+      const roundTrippedFull = yield* roundTrip(full);
+      assert.deepStrictEqual(roundTrippedFull, full);
+      const roundTrippedDefault = yield* roundTrip(defaultConfig('x'));
+      assert.deepStrictEqual(roundTrippedDefault, defaultConfig('x'));
     }).pipe(Effect.provide(BunServices.layer)),
   );
 
@@ -73,7 +72,8 @@ describe('shoemaker.config.ts', () => {
     Effect.gen(function* () {
       for (const config of [full, defaultConfig('x')]) {
         const text = renderConfigFile(config);
-        assert.strictEqual(yield* formatContent(CONFIG_PATH, text), text);
+        const formattedConfig = yield* formatContent(CONFIG_PATH, text);
+        assert.strictEqual(formattedConfig, text);
       }
     }),
   );

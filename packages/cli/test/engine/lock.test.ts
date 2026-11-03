@@ -20,8 +20,9 @@ describe('lock', () => {
 
   it.effect('round-trips through render and parse', () =>
     Effect.gen(function* () {
-      const text = renderLock(lock);
-      assert.deepStrictEqual(yield* parseLock(text), lock);
+      const text = yield* renderLock(lock);
+      const parsedLock = yield* parseLock(text);
+      assert.deepStrictEqual(parsedLock, lock);
       // Paths are sorted so the lock diffs cleanly.
       assert.isBelow(
         Option.getOrElse(Str.indexOf('a.ts')(text), () => -1),
@@ -48,7 +49,8 @@ describe('lock', () => {
 
   it.effect('reads a missing lock as undefined', () =>
     Effect.gen(function* () {
-      assert.strictEqual(yield* readLock(makeMemoryRepo({})), undefined);
+      const missingLock = yield* readLock(makeMemoryRepo({}));
+      assert.strictEqual(missingLock, undefined);
     }),
   );
 });

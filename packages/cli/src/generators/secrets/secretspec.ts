@@ -1,4 +1,4 @@
-import { Array as Arr } from 'effect';
+import { Array as Arr, Option, String as Str } from 'effect';
 
 import type { Renderer } from '../../engine/types.ts';
 import { managed, region } from '../shared.ts';
@@ -8,16 +8,39 @@ import type { EnvVar } from './model.ts';
 // TOML cannot reopen a table, so each profile table holds its own region and
 // project secrets go under the region, still inside that table.
 
-const str = (value: string) => JSON.stringify(value);
+const TOML_ESCAPES: Readonly<Record<string, string>> = {
+  '"': String.raw`\"`,
+  '\\': String.raw`\\`,
+  '\b': String.raw`\b`,
+  '\t': String.raw`\t`,
+  '\n': String.raw`\n`,
+  '\f': String.raw`\f`,
+  '\r': String.raw`\r`,
+};
+
+const CONTROL = /^\p{Cc}$/u;
+
+const tomlChar = (char: string) =>
+  TOML_ESCAPES[char] ??
+  (CONTROL.test(char)
+    ? Option.match(Str.codePointAt(0)(char), {
+        onNone: () => char,
+        onSome: (code) => `\\u${Str.padStart(4, '0')(code.toString(16))}`,
+      })
+    : char);
+
+// A TOML basic string: quote, backslash and control characters escaped.
+const tomlString = (text: string) =>
+  `"${Arr.join(Arr.map(Str.split('')(text), tomlChar), '')}"`;
 
 const entry = (v: EnvVar) => {
   const fields = [
-    `description = ${str(v.description)}`,
+    `description = ${tomlString(v.description)}`,
     `required = ${v.required}`,
     // Secrets never carry committed defaults.
     ...(v.default === undefined || v.sensitive
       ? []
-      : [`default = ${str(v.default)}`]),
+      : [`default = ${tomlString(v.default)}`]),
   ];
   return `${v.key} = { ${Arr.join(fields, ', ')} }`;
 };
@@ -32,7 +55,7 @@ export const secretspecToml = (name: string, vars: ReadonlyArray<EnvVar>) => {
 # it is stored. \`secretspec run --profile <stage> -- <command>\` materializes it.
 # Docs: https://secretspec.dev/concepts/declarative/
 [project]
-name = ${str(name)}
+name = ${tomlString(name)}
 revision = "1.0"`,
     '#',
   );

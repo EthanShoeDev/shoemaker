@@ -2,6 +2,7 @@ import {
   Array as Arr,
   Console,
   Effect,
+  Equal,
   FileSystem,
   Option,
   Path,
@@ -19,7 +20,6 @@ import {
   decodeConfig,
 } from '../config/schema.ts';
 import { ensureCleanTree, writeFile } from '../engine/apply.ts';
-import { canonicalJson } from '../engine/json.ts';
 import { nameApps } from './init.ts';
 import { type CommandFailed, cwdFlag, fail, resolveRoot } from './shared.ts';
 import { runSync } from './sync.ts';
@@ -69,10 +69,7 @@ const writeConfig = Effect.fnUntraced(function* (
   if (edited === undefined) return false;
   yield* writeFile(root, CONFIG_PATH, edited);
   const reloaded = yield* loadConfig(root).pipe(Effect.option);
-  if (
-    Option.isSome(reloaded) &&
-    canonicalJson(reloaded.value) === canonicalJson(next)
-  ) {
+  if (Option.isSome(reloaded) && Equal.equals(reloaded.value, next)) {
     return true;
   }
   yield* writeFile(root, CONFIG_PATH, source);

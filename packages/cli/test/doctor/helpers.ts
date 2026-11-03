@@ -1,9 +1,12 @@
-import { Array as Arr, Effect } from 'effect';
+import { Array as Arr, Effect, Record as Rec } from 'effect';
 
 import type { DoctorCheck } from '../../src/doctor/types.ts';
+import { renderJson } from '../../src/engine/json.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
 
-export const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+// Fixture files from JSON values, each written the way shoemaker writes JSON.
+export const jsonFiles = (files: Readonly<Record<string, unknown>>) =>
+  Effect.all(Rec.map(files, renderJson));
 
 export const runCheck = (
   check: DoctorCheck,

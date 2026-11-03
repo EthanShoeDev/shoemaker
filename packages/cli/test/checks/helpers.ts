@@ -1,4 +1,10 @@
-import { Option, Schema } from 'effect';
+import { Effect, Option, Record as Rec, Schema } from 'effect';
+
+import { encodeJson } from '../../src/engine/json.ts';
+
+// Fixture files from JSON values, each written on one line.
+export const compactJsonFiles = (files: Readonly<Record<string, unknown>>) =>
+  Effect.all(Rec.map(files, (value) => encodeJson(value)));
 
 const Deps = Schema.Record(Schema.String, Schema.String);
 const decodePkg = Schema.decodeUnknownOption(

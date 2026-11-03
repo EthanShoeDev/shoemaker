@@ -29,9 +29,11 @@ export const isGitignored = (gitignore: string | undefined, file: string) =>
 
 // Project source files (JS/TS family), skipping vendored and ignored trees.
 export const sourceFiles = Effect.fnUntraced(function* (repo: Repo) {
-  const ignored = gitignoredDirs(yield* repo.read('.gitignore'));
+  const gitignore = yield* repo.read('.gitignore');
+  const ignored = gitignoredDirs(gitignore);
+  const matches = yield* repo.glob(SOURCES);
   return Arr.filter(
-    yield* repo.glob(SOURCES),
+    matches,
     (file) =>
       !NOT_PROJECT.test(`/${file}`) &&
       !/\.gen\.|\.d\.ts$/u.test(file) &&

@@ -1,27 +1,22 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, Option, Record as Rec } from 'effect';
+import { Array as Arr, Effect, Option, Record as Rec, Schema } from 'effect';
 
 import { catalogCheck } from '../../src/checks/catalog.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
+import { jsonFiles } from '../doctor/helpers.ts';
 import { pkgIn } from './helpers.ts';
 
-const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+const root = {
+  name: 'demo',
+  workspaces: {
+    packages: ['apps/*', 'packages/*'],
+    catalog: { effect: '4.0.1', zod: '^3.0.0' },
+  },
+  devDependencies: { effect: 'catalog:' },
+};
 
-const root = (extra: Record<string, unknown> = {}) =>
-  json({
-    name: 'demo',
-    workspaces: {
-      packages: ['apps/*', 'packages/*'],
-      catalog: { effect: '4.0.1', zod: '^3.0.0' },
-    },
-    devDependencies: { effect: 'catalog:' },
-    ...extra,
-  });
-
-const tabbed = JSON.stringify(
-  { name: '@demo/web', dependencies: { effect: '4.0.1' } },
-  null,
-  '\t',
+const encodeTabbed = Schema.encodeUnknownEffect(
+  Schema.fromJsonString(Schema.Json, { space: '\t' }),
 );
 
 const fileOf = (
@@ -36,19 +31,18 @@ const fileOf = (
 describe('catalog check', () => {
   it.effect('passes when every dependency uses catalog: / workspace:*', () =>
     Effect.gen(function* () {
-      const result = yield* catalogCheck.run(
-        makeMemoryRepo({
-          'package.json': root(),
-          'apps/web/package.json': json({
-            name: '@demo/web',
-            dependencies: { effect: 'catalog:', '@demo/lib': 'workspace:*' },
-          }),
-          'packages/lib/package.json': json({
-            name: '@demo/lib',
-            dependencies: { zod: 'catalog:' },
-          }),
-        }),
-      );
+      const files = yield* jsonFiles({
+        'package.json': root,
+        'apps/web/package.json': {
+          name: '@demo/web',
+          dependencies: { effect: 'catalog:', '@demo/lib': 'workspace:*' },
+        },
+        'packages/lib/package.json': {
+          name: '@demo/lib',
+          dependencies: { zod: 'catalog:' },
+        },
+      });
+      const result = yield* catalogCheck.run(makeMemoryRepo(files));
       assert.isTrue(result.ok);
       assert.deepStrictEqual(result.fixes, []);
     }),
@@ -58,16 +52,15 @@ describe('catalog check', () => {
     'flags pinned catalog deps and non-workspace internal deps, and fixes both',
     () =>
       Effect.gen(function* () {
-        const result = yield* catalogCheck.run(
-          makeMemoryRepo({
-            'package.json': root(),
-            'apps/web/package.json': json({
-              name: '@demo/web',
-              dependencies: { effect: '4.0.6', '@demo/lib': '^0.1.0' },
-            }),
-            'packages/lib/package.json': json({ name: '@demo/lib' }),
-          }),
-        );
+        const files = yield* jsonFiles({
+          'package.json': root,
+          'apps/web/package.json': {
+            name: '@demo/web',
+            dependencies: { effect: '4.0.6', '@demo/lib': '^0.1.0' },
+          },
+          'packages/lib/package.json': { name: '@demo/lib' },
+        });
+        const result = yield* catalogCheck.run(makeMemoryRepo(files));
         assert.isFalse(result.ok);
         assert.include(
           result.report,
@@ -94,19 +87,18 @@ describe('catalog check', () => {
     'adds missing deps to the catalog in sorted position and rewrites every use',
     () =>
       Effect.gen(function* () {
-        const result = yield* catalogCheck.run(
-          makeMemoryRepo({
-            'package.json': root(),
-            'apps/web/package.json': json({
-              name: '@demo/web',
-              dependencies: { react: '^19.1.0' },
-            }),
-            'packages/lib/package.json': json({
-              name: '@demo/lib',
-              peerDependencies: { react: '^19.2.0' },
-            }),
-          }),
-        );
+        const files = yield* jsonFiles({
+          'package.json': root,
+          'apps/web/package.json': {
+            name: '@demo/web',
+            dependencies: { react: '^19.1.0' },
+          },
+          'packages/lib/package.json': {
+            name: '@demo/lib',
+            peerDependencies: { react: '^19.2.0' },
+          },
+        });
+        const result = yield* catalogCheck.run(makeMemoryRepo(files));
         assert.isFalse(result.ok);
         assert.include(result.report, '"react": "^19.2.0" (used in 2 packages');
         const rootPkg = fileOf(result.fixes, 'package.json');
@@ -130,27 +122,28 @@ describe('catalog check', () => {
 
   it.effect('honours per-package catalogSkip and the global skip list', () =>
     Effect.gen(function* () {
-      const result = yield* catalogCheck.run(
-        makeMemoryRepo({
-          'package.json': root(),
-          'apps/mobile/package.json': json({
-            name: '@demo/mobile',
-            catalogSkip: ['effect'],
-            dependencies: { effect: '4.0.0', 'electron-updater': '6.0.0' },
-          }),
-        }),
-      );
+      const files = yield* jsonFiles({
+        'package.json': root,
+        'apps/mobile/package.json': {
+          name: '@demo/mobile',
+          catalogSkip: ['effect'],
+          dependencies: { effect: '4.0.0', 'electron-updater': '6.0.0' },
+        },
+      });
+      const result = yield* catalogCheck.run(makeMemoryRepo(files));
       assert.isTrue(result.ok);
     }),
   );
 
   it.effect('keeps the file formatting (tabs) when fixing', () =>
     Effect.gen(function* () {
+      const files = yield* jsonFiles({ 'package.json': root });
+      const tabbed = yield* encodeTabbed({
+        name: '@demo/web',
+        dependencies: { effect: '4.0.1' },
+      });
       const result = yield* catalogCheck.run(
-        makeMemoryRepo({
-          'package.json': root(),
-          'apps/web/package.json': tabbed,
-        }),
+        makeMemoryRepo({ ...files, 'apps/web/package.json': tabbed }),
       );
       const web =
         Option.getOrUndefined(

@@ -123,7 +123,8 @@ describe('trace export', () => {
     Effect.gen(function* () {
       const json = yield* encodeTraceExport(trace);
       assert.include(json, '\n  "serviceName": "svc"');
-      assert.deepStrictEqual(yield* decodeTraceExport(json), trace);
+      const decoded = yield* decodeTraceExport(json);
+      assert.deepStrictEqual(decoded, trace);
     }),
   );
 

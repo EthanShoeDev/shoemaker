@@ -73,9 +73,8 @@ export const cloudflareObservabilityMcp: DoctorCheck = {
       Arr.some(CLOUDFLARE_DEPS, (dep) => hasDep(manifest.pkg, dep)),
     );
     if (!cloudflare) return [];
-    return mcpUrls(yield* repo.read('.mcp.json')).includes(
-      CLOUDFLARE_OBSERVABILITY_MCP,
-    )
+    const mcpJson = yield* repo.read('.mcp.json');
+    return mcpUrls(mcpJson).includes(CLOUDFLARE_OBSERVABILITY_MCP)
       ? [pass('.mcp.json has the Cloudflare observability MCP server')]
       : [
           fail('.mcp.json lacks the Cloudflare observability MCP server', {

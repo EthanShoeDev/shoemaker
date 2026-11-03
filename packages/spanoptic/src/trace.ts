@@ -1,4 +1,4 @@
-import { Array as Arr, Order, Predicate, Schema } from 'effect';
+import { Array as Arr, Formatter, Order, Predicate, Schema } from 'effect';
 
 export const LogEntry = Schema.Struct({
   timestamp: Schema.Finite,
@@ -137,7 +137,7 @@ export const formatLogMessage = (message: unknown) => {
   const parts = Arr.isArray(message) ? message : [message];
   return Arr.join(
     Arr.map(parts, (part) =>
-      Predicate.isString(part) ? part : JSON.stringify(part),
+      Predicate.isString(part) ? part : Formatter.format(part),
     ),
     ' ',
   );

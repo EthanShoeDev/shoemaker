@@ -43,10 +43,10 @@ export const runSync = Effect.fnUntraced(function* (options: SyncOptions) {
       yield* ensureCleanTree(options.root);
     }
     yield* applyPlan(options.root, plan);
-    const next = nextLock(lock, plan, cliVersion);
-    if ((yield* repo.read(LOCK_PATH)) !== renderLock(next)) {
-      yield* writeLock(options.root, next);
-    }
+    const next = yield* nextLock(lock, plan, cliVersion);
+    const rendered = yield* renderLock(next);
+    const onDisk = yield* repo.read(LOCK_PATH);
+    if (onDisk !== rendered) yield* writeLock(options.root, next);
   }
 
   if (blocked.length > 0) {

@@ -40,12 +40,12 @@ describe('makeRepo glob', () => {
       yield* write(dir);
       yield* runCapture('git', ['init', '-q'], dir);
       const repo = yield* makeRepo(dir);
-      assert.deepStrictEqual(yield* repo.glob('**/*.md'), [
-        'README.md',
-        'docs/guide.md',
-      ]);
-      assert.deepStrictEqual(yield* repo.glob('*.log'), ['keep.log']);
-      assert.deepStrictEqual(yield* repo.glob('**/turbo.json{,c}'), [
+      const markdownFiles = yield* repo.glob('**/*.md');
+      assert.deepStrictEqual(markdownFiles, ['README.md', 'docs/guide.md']);
+      const logFiles = yield* repo.glob('*.log');
+      assert.deepStrictEqual(logFiles, ['keep.log']);
+      const turboConfigs = yield* repo.glob('**/turbo.json{,c}');
+      assert.deepStrictEqual(turboConfigs, [
         'apps/web/turbo.jsonc',
         'turbo.json',
       ]);
@@ -62,9 +62,8 @@ describe('makeRepo glob', () => {
       assert.include(markdown, 'docs/cloned-repos-as-docs/effect/README.md');
       assert.notInclude(markdown, 'node_modules/dep/README.md');
       // Files only: the `_` directory is not a match.
-      assert.deepStrictEqual(yield* repo.glob('.husky/*'), [
-        '.husky/pre-commit',
-      ]);
+      const huskyHooks = yield* repo.glob('.husky/*');
+      assert.deepStrictEqual(huskyHooks, ['.husky/pre-commit']);
     }).pipe(Effect.scoped, Effect.provide(BunServices.layer)),
   );
 });

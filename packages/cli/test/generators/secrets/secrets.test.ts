@@ -3,7 +3,9 @@ import { Array as Arr, Option, pipe, String as Str } from 'effect';
 
 import type { ShoemakerConfig } from '../../../src/config/schema.ts';
 import { allEnvVars } from '../../../src/generators/secrets/env-vars.ts';
-import { parseJson, preset, record, render } from '../root/fixtures.ts';
+import { secretspecToml } from '../../../src/generators/secrets/secretspec.ts';
+import { record } from '../files.ts';
+import { preset, render } from '../root/fixtures.ts';
 
 const withSecrets = (
   config: ShoemakerConfig,
@@ -29,10 +31,10 @@ const tomlTable = (toml: string, table: string) => {
 };
 
 describe('varlock', () => {
-  const { aggregate, byPath, file } = render(
+  const { aggregate, byPath, text, json } = render(
     withSecrets(preset('web'), 'varlock'),
   );
-  const schema = file('.env.schema').content;
+  const schema = text('.env.schema');
 
   it('declares every aggregated var with its decorators', () => {
     assert.include(
@@ -73,18 +75,18 @@ describe('varlock', () => {
   });
 
   it('installs varlock from the catalog at the root', () => {
-    const root = parseJson(file('package.json'));
+    const root = json('package.json');
     assert.strictEqual(record(root.devDependencies).varlock, 'catalog:');
     assert.include(aggregate.catalog, 'varlock');
-    assert.include(file('.gitignore').content, '.env.local');
+    assert.include(text('.gitignore'), '.env.local');
   });
 });
 
 describe('secretspec', () => {
-  const { aggregate, byPath, file } = render(
+  const { aggregate, byPath, text } = render(
     withSecrets(preset('full'), 'secretspec'),
   );
-  const toml = file('secretspec.toml').content;
+  const toml = text('secretspec.toml');
 
   it('declares every aggregated var in the default profile', () => {
     assert.include(toml, '[project]\nname = "sample-full"\nrevision = "1.0"');
@@ -109,7 +111,7 @@ describe('secretspec', () => {
 
   it('puts the secretspec CLI in the nix shell', () => {
     assert.include(aggregate.nixPackages, 'secretspec');
-    assert.match(file('flake.nix').content, /^\s+secretspec$/mu);
+    assert.match(text('flake.nix'), /^\s+secretspec$/mu);
   });
 });
 
@@ -121,5 +123,22 @@ describe('env package', () => {
       const { byPath } = render(preset(name));
       assert.isFalse(byPath.has('packages/env/package.json'), name);
     }
+  });
+});
+
+describe('secretspec strings', () => {
+  it('escapes quotes, backslashes and every control character TOML forbids', () => {
+    const toml = secretspecToml('demo', [
+      {
+        key: 'TOKEN',
+        description: 'say "hi" \\ then\ttab\u0001\u007F',
+        required: true,
+        sensitive: false,
+      },
+    ]);
+    assert.include(
+      toml,
+      String.raw`TOKEN = { description = "say \"hi\" \\ then\ttab\u0001\u007f", required = true }`,
+    );
   });
 });

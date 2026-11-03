@@ -11,7 +11,7 @@ import {
   oxlintUnusedDirectives,
   retiredPlugins,
 } from '../../src/doctor/lint.ts';
-import { failures, json } from './helpers.ts';
+import { failures, jsonFiles } from './helpers.ts';
 
 const shared =
   "import { defineShoemakerConfig } from 'shoemaker-oxlint-config';\nexport default defineShoemakerConfig({ scope: 'x' });\n";
@@ -42,11 +42,12 @@ describe('oxlint doctor checks', () => {
             ],
           ],
         );
-        assert.lengthOf(
-          yield* failures(oxlintConfigFormat, { 'oxlint.config.ts': shared }),
-          0,
-        );
-        assert.lengthOf(yield* failures(oxlintConfigFormat, {}), 1);
+        const sharedFormatFailures = yield* failures(oxlintConfigFormat, {
+          'oxlint.config.ts': shared,
+        });
+        assert.lengthOf(sharedFormatFailures, 0);
+        const missingFormatFailures = yield* failures(oxlintConfigFormat, {});
+        assert.lengthOf(missingFormatFailures, 1);
       }),
   );
 
@@ -54,10 +55,10 @@ describe('oxlint doctor checks', () => {
     'oxlint-shared-config: shared passes; hand-rolled needs categories and options',
     () =>
       Effect.gen(function* () {
-        assert.lengthOf(
-          yield* failures(oxlintSharedConfig, { 'oxlint.config.ts': shared }),
-          0,
-        );
+        const sharedConfigFailures = yield* failures(oxlintSharedConfig, {
+          'oxlint.config.ts': shared,
+        });
+        assert.lengthOf(sharedConfigFailures, 0);
         const partial = yield* failures(oxlintSharedConfig, {
           'oxlint.config.ts': handRolled(
             "correctness: 'error', style: 'warn'",
@@ -85,20 +86,23 @@ describe('oxlint doctor checks', () => {
     'oxlint-no-warn: finds warn in rc rules, overrides and TS configs',
     () =>
       Effect.gen(function* () {
-        const found = yield* failures(oxlintNoWarn, {
-          '.oxlintrc.json': json({
+        const rc = yield* jsonFiles({
+          '.oxlintrc.json': {
             rules: { a: 'warn', b: ['warn', {}], c: 'error' },
             overrides: [{ rules: { d: 1 } }],
-          }),
+          },
+        });
+        const found = yield* failures(oxlintNoWarn, {
+          ...rc,
           'oxlint.config.ts':
             "export default {\n  rules: {\n    // 'warn' in a comment is fine\n    eqeqeq: 'warn',\n  },\n};\n",
         });
         assert.include(found[0]?.message ?? '', 'a, b, d');
         assert.include(found[1]?.message ?? '', 'line 4');
-        assert.lengthOf(
-          yield* failures(oxlintNoWarn, { 'oxlint.config.ts': shared }),
-          0,
-        );
+        const sharedNoWarnFailures = yield* failures(oxlintNoWarn, {
+          'oxlint.config.ts': shared,
+        });
+        assert.lengthOf(sharedNoWarnFailures, 0);
       }),
   );
 
@@ -106,29 +110,31 @@ describe('oxlint doctor checks', () => {
     'oxlint-unused-directives: options or shared config, not CLI flags',
     () =>
       Effect.gen(function* () {
-        assert.lengthOf(
-          yield* failures(oxlintUnusedDirectives, {
-            'oxlint.config.ts': shared,
-          }),
-          0,
-        );
-        assert.lengthOf(
-          yield* failures(oxlintUnusedDirectives, {
+        const sharedUnusedFailures = yield* failures(oxlintUnusedDirectives, {
+          'oxlint.config.ts': shared,
+        });
+        assert.lengthOf(sharedUnusedFailures, 0);
+        const handRolledUnusedFailures = yield* failures(
+          oxlintUnusedDirectives,
+          {
             'oxlint.config.ts': handRolled(
               '',
               "reportUnusedDisableDirectives: 'error'",
             ),
-          }),
-          0,
+          },
         );
-        const viaCli = yield* failures(oxlintUnusedDirectives, {
-          'oxlint.config.ts': handRolled('', ''),
-          'package.json': json({
+        assert.lengthOf(handRolledUnusedFailures, 0);
+        const manifest = yield* jsonFiles({
+          'package.json': {
             scripts: {
               'oxlint:check':
                 'oxlint --report-unused-disable-directives-severity=error .',
             },
-          }),
+          },
+        });
+        const viaCli = yield* failures(oxlintUnusedDirectives, {
+          'oxlint.config.ts': handRolled('', ''),
+          ...manifest,
         });
         assert.include(viaCli[0]?.message ?? '', 'CLI flag');
       }),
@@ -136,16 +142,16 @@ describe('oxlint doctor checks', () => {
 
   it.effect('oxlint-cli-flags: type-aware flags in scripts', () =>
     Effect.gen(function* () {
-      const files = {
-        'package.json': json({
+      const manifest = yield* jsonFiles({
+        'package.json': {
           scripts: {
             'oxlint:check':
               'oxlint -c oxlint.config.ts --type-aware --type-check .',
             other: 'oxlint-tsgolint --type-aware',
           },
-        }),
-        'oxlint.config.ts': shared,
-      };
+        },
+      });
+      const files = { ...manifest, 'oxlint.config.ts': shared };
       const found = yield* failures(oxlintCliFlags, files);
       assert.lengthOf(found, 1);
       assert.include(found[0]?.message ?? '', 'package.json#oxlint:check');
@@ -161,30 +167,22 @@ describe('oxlint doctor checks', () => {
       });
       assert.include(rc[0]?.fix ?? '', 'oxfmt.config.ts');
       assert.isDefined(rc[1]?.fix);
-      assert.lengthOf(
-        yield* failures(oxfmtSortImports, {
-          '.oxfmtrc.jsonc': '{ "experimentalSortImports": {} }',
-        }),
-        0,
-      );
-      assert.lengthOf(
-        yield* failures(oxfmtSortImports, {
-          '.oxfmtrc.jsonc': '{ "singleQuote": true }',
-        }),
-        1,
-      );
-      assert.lengthOf(
-        yield* failures(oxfmtSortImports, {
-          'oxfmt.config.ts': 'export default { sortImports: true };',
-        }),
-        0,
-      );
-      assert.lengthOf(
-        yield* failures(oxfmtSortImports, {
-          'oxfmt.config.ts': '// sortImports: true\nexport default {};',
-        }),
-        1,
-      );
+      const jsoncSortImportsFailures = yield* failures(oxfmtSortImports, {
+        '.oxfmtrc.jsonc': '{ "experimentalSortImports": {} }',
+      });
+      assert.lengthOf(jsoncSortImportsFailures, 0);
+      const unsortedImportsFailures = yield* failures(oxfmtSortImports, {
+        '.oxfmtrc.jsonc': '{ "singleQuote": true }',
+      });
+      assert.lengthOf(unsortedImportsFailures, 1);
+      const tsSortImportsFailures = yield* failures(oxfmtSortImports, {
+        'oxfmt.config.ts': 'export default { sortImports: true };',
+      });
+      assert.lengthOf(tsSortImportsFailures, 0);
+      const commentedSortImportsFailures = yield* failures(oxfmtSortImports, {
+        'oxfmt.config.ts': '// sortImports: true\nexport default {};',
+      });
+      assert.lengthOf(commentedSortImportsFailures, 1);
     }),
   );
 

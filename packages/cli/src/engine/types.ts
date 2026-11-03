@@ -1,5 +1,8 @@
+import { Data, type Schema } from 'effect';
+
 import type { ShoemakerConfig } from '../config/schema.ts';
 import type { EnvVar } from '../generators/secrets/model.ts';
+import type { Jsonc } from '../generators/task-runner/jsonc.ts';
 import type { TaskDef } from '../generators/task-runner/model.ts';
 
 // How `shoemaker sync` treats a generated file once it exists on disk.
@@ -11,21 +14,51 @@ import type { TaskDef } from '../generators/task-runner/model.ts';
 // - `managed`: the file contains `shoemaker:begin <id>` / `shoemaker:end <id>`
 //   regions. Sync rewrites region bodies only; text outside them is the
 //   user's. A missing file is written in full.
-// - `json-merge`: `content` is a JSON object of keys shoemaker owns. Sync deep
-//   merges them into the existing JSON file (objects merge, everything else is
-//   replaced) and leaves unowned keys alone. Used for package.json.
+// - `json-merge`: a JSON object of keys shoemaker owns. Sync deep merges them
+//   into the existing JSON file (objects merge, everything else is replaced)
+//   and leaves unowned keys alone. Used for package.json.
 export type FileStrategy = 'owned' | 'seed' | 'managed' | 'json-merge';
 
-export interface GeneratedFile {
+interface FileFields {
   // Repo-relative POSIX path.
   readonly path: string;
-  readonly content: string;
-  readonly strategy: FileStrategy;
-  // Mark executable (scripts/*.sh).
-  readonly executable?: boolean;
   // Written as rendered, unformatted: the repo's oxfmt ignores it.
   readonly verbatim?: boolean;
 }
+
+// What a generator emits. JSON stays a value until the engine writes it, so
+// generators never serialize and json-merge never reparses.
+export type GeneratedFile = Data.TaggedEnum<{
+  Text: FileFields & {
+    readonly strategy: 'owned' | 'seed' | 'managed';
+    readonly content: string;
+    // Mark executable (scripts/*.sh).
+    readonly executable?: boolean;
+  };
+  Json: FileFields & {
+    readonly strategy: 'owned' | 'seed';
+    readonly json: Schema.JsonObject;
+  };
+  // Printed in oxfmt's layout, with comments; `.json` files take no trailing
+  // commas.
+  Jsonc: FileFields & {
+    readonly strategy: 'owned' | 'seed';
+    readonly jsonc: Jsonc;
+    readonly trailingCommas: boolean;
+  };
+  Merge: FileFields & {
+    readonly strategy: 'json-merge';
+    readonly json: Schema.JsonObject;
+  };
+}>;
+
+export const GeneratedFile = Data.taggedEnum<GeneratedFile>();
+
+// A generated file after the engine rendered it: whole files are text, and a
+// json-merge fragment stays a value to merge with the file on disk.
+export type RenderedFile =
+  | Data.TaggedEnum.Value<GeneratedFile, 'Text'>
+  | Data.TaggedEnum.Value<GeneratedFile, 'Merge'>;
 
 // Facts generators share. Generators are pure: config in, files out.
 export interface GenContext {

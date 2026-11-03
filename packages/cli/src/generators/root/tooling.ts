@@ -8,7 +8,7 @@ import {
 
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
-import { hasApp, json, managed, owned, region } from '../shared.ts';
+import { hasApp, managed, owned, ownedJson, region } from '../shared.ts';
 import { type Workspace, workspaces } from './workspaces.ts';
 
 const quote = (value: string) =>
@@ -238,25 +238,22 @@ const jscpdIgnore = [
 ];
 
 export const jscpdConfig: Renderer = (_ctx, aggregate) => [
-  owned(
-    '.jscpd.json',
-    json({
-      pattern: '**/*',
-      ignore: [
-        ...new Set([
-          ...jscpdIgnore,
-          ...Arr.map(aggregate.ignore, (glob) =>
-            Str.startsWith('**/')(glob) ? glob : `**/${glob}`,
-          ),
-        ]),
-      ],
-      threshold: 0,
-      minTokens: 50,
-      minLines: 33,
-      maxLines: 1000,
-      maxSize: '100kb',
-    }),
-  ),
+  ownedJson('.jscpd.json', {
+    pattern: '**/*',
+    ignore: [
+      ...new Set([
+        ...jscpdIgnore,
+        ...Arr.map(aggregate.ignore, (glob) =>
+          Str.startsWith('**/')(glob) ? glob : `**/${glob}`,
+        ),
+      ]),
+    ],
+    threshold: 0,
+    minTokens: 50,
+    minLines: 33,
+    maxLines: 1000,
+    maxSize: '100kb',
+  }),
 ];
 
 export const rootTsconfig: Generator = () => ({

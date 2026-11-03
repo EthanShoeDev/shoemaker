@@ -10,9 +10,9 @@ import { cliVersion } from './engine/meta.ts';
 
 const effect = '4.1.2';
 const oxlint = '1.90.0';
-const alchemy = '2.0.0-beta.84';
+const alchemy = '2.0.0-beta.85';
 const tanstackRouter = '^1.170.46';
-const expoSdk = '~58.0.22';
+const expoSdk = '~58.0.23';
 // Changesets releases the shoemaker packages as one fixed group, so the CLI's
 // own version is theirs. On 0.x a caret only admits patches, so a literal here
 // fell behind the first minor release.
@@ -83,7 +83,7 @@ export const versions = {
   '@effect/opentelemetry': effect,
   '@effect/atom-react': effect,
   '@effect/sql-pg': effect,
-  // @effect/tsgo 0.63 supports oxlint 1.88-1.90, tsgolint 7.0.2004-2005, TS 7.0.2.
+  // @effect/tsgo 0.64 supports oxlint 1.88-1.90, tsgolint 7.0.2004-2005, TS 7.0.2.
   '@effect/tsgo': '0.64.1',
   '@effect/language-service': '^0.87.5',
 
@@ -91,7 +91,7 @@ export const versions = {
   oxlint,
   '@oxlint/plugins': oxlint,
   'oxlint-tsgolint': '7.0.2005',
-  oxfmt: '0.75.0',
+  oxfmt: '0.76.0',
   knip: '^6.44.1',
   jscpd: '^5.4.2',
   '@tanstack/eslint-plugin-query': '^5.105.3',
@@ -102,7 +102,7 @@ export const versions = {
   typescript: '^7.0.2',
   turbo: '^2.11.10',
   nx: '^24.0.3',
-  tsdown: '^0.23.4',
+  tsdown: '^0.23.5',
   vitest: '^5.1.0',
   'happy-dom': '^21.0.4',
   '@types/node': '^26.6.6',
@@ -137,8 +137,8 @@ export const versions = {
   // the web app's @babel/core at the root, where Metro loads it and Expo's
   // Babel 7 presets refuse 8. @rolldown/plugin-babel takes either.
   '@babel/core': '^7.29.0',
-  tailwindcss: '^4.3.3',
-  '@tailwindcss/vite': '^4.3.3',
+  tailwindcss: '^4.3.4',
+  '@tailwindcss/vite': '^4.3.4',
   '@tanstack/react-start': '^1.169.4',
   '@tanstack/react-router': tanstackRouter,
   '@tanstack/router-plugin': '^1.168.48',
@@ -154,12 +154,12 @@ export const versions = {
 
   // Expo family: let `expo install --fix` own the exact RN-side versions.
   expo: expoSdk,
-  'expo-router': '~58.0.29',
+  'expo-router': '~58.0.30',
   'expo-status-bar': '~58.0.4',
   'expo-system-ui': '~58.0.7',
-  'expo-constants': '~58.0.14',
-  'expo-linking': '~58.0.15',
-  'react-native-safe-area-context': '~5.10.1',
+  'expo-constants': '~58.0.15',
+  'expo-linking': '~58.0.16',
+  'react-native-safe-area-context': '~5.11.1',
   'react-native-screens': '~4.30.1',
   'react-native': '0.88.1',
   uniwind: '^1.13.1',

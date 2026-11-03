@@ -35,5 +35,6 @@ export const writeJson = Effect.fnUntraced(function* (
   value: unknown,
 ) {
   const fs = yield* FileSystem.FileSystem;
-  yield* fs.writeFileString(file, renderJson(value));
+  const text = yield* renderJson(value);
+  yield* fs.writeFileString(file, text);
 });

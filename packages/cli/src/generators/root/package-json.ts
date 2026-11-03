@@ -3,7 +3,7 @@ import { Array as Arr, Record as Rec, String as Str } from 'effect';
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
 import { effectFamily } from '../../versions.ts';
-import { catalogDeps, json } from '../shared.ts';
+import { catalogDeps, jsonMerge } from '../shared.ts';
 
 const BUN_VERSION = '1.4.4';
 export const PACKAGE_MANAGER = `bun@${BUN_VERSION}`;
@@ -79,52 +79,44 @@ const scripts = (config: ShoemakerConfig) => ({
 // (infra scripts), and the renderer only fills in the catalog.
 export const rootPackageJson: Generator = (ctx) => ({
   files: [
-    {
-      path: 'package.json',
-      strategy: 'json-merge',
-      content: json({
-        name: ctx.config.name,
-        private: true,
-        ...(ctx.config.description === ''
-          ? {}
-          : { description: ctx.config.description }),
-        type: 'module',
-        workspaces: { packages: ['apps/*', 'packages/*'] },
-        scripts: scripts(ctx.config),
-        devDependencies: catalogDeps(rootDevDependencies(ctx.config)),
-        // Transitive @effect/* caret ranges drift ahead of the exact effect
-        // pin, which effect-versions:check rejects.
-        overrides: Rec.fromEntries(
-          Arr.map(
-            Arr.sort(effectFamily, Str.Order),
-            (name) => [name, ctx.version('effect')] as const,
-          ),
+    jsonMerge('package.json', {
+      name: ctx.config.name,
+      private: true,
+      ...(ctx.config.description === ''
+        ? {}
+        : { description: ctx.config.description }),
+      type: 'module',
+      workspaces: { packages: ['apps/*', 'packages/*'] },
+      scripts: scripts(ctx.config),
+      devDependencies: catalogDeps(rootDevDependencies(ctx.config)),
+      // Transitive @effect/* caret ranges drift ahead of the exact effect
+      // pin, which effect-versions:check rejects.
+      overrides: Rec.fromEntries(
+        Arr.map(
+          Arr.sort(effectFamily, Str.Order),
+          (name) => [name, ctx.version('effect')] as const,
         ),
-        engines: { node: '^22.18.0 || ^24.0.0 || >=26.0.0' },
-        // Turbo reads `devEngines` and will drop the top-level field in a
-        // future major; tools that only know `packageManager` still read it.
-        devEngines: {
-          packageManager: { name: 'bun', version: BUN_VERSION },
-        },
-        packageManager: PACKAGE_MANAGER,
-      }),
-    },
+      ),
+      engines: { node: '^22.18.0 || ^24.0.0 || >=26.0.0' },
+      // Turbo reads `devEngines` and will drop the top-level field in a
+      // future major; tools that only know `packageManager` still read it.
+      devEngines: {
+        packageManager: { name: 'bun', version: BUN_VERSION },
+      },
+      packageManager: PACKAGE_MANAGER,
+    }),
   ],
 });
 
 export const rootCatalog: Renderer = (ctx, aggregate) => [
-  {
-    path: 'package.json',
-    strategy: 'json-merge',
-    content: json({
-      workspaces: {
-        catalog: Rec.fromEntries(
-          Arr.map(
-            aggregate.catalog,
-            (name) => [name, ctx.version(name)] as const,
-          ),
+  jsonMerge('package.json', {
+    workspaces: {
+      catalog: Rec.fromEntries(
+        Arr.map(
+          aggregate.catalog,
+          (name) => [name, ctx.version(name)] as const,
         ),
-      },
-    }),
-  },
+      ),
+    },
+  }),
 ];

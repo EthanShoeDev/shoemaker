@@ -13,24 +13,25 @@ import type { ShoemakerConfig } from '../../src/config/schema.ts';
 import { readLock } from '../../src/engine/lock.ts';
 import { makeRepo } from '../../src/engine/repo-live.ts';
 import { Generate } from '../../src/engine/sync.ts';
-import type { GeneratedFile } from '../../src/engine/types.ts';
-import { region } from '../../src/generators/shared.ts';
+import { GeneratedFile } from '../../src/engine/types.ts';
+import {
+  jsonMerge,
+  managed,
+  owned,
+  region,
+  seed,
+} from '../../src/generators/shared.ts';
 import { run, scratch, withBun } from './helpers.ts';
 
 // Stands in for the real generators so these tests exercise the commands and
 // engine, not generator output.
 const fakeGenerate = (config: ShoemakerConfig) => ({
   files: [
-    {
-      path: 'package.json',
-      strategy: 'json-merge',
-      content: JSON.stringify({ name: config.name, private: true }),
-    },
-    { path: 'README.md', strategy: 'seed', content: `# ${config.name}\n` },
-    {
-      path: 'AGENTS.md',
-      strategy: 'managed',
-      content: `# Agents\n\n${region(
+    jsonMerge('package.json', { name: config.name, private: true }),
+    seed('README.md', `# ${config.name}\n`),
+    managed(
+      'AGENTS.md',
+      `# Agents\n\n${region(
         'rules',
         `apps: ${Arr.join(
           Arr.map(config.apps, (a) => a.name),
@@ -38,19 +39,15 @@ const fakeGenerate = (config: ShoemakerConfig) => ({
         )}`,
         '<!--',
       )}\n`,
-    },
-    {
-      path: 'src/index.ts',
-      strategy: 'owned',
-      content: `export const name = "${config.name}"`,
-    },
-    {
+    ),
+    owned('src/index.ts', `export const name = "${config.name}"`),
+    GeneratedFile.Text({
       path: 'scripts/hello.sh',
       strategy: 'owned',
       content: '#!/bin/sh\necho hi\n',
       executable: true,
-    },
-  ] satisfies ReadonlyArray<GeneratedFile>,
+    }),
+  ],
   aggregate: {
     tasks: [],
     env: [],
@@ -92,13 +89,15 @@ describe('init + sync', () => {
           { kind: 'effect-api', name: 'api' },
           { kind: 'effect-api', name: 'worker' },
         ]);
-        assert.strictEqual(
-          yield* fs.readFileString(path.join(dir, 'src/index.ts')),
-          "export const name = 'my-repo';\n",
+        const indexSource = yield* fs.readFileString(
+          path.join(dir, 'src/index.ts'),
         );
-        const mode = (yield* fs.stat(path.join(dir, 'scripts/hello.sh'))).mode;
+        assert.strictEqual(indexSource, "export const name = 'my-repo';\n");
+        const helloStat = yield* fs.stat(path.join(dir, 'scripts/hello.sh'));
+        const mode = helloStat.mode;
         assert.strictEqual((mode % 0o1000).toString(8), '755');
-        const lock = yield* readLock(yield* makeRepo(dir));
+        const repo = yield* makeRepo(dir);
+        const lock = yield* readLock(repo);
         assert.deepStrictEqual(
           Arr.sort(Rec.keys(lock?.files ?? {}), Str.Order),
           [
@@ -237,8 +236,9 @@ describe('init + sync', () => {
           assert.strictEqual(error._tag, 'CommandFailed');
           assert.match(Arr.join(out, '\n'), /conflict\s+src\/index\.ts/u);
           // The conflict is left alone.
+          const conflictSource = yield* fs.readFileString(target);
           assert.strictEqual(
-            yield* fs.readFileString(target),
+            conflictSource,
             "export const name = 'hand edited';\n",
           );
 
@@ -246,10 +246,8 @@ describe('init + sync', () => {
             ['sync', '--allow-dirty', '--force', 'src/**', '--cwd', dir],
             [],
           );
-          assert.strictEqual(
-            yield* fs.readFileString(target),
-            "export const name = 'my-repo';\n",
-          );
+          const forcedSource = yield* fs.readFileString(target);
+          assert.strictEqual(forcedSource, "export const name = 'my-repo';\n");
         }),
       ),
   );

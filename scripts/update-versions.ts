@@ -39,6 +39,8 @@ const NOT_FROM_EXPO = new Set(['react', 'react-dom']);
 // Pins that stay put until their reason no longer holds.
 const HELD: Readonly<Record<string, string>> = {
   '@babel/core': "Expo's Metro presets need Babel 7 (see versions.ts)",
+  oxlint:
+    '`effect-tsgo patch --oxlint` refuses an oxlint @effect/tsgo does not list (see versions.ts)',
 };
 
 class RegistryError extends Schema.TaggedError<
@@ -61,7 +63,8 @@ const fetchJson = Effect.fnUntraced(function* <S extends Schema.Top>(
   if (response.status !== 200) {
     return yield* RegistryError.make({ url, status: response.status });
   }
-  return yield* Schema.decodeEffect(schema)(yield* response.json);
+  const body = yield* response.json;
+  return yield* Schema.decodeEffect(schema)(body);
 });
 
 const latestOf = (name: string) =>
@@ -121,14 +124,12 @@ const proposeChanges = Effect.fnUntraced(function* (source: string) {
     ...Arr.filter(Rec.keys(pinned), (name) => !users.has(name)),
     ...anchors.values(),
   ];
-  const latest = new Map(
-    yield* Effect.forEach(
-      lookups,
-      (name) =>
-        Effect.map(latestOf(name), (version) => [name, version] as const),
-      { concurrency: 8 },
-    ),
+  const lookedUp = yield* Effect.forEach(
+    lookups,
+    (name) => Effect.map(latestOf(name), (version) => [name, version] as const),
+    { concurrency: 8 },
   );
+  const latest = new Map(lookedUp);
 
   const changes: Array<Change> = [];
   const held: Array<string> = [];
@@ -138,6 +139,11 @@ const proposeChanges = Effect.fnUntraced(function* (source: string) {
 
   for (const [constant, value] of literals) {
     const anchor = anchors.get(constant);
+    const reason = anchor === undefined ? undefined : HELD[anchor];
+    if (reason !== undefined) {
+      held.push(`${constant} ${value}: ${reason}`);
+      continue;
+    }
     const version = anchor === undefined ? undefined : latest.get(anchor);
     if (version === undefined) continue;
     const to = targetSpec(value, version);

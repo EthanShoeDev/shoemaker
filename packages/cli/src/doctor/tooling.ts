@@ -78,7 +78,8 @@ export const turboFixUncached: DoctorCheck = {
     const paths = yield* repo.glob('**/turbo.json{,c}');
     const cached: Array<string> = [];
     for (const path of paths) {
-      const turbo = decodeJsonc(TurboTasks, yield* repo.read(path));
+      const turboSource = yield* repo.read(path);
+      const turbo = decodeJsonc(TurboTasks, turboSource);
       if (Option.isNone(turbo)) continue;
       for (const [key, task] of Rec.toEntries(turbo.value.tasks ?? {})) {
         // `"command": null` opts a package out: nothing runs, so nothing caches.
@@ -163,7 +164,8 @@ export const scriptNames: DoctorCheck = {
   description:
     'Scripts are named <tool>:check / <tool>:fix (not lint:<tool>, fmt:*)',
   run: Effect.fnUntraced(function* (repo) {
-    const drifted = Arr.flatMap(scriptsOf(yield* manifestsOf(repo)), (s) => {
+    const manifests = yield* manifestsOf(repo);
+    const drifted = Arr.flatMap(scriptsOf(manifests), (s) => {
       const to = renameScript(s.name, s.command);
       return to === undefined
         ? []
@@ -186,7 +188,8 @@ export const bunTest: DoctorCheck = {
   id: 'no-bun-test',
   description: 'Tests run through vitest (`bun run test`), never `bun test`',
   run: Effect.fnUntraced(function* (repo) {
-    const flagged = Arr.filter(scriptsOf(yield* manifestsOf(repo)), (s) =>
+    const manifests = yield* manifestsOf(repo);
+    const flagged = Arr.filter(scriptsOf(manifests), (s) =>
       /\bbun test\b/u.test(s.command),
     );
     return flagged.length === 0
@@ -476,7 +479,8 @@ export const jscpd: DoctorCheck = {
   description:
     'jscpd configured (.jscpd.json: threshold 0, minTokens 50, minLines 33) with a jscpd:check script',
   run: Effect.fnUntraced(function* (repo) {
-    const config = decodeJsonc(Jscpd, yield* repo.read('.jscpd.json'));
+    const jscpdSource = yield* repo.read('.jscpd.json');
+    const config = decodeJsonc(Jscpd, jscpdSource);
     if (Option.isNone(config)) {
       return [
         fail('no .jscpd.json', {

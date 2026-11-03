@@ -399,7 +399,7 @@ const alchemyPrompt = (picked: ReadonlyArray<AlchemyProvider>) => {
         {
           title: 'AWS',
           value: 'aws' as const,
-          description: 'shared; an S3 bucket is created on first use',
+          description: 'shared; a DynamoDB table is created on first use',
         },
       ],
     }),
@@ -640,10 +640,8 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
   const root = path.resolve(input.directory);
 
   if ((yield* fs.exists(root)) && !input.force) {
-    const entries = Arr.filter(
-      yield* fs.readDirectory(root),
-      (entry) => entry !== '.git',
-    );
+    const rootEntries = yield* fs.readDirectory(root);
+    const entries = Arr.filter(rootEntries, (entry) => entry !== '.git');
     if (entries.length > 0) {
       return yield* fail(
         `${root} is not empty. Use \`shoemaker adopt\` for an existing repo, or pass --force.`,
@@ -698,7 +696,8 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
   });
   yield* applyPlan(root, plan);
   yield* writeFile(root, CONFIG_PATH, renderConfigFile(shoemakerConfig));
-  yield* writeLock(root, nextLock(undefined, plan, cliVersion));
+  const lock = yield* nextLock(undefined, plan, cliVersion);
+  yield* writeLock(root, lock);
   yield* Console.log(renderSummary(plan, s));
   yield* Console.log(s.green(`Created ${shoemakerConfig.name} in ${root}`));
 

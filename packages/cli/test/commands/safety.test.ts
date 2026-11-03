@@ -14,8 +14,7 @@ import { ensureCleanTree } from '../../src/engine/apply.ts';
 import { readLock } from '../../src/engine/lock.ts';
 import { makeRepo } from '../../src/engine/repo-live.ts';
 import { Generate } from '../../src/engine/sync.ts';
-import type { GeneratedFile } from '../../src/engine/types.ts';
-import { json } from '../../src/generators/shared.ts';
+import { jsonMerge } from '../../src/generators/shared.ts';
 import { pkgIn } from '../checks/helpers.ts';
 import { git, readText, run, scratch, withBun, writeText } from './helpers.ts';
 
@@ -35,15 +34,11 @@ const emptyAggregate = {
 const scriptGenerate =
   (script: string, command: string) => (config: ShoemakerConfig) => ({
     files: [
-      {
-        path: 'package.json',
-        strategy: 'json-merge',
-        content: json({
-          name: config.name,
-          scripts: { [script]: command },
-        }),
-      },
-    ] satisfies ReadonlyArray<GeneratedFile>,
+      jsonMerge('package.json', {
+        name: config.name,
+        scripts: { [script]: command },
+      }),
+    ],
     aggregate: emptyAggregate,
   });
 
@@ -105,7 +100,8 @@ describe('add', () => {
             [],
           );
           // Seeds are written once and never updated, so they may differ.
-          const lock = yield* readLock(yield* makeRepo(fresh));
+          const freshRepo = yield* makeRepo(fresh);
+          const lock = yield* readLock(freshRepo);
           const files = Arr.flatMap(
             Rec.toEntries(lock?.files ?? {}),
             ([file, entry]) => (entry.strategy === 'seed' ? [] : [file]),
@@ -113,11 +109,9 @@ describe('add', () => {
           assert.isAbove(files.length, 20);
           for (const file of files) {
             const target = path.join(fresh, file);
-            assert.strictEqual(
-              yield* readText(dir, file),
-              yield* fs.readFileString(target),
-              file,
-            );
+            const upgradedText = yield* readText(dir, file);
+            const freshText = yield* fs.readFileString(target);
+            assert.strictEqual(upgradedText, freshText, file);
           }
         }),
       ),
@@ -154,8 +148,9 @@ describe('add', () => {
             ['add', 'package', 'core', '--allow-dirty', '--cwd', dir],
             [],
           ).pipe(Effect.provideService(Generate, scriptGenerate('x', 'y')));
+          const configText = yield* readText(dir, 'shoemaker.config.ts');
           assert.include(
-            yield* readText(dir, 'shoemaker.config.ts'),
+            configText,
             "  packages: [\n    {\n      name: 'core',\n      kind: 'library',\n    },\n  ],",
           );
         }),
@@ -186,10 +181,8 @@ describe('add', () => {
             ).pipe(Effect.provideService(Generate, scriptGenerate('x', 'y'))),
           );
           assert.strictEqual(error._tag, 'CommandFailed');
-          assert.strictEqual(
-            yield* readText(dir, 'shoemaker.config.ts'),
-            computed,
-          );
+          const configText = yield* readText(dir, 'shoemaker.config.ts');
+          assert.strictEqual(configText, computed);
           assert.include(
             Arr.join(out, '\n'),
             "{ name: 'cli', kind: 'effect-cli' },",

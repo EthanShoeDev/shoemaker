@@ -1,9 +1,17 @@
-import { Array as Arr, Effect, String as Str } from 'effect';
+import {
+  Array as Arr,
+  type Data,
+  Effect,
+  type Schema,
+  String as Str,
+} from 'effect';
 import { type FormatConfig, format } from 'oxfmt';
 import { shoemakerFormat } from 'shoemaker-oxfmt-config';
 
+import { printJsonc } from '../generators/task-runner/jsonc.ts';
 import { matchesAny } from './glob.ts';
-import type { GeneratedFile } from './types.ts';
+import { renderJson } from './json.ts';
+import { GeneratedFile, type RenderedFile } from './types.ts';
 
 // The options generated repos format with, so the bytes shoemaker writes are
 // what `oxfmt --write` produces there and a formatter run is never drift.
@@ -38,17 +46,43 @@ export const formatContent = (path: string, content: string) =>
         ),
       );
 
-// json-merge content is a fragment that is merged before formatting, and a
-// verbatim file is one the repo's formatter ignores, so both are left alone.
+const asText = (
+  file: Data.TaggedEnum.Value<GeneratedFile, 'Json' | 'Jsonc'>,
+  content: string,
+) =>
+  GeneratedFile.Text({
+    path: file.path,
+    strategy: file.strategy,
+    content,
+    ...(file.verbatim === undefined ? {} : { verbatim: file.verbatim }),
+  });
+
+// Whole JSON files become text here, inside Effect, so a value the codec
+// cannot encode fails the plan instead of throwing in a generator.
+export const renderFile = GeneratedFile.$match({
+  Text: (file): Effect.Effect<RenderedFile, Schema.SchemaError> =>
+    Effect.succeed(file),
+  Merge: (file) => Effect.succeed(file),
+  Json: (file) =>
+    Effect.map(renderJson(file.json), (content) => asText(file, content)),
+  Jsonc: (file) =>
+    Effect.map(printJsonc(file.jsonc, file.trailingCommas), (content) =>
+      asText(file, content),
+    ),
+});
+
+// A json-merge fragment is merged with the file on disk before formatting, and
+// a verbatim file is one the repo's formatter ignores, so both are left alone.
 export const formatFiles = (files: ReadonlyArray<GeneratedFile>) =>
   Effect.forEach(
     files,
-    (file) =>
-      file.strategy === 'json-merge' || file.verbatim === true
-        ? Effect.succeed(file)
-        : Effect.map(formatContent(file.path, file.content), (content) => ({
-            ...file,
-            content,
-          })),
+    Effect.fnUntraced(function* (file) {
+      const rendered = yield* renderFile(file);
+      if (GeneratedFile.$is('Merge')(rendered) || rendered.verbatim === true) {
+        return rendered;
+      }
+      const content = yield* formatContent(rendered.path, rendered.content);
+      return GeneratedFile.Text({ ...rendered, content });
+    }),
     { concurrency: 16 },
   );

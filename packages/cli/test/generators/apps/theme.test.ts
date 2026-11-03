@@ -1,10 +1,10 @@
 import { assert, describe, it } from '@effect/vitest';
 import { Effect } from 'effect';
 
-import { parseJsonc } from '../../../src/checks/workspace.ts';
 import type { ShoemakerConfig } from '../../../src/config/schema.ts';
 import { formatFiles } from '../../../src/engine/format.ts';
-import { parseJson, record, render } from '../root/fixtures.ts';
+import { record, textOf } from '../files.ts';
+import { render } from '../root/fixtures.ts';
 import { sampleConfig } from './helpers.ts';
 
 const themed = sampleConfig({
@@ -19,10 +19,10 @@ const only = (app: ShoemakerConfig['apps'][number]) =>
   sampleConfig({ apps: [app] });
 
 describe('shared theme', () => {
-  const { byPath, file } = render(themed);
+  const { byPath, file, text, json } = render(themed);
 
   it('gives a repo with more than one UI app a theme package', () => {
-    const manifest = parseJson(file('packages/theme/package.json'));
+    const manifest = json('packages/theme/package.json');
     assert.strictEqual(manifest.name, '@sample/theme');
     assert.deepStrictEqual(record(manifest.exports), {
       './tokens.css': './tokens.css',
@@ -35,11 +35,11 @@ describe('shared theme', () => {
   });
 
   it('declares every themed color and sets it in both themes', () => {
-    const tokens = file('packages/theme/tokens.css').content;
+    const tokens = text('packages/theme/tokens.css');
     assert.include(tokens, '--color-background: unset;');
     assert.include(tokens, '@variant light {');
     assert.include(tokens, '@variant dark {');
-    const web = file('packages/theme/web.css').content;
+    const web = text('packages/theme/web.css');
     assert.include(web, "@import './tokens.css';");
     assert.include(web, '@custom-variant dark {');
   });
@@ -47,31 +47,27 @@ describe('shared theme', () => {
   it('points each app stylesheet at its platform entry', () => {
     for (const app of ['web', 'site']) {
       assert.strictEqual(
-        file(`apps/${app}/src/styles.css`).content,
+        text(`apps/${app}/src/styles.css`),
         "@import 'tailwindcss';\n@import '@sample/theme/web.css';\n",
       );
       assert.strictEqual(
-        record(parseJson(file(`apps/${app}/package.json`)).dependencies)[
-          '@sample/theme'
-        ],
+        record(json(`apps/${app}/package.json`).dependencies)['@sample/theme'],
         'workspace:*',
       );
     }
     assert.strictEqual(
-      file('apps/mobile/global.css').content,
+      text('apps/mobile/global.css'),
       "@import 'tailwindcss';\n@import 'uniwind';\n@import '@sample/theme/tokens.css';\n",
     );
-    assert.include(file('apps/mobile/app/index.tsx').content, 'bg-background');
+    assert.include(text('apps/mobile/app/index.tsx'), 'bg-background');
   });
 
   it('opts the CSS-only package out of the shared commands', () => {
-    const tasks = record(
-      record(parseJsonc(file('packages/theme/turbo.jsonc').content)).tasks,
-    );
+    const tasks = record(json('packages/theme/turbo.jsonc').tasks);
     for (const name of ['typecheck', 'test', 'oxlint:check', 'oxlint:fix']) {
       assert.isNull(record(tasks[name]).command, name);
     }
-    assert.notInclude(file('vitest.config.ts').content, 'packages/theme');
+    assert.notInclude(text('vitest.config.ts'), 'packages/theme');
   });
 
   it.each([
@@ -84,36 +80,40 @@ describe('shared theme', () => {
       app.kind === 'expo'
         ? 'apps/mobile/global.css'
         : 'apps/web/src/styles.css';
-    assert.notInclude(single.file(sheet).content, '@sample/theme');
+    assert.notInclude(single.text(sheet), '@sample/theme');
   });
 });
 
 describe('Expo styling', () => {
-  const { aggregate, file } = render(only({ name: 'mobile', kind: 'expo' }));
+  const { aggregate, file, text, json } = render(
+    only({ name: 'mobile', kind: 'expo' }),
+  );
 
   it('styles with Uniwind through Metro', () => {
-    const metro = file('apps/mobile/metro.config.ts').content;
+    const metro = text('apps/mobile/metro.config.ts');
     assert.include(metro, "import { withUniwindConfig } from 'uniwind/metro';");
     assert.include(metro, "cssEntryFile: './global.css'");
-    const manifest = parseJson(file('apps/mobile/package.json'));
+    const manifest = json('apps/mobile/package.json');
     assert.property(record(manifest.dependencies), 'uniwind');
     assert.property(record(manifest.devDependencies), 'tailwindcss');
     assert.include(
-      file('apps/mobile/app/_layout.tsx').content,
+      text('apps/mobile/app/_layout.tsx'),
       "import '../global.css';",
     );
-    assert.include(
-      file('apps/mobile/app/index.tsx').content,
-      'dark:bg-neutral-950',
-    );
+    assert.include(text('apps/mobile/app/index.tsx'), 'dark:bg-neutral-950');
   });
 
   it('seeds the types Uniwind writes, kept out of lint and format', () => {
-    const types = file('apps/mobile/uniwind-types.d.ts');
-    assert.strictEqual(types.strategy, 'seed');
-    assert.include(types.content, '/// <reference types="uniwind/types" />');
+    assert.strictEqual(file('apps/mobile/uniwind-types.d.ts').strategy, 'seed');
+    assert.include(
+      text('apps/mobile/uniwind-types.d.ts'),
+      '/// <reference types="uniwind/types" />',
+    );
     assert.include(aggregate.ignore, 'apps/mobile/uniwind-types.d.ts');
-    assert.include(file('apps/mobile/tsconfig.json').content, '"expo/types"');
+    assert.include(
+      record(json('apps/mobile/tsconfig.json').compilerOptions).types,
+      'expo/types',
+    );
   });
 
   it.effect(
@@ -122,9 +122,10 @@ describe('Expo styling', () => {
       Effect.gen(function* () {
         const types = file('apps/mobile/uniwind-types.d.ts');
         const [written] = yield* formatFiles([types]);
-        assert.strictEqual(written?.content, types.content);
+        assert.isDefined(written);
+        assert.strictEqual(textOf(written), textOf(types));
         assert.include(
-          types.content,
+          textOf(types),
           "    themes: readonly ['light', 'dark']\n",
         );
       }),

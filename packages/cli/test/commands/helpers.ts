@@ -26,7 +26,8 @@ export const scratch = (name = 'my-repo') =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    return path.join(yield* fs.makeTempDirectoryScoped(), name);
+    const tempDir = yield* fs.makeTempDirectoryScoped();
+    return path.join(tempDir, name);
   });
 
 export const withBun = <A, E, R>(effect: Effect.Effect<A, E, R>) =>

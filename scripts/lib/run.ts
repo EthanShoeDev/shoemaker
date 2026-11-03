@@ -1,12 +1,5 @@
 import { BunRuntime, BunServices } from '@effect/platform-bun';
-import {
-  Array as Arr,
-  Effect,
-  Layer,
-  Schema,
-  Stream,
-  String as Str,
-} from 'effect';
+import { Array as Arr, Effect, Schema, Stream, String as Str } from 'effect';
 import { FetchHttpClient, HttpClient } from 'effect/http';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
@@ -83,18 +76,17 @@ export const runInherit = Effect.fnUntraced(function* (
   options: RunOptions = {},
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const code = Number(
-    yield* spawner.exitCode(
-      ChildProcess.make(command, args, {
-        cwd: options.cwd,
-        env: options.env,
-        extendEnv: true,
-        stdin: 'inherit',
-        stdout: 'inherit',
-        stderr: 'inherit',
-      }),
-    ),
+  const exitCode = yield* spawner.exitCode(
+    ChildProcess.make(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      extendEnv: true,
+      stdin: 'inherit',
+      stdout: 'inherit',
+      stderr: 'inherit',
+    }),
   );
+  const code = Number(exitCode);
   if (code !== 0) {
     return yield* CommandFailed.make({
       command: Arr.join([command, ...args], ' '),
@@ -110,7 +102,6 @@ export const runScript = <A, E>(
   program: Effect.Effect<A, E, BunServices.BunServices | HttpClient.HttpClient>,
 ) =>
   program.pipe(
-    // oxlint-disable-next-line effecttsgo/strict-effect-provide -- this is the entry point
-    Effect.provide(Layer.mergeAll(BunServices.layer, FetchHttpClient.layer)),
+    Effect.provide([BunServices.layer, FetchHttpClient.layer]),
     BunRuntime.runMain,
   );

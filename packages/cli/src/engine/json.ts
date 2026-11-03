@@ -1,9 +1,12 @@
 import {
   Array as Arr,
+  Effect,
+  Equal,
   Option,
   Predicate,
   Record as Rec,
   Result,
+  Schema,
   String as Str,
 } from 'effect';
 import { type ParseError, parse } from 'jsonc-parser';
@@ -97,23 +100,20 @@ export const ownedPointers = (
     return isPlainObject(value) ? ownedPointers(value, pointer) : [pointer];
   });
 
-// List entries in `before` that `after` no longer has, as `pointer: entry`.
-// A list `after` lacks entirely loses every entry.
+// List entries in `before` that `after` no longer has, each with the pointer
+// of its list. A list `after` lacks entirely loses every entry.
 export const droppedEntries = (
   before: unknown,
   after: unknown,
   prefix = '',
-): ReadonlyArray<string> => {
+): ReadonlyArray<{ readonly pointer: string; readonly entry: unknown }> => {
   if (Arr.isArray(before)) {
-    const kept = new Set(
-      Arr.isArray(after) ? Arr.map(after, canonicalJson) : [],
-    );
-    return Arr.filterMap(before, (entry) => {
-      const key = canonicalJson(entry);
-      return kept.has(key)
+    const kept: ReadonlyArray<unknown> = Arr.isArray(after) ? after : [];
+    return Arr.filterMap(before, (entry) =>
+      Arr.containsWith(Equal.equals)(kept, entry)
         ? Result.failVoid
-        : Result.succeed(`${prefix === '' ? '/' : prefix}: ${key}`);
-    });
+        : Result.succeed({ pointer: prefix === '' ? '/' : prefix, entry }),
+    );
   }
   if (!isPlainObject(before)) return [];
   const next = isPlainObject(after) && !Arr.isArray(after) ? after : {};
@@ -230,20 +230,34 @@ export const maskVersions = (
       )
     : value;
 
-// Stable serialization (sorted keys) for hashing.
-export const canonicalJson = (value: unknown): string => {
-  if (Arr.isArray(value)) {
-    return `[${Arr.join(Arr.map(value, canonicalJson), ',')}]`;
-  }
-  if (isPlainObject(value)) {
-    const members = Arr.map(
-      Arr.sort(Rec.keys(value), Str.Order),
-      (key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`,
-    );
-    return `{${Arr.join(members, ',')}}`;
-  }
-  return JSON.stringify(value);
+// Compact JSON text, e.g. a quoted string or one value on one line.
+export const encodeJson = Schema.encodeUnknownEffect(
+  Schema.fromJsonString(Schema.Json),
+);
+const PrettyJsonText = Schema.fromJsonString(Schema.Json, { space: 2 });
+
+// A JSON file as shoemaker writes it: two-space indent, trailing newline.
+export const renderJson = (value: unknown) =>
+  Effect.map(
+    Schema.encodeUnknownEffect(PrettyJsonText)(value),
+    (text) => `${text}\n`,
+  );
+
+// Keys sorted at every depth. `undefined` follows JSON: a dropped member, a
+// `null` array entry.
+const sortKeys = (value: unknown): unknown => {
+  if (value === undefined) return null;
+  if (Arr.isArray(value)) return Arr.map(value, sortKeys);
+  if (!isPlainObject(value)) return value;
+  return Rec.fromEntries(
+    Arr.filterMap(Arr.sort(Rec.keys(value), Str.Order), (key) =>
+      value[key] === undefined
+        ? Result.failVoid
+        : Result.succeed([key, sortKeys(value[key])] as const),
+    ),
+  );
 };
 
-export const renderJson = (value: unknown) =>
-  `${JSON.stringify(value, null, 2)}\n`;
+// Compact JSON with sorted keys: equal values give equal text, so hashes of it
+// are stable.
+export const canonicalJson = (value: unknown) => encodeJson(sortKeys(value));

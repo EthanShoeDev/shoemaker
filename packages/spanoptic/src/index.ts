@@ -22,6 +22,7 @@ import {
   Clock,
   Deferred,
   Effect,
+  Formatter,
   Layer,
   Logger,
   Predicate,
@@ -441,7 +442,7 @@ class SpanopticTUI {
         { content: '', fg: colors.dimText },
         { content: 'Attributes:', fg: colors.dimText },
         ...Arr.map(attributes, ([key, value]) => ({
-          content: `  ${key}: ${JSON.stringify(value)}`,
+          content: `  ${key}: ${Formatter.format(value)}`,
           fg: colors.attrKey,
         })),
       );
@@ -673,7 +674,8 @@ export const traceVisualize = <A, E, R>(
         Effect.forever(
           Effect.gen(function* () {
             yield* Effect.sleep('80 millis');
-            tui.tick(yield* Clock.currentTimeMillis);
+            const now = yield* Clock.currentTimeMillis;
+            tui.tick(now);
           }),
         ),
       );

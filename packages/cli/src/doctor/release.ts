@@ -36,13 +36,11 @@ export const androidRelease: DoctorCheck = {
         );
       }
     }
-    const tagged = Option.match(
-      decodeJsonc(ChangesetConfig, yield* repo.read('.changeset/config.json')),
-      {
-        onNone: () => false,
-        onSome: (config) => config.privatePackages?.tag === true,
-      },
-    );
+    const changesetSource = yield* repo.read('.changeset/config.json');
+    const tagged = Option.match(decodeJsonc(ChangesetConfig, changesetSource), {
+      onNone: () => false,
+      onSome: (config) => config.privatePackages?.tag === true,
+    });
     if (!tagged) {
       findings.push(
         fail(

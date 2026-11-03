@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, String as Str } from 'effect';
+import { Array as Arr, Effect, Record as Rec, String as Str } from 'effect';
 
 import {
   bunTest,
@@ -21,36 +21,40 @@ import {
   vscode,
 } from '../../src/doctor/tooling.ts';
 import { cliVersion } from '../../src/engine/meta.ts';
-import { failures, json } from './helpers.ts';
+import { failures, jsonFiles } from './helpers.ts';
 
-const rootWith = (extra: Record<string, unknown>) =>
-  json({
-    name: 'demo',
-    type: 'module',
-    packageManager: 'bun@1.4.4',
-    devEngines: { packageManager: { name: 'bun', version: '1.4.4' } },
-    workspaces: { packages: ['apps/*', 'packages/*'] },
-    ...extra,
-  });
+const rootWith = (extra: Record<string, unknown>) => ({
+  name: 'demo',
+  type: 'module',
+  packageManager: 'bun@1.4.4',
+  devEngines: { packageManager: { name: 'bun', version: '1.4.4' } },
+  workspaces: { packages: ['apps/*', 'packages/*'] },
+  ...extra,
+});
+
+// A repo holding only the root package.json `rootWith(extra)`.
+const rootOnly = (extra: Record<string, unknown>) =>
+  jsonFiles({ 'package.json': rootWith(extra) });
 
 describe('tooling doctor checks', () => {
   it.effect('shoemaker-versions: a range below this CLI fails', () =>
     Effect.gen(function* () {
-      const found = yield* failures(shoemakerVersions, {
+      const files = yield* jsonFiles({
         'package.json': rootWith({
           workspaces: {
             packages: ['apps/*'],
             catalog: { 'shoemaker-oxlint-config': '^0.0.1' },
           },
         }),
-        'apps/web/package.json': json({
+        'apps/web/package.json': {
           name: '@demo/web',
           devDependencies: {
             'shoemaker-oxlint-config': 'catalog:',
             'shoemaker-knip-config': '0.0.1',
           },
-        }),
+        },
       });
+      const found = yield* failures(shoemakerVersions, files);
       assert.deepStrictEqual(
         Arr.map(found, (f) => [f.message, f.path]),
         [
@@ -64,17 +68,14 @@ describe('tooling doctor checks', () => {
           ],
         ],
       );
-      assert.lengthOf(
-        yield* failures(shoemakerVersions, {
-          'package.json': rootWith({
-            workspaces: {
-              packages: [],
-              catalog: { 'shoemaker-oxlint-config': `^${cliVersion}` },
-            },
-          }),
-        }),
-        0,
-      );
+      const pinned = yield* rootOnly({
+        workspaces: {
+          packages: [],
+          catalog: { 'shoemaker-oxlint-config': `^${cliVersion}` },
+        },
+      });
+      const pinnedVersionFailures = yield* failures(shoemakerVersions, pinned);
+      assert.lengthOf(pinnedVersionFailures, 0);
     }),
   );
 
@@ -88,8 +89,12 @@ describe('tooling doctor checks', () => {
         Arr.map(found, (f) => f.fix),
         ['rename it to turbo.jsonc'],
       );
-      assert.lengthOf(yield* failures(turboJsonc, { 'turbo.jsonc': '{}' }), 0);
-      assert.lengthOf(yield* failures(turboJsonc, { 'nx.json': '{}' }), 0);
+      const rootTurboFailures = yield* failures(turboJsonc, {
+        'turbo.jsonc': '{}',
+      });
+      assert.lengthOf(rootTurboFailures, 0);
+      const nxOnlyFailures = yield* failures(turboJsonc, { 'nx.json': '{}' });
+      assert.lengthOf(nxOnlyFailures, 0);
     }),
   );
 
@@ -97,18 +102,23 @@ describe('tooling doctor checks', () => {
     'turbo-task-commands: copies of a command, scripts in every package',
     () =>
       Effect.gen(function* () {
-        const pkg = (name: string, scripts: Record<string, string>) =>
-          json({ name, scripts });
-        const copies = yield* failures(turboTaskCommands, {
+        const pkg = (name: string, scripts: Record<string, string>) => ({
+          name,
+          scripts,
+        });
+        const copied = yield* jsonFiles({
           'package.json': rootWith({ scripts: { typecheck: 'tsc --noEmit' } }),
-          'turbo.jsonc':
-            '{\n  // shared\n  "tasks": { "typecheck": { "command": ["bun", "run", "tsc", "--noEmit"] } },\n}\n',
           'apps/web/package.json': pkg('@demo/web', {
             typecheck: 'tsc  --noEmit',
           }),
           'apps/api/package.json': pkg('@demo/api', {
             typecheck: 'tsc --noEmit -p tsconfig.app.json',
           }),
+        });
+        const copies = yield* failures(turboTaskCommands, {
+          ...copied,
+          'turbo.jsonc':
+            '{\n  // shared\n  "tasks": { "typecheck": { "command": ["bun", "run", "tsc", "--noEmit"] } },\n}\n',
         });
         assert.deepStrictEqual(
           Arr.map(copies, (f) => f.fix),
@@ -118,7 +128,8 @@ describe('tooling doctor checks', () => {
         assert.include(copy?.message, 'apps/web/package.json#typecheck');
         assert.notInclude(copy?.message, 'apps/api');
 
-        const packages = {
+        const packages = yield* jsonFiles({
+          'package.json': rootWith({}),
           'apps/web/package.json': pkg('@demo/web', {
             'oxlint:check': 'oxlint .',
             prepack: 'bun pack.ts',
@@ -129,9 +140,8 @@ describe('tooling doctor checks', () => {
             prepack: 'bun pack.ts',
             build: 'tsdown',
           }),
-        };
+        });
         const everywhere = yield* failures(turboTaskCommands, {
-          'package.json': rootWith({}),
           'turbo.jsonc': '{ "tasks": {} }',
           ...packages,
         });
@@ -141,29 +151,25 @@ describe('tooling doctor checks', () => {
         assert.notInclude(shared?.message, 'prepack');
         assert.notInclude(shared?.message, 'build');
         // nx runs package scripts, so the copies are how it works there.
-        assert.lengthOf(
-          yield* failures(turboTaskCommands, {
-            'package.json': rootWith({}),
-            'nx.json': '{}',
-            ...packages,
-          }),
-          0,
-        );
+        const turboCommandFailures = yield* failures(turboTaskCommands, {
+          'nx.json': '{}',
+          ...packages,
+        });
+        assert.lengthOf(turboCommandFailures, 0);
       }),
   );
 
   it.effect('script-names: lint:* and fmt:* drift', () =>
     Effect.gen(function* () {
-      const found = yield* failures(scriptNames, {
-        'package.json': rootWith({
-          scripts: {
-            'lint:oxlint': 'oxlint --fix .',
-            'fmt:check': 'oxfmt --check',
-            lint: 'turbo run lint',
-            'oxlint:check': 'oxlint .',
-          },
-        }),
+      const files = yield* rootOnly({
+        scripts: {
+          'lint:oxlint': 'oxlint --fix .',
+          'fmt:check': 'oxfmt --check',
+          lint: 'turbo run lint',
+          'oxlint:check': 'oxlint .',
+        },
       });
+      const found = yield* failures(scriptNames, files);
       assert.include(
         found[0]?.message ?? '',
         'lint:oxlint -> oxlint:fix, fmt:check -> oxfmt:check',
@@ -177,42 +183,36 @@ describe('tooling doctor checks', () => {
 
   it.effect('no-bun-test', () =>
     Effect.gen(function* () {
-      assert.lengthOf(
-        yield* failures(bunTest, {
-          'package.json': rootWith({ scripts: { test: 'bun test' } }),
-        }),
-        1,
-      );
-      assert.lengthOf(
-        yield* failures(bunTest, {
-          'package.json': rootWith({ scripts: { test: 'vitest run' } }),
-        }),
-        0,
-      );
+      const bunScript = yield* rootOnly({ scripts: { test: 'bun test' } });
+      const bunTestScriptFailures = yield* failures(bunTest, bunScript);
+      assert.lengthOf(bunTestScriptFailures, 1);
+      const vitestScript = yield* rootOnly({ scripts: { test: 'vitest run' } });
+      const vitestScriptFailures = yield* failures(bunTest, vitestScript);
+      assert.lengthOf(vitestScriptFailures, 0);
     }),
   );
 
   it.effect('effect-tsgo-prepare', () =>
     Effect.gen(function* () {
-      const ok = rootWith({
+      const ok = yield* rootOnly({
         scripts: { prepare: 'effect-tsgo patch --oxlint' },
         devDependencies: { '@effect/tsgo': 'catalog:' },
       });
-      assert.lengthOf(yield* failures(effectTsgo, { 'package.json': ok }), 0);
-      const noOxlint = rootWith({
+      const okTsgoFailures = yield* failures(effectTsgo, ok);
+      assert.lengthOf(okTsgoFailures, 0);
+      const noOxlint = yield* rootOnly({
         scripts: { prepare: 'effect-tsgo patch' },
         devDependencies: { '@effect/tsgo': 'catalog:' },
       });
       assert.include(
-        (yield* failures(effectTsgo, { 'package.json': noOxlint }))[0]
-          ?.message ?? '',
+        (yield* failures(effectTsgo, noOxlint))[0]?.message ?? '',
         '"effect-tsgo patch"',
       );
-      const ls = rootWith({
+      const ls = yield* rootOnly({
         devDependencies: { '@effect/language-service': '^0.1.0' },
       });
       assert.include(
-        (yield* failures(effectTsgo, { 'package.json': ls }))[0]?.message ?? '',
+        (yield* failures(effectTsgo, ls))[0]?.message ?? '',
         'without @effect/tsgo',
       );
     }),
@@ -220,16 +220,15 @@ describe('tooling doctor checks', () => {
 
   it.effect('typescript-7: tsgo scripts, native-preview, old typescript', () =>
     Effect.gen(function* () {
-      const found = yield* failures(typescript7, {
-        'package.json': rootWith({
-          scripts: { typecheck: 'tsgo --noEmit', prepare: 'effect-tsgo patch' },
-          devDependencies: {
-            '@typescript/native-preview': '7.0.0-dev',
-            typescript: 'catalog:',
-          },
-          workspaces: { packages: [], catalog: { typescript: '~5.9.3' } },
-        }),
+      const files = yield* rootOnly({
+        scripts: { typecheck: 'tsgo --noEmit', prepare: 'effect-tsgo patch' },
+        devDependencies: {
+          '@typescript/native-preview': '7.0.0-dev',
+          typescript: 'catalog:',
+        },
+        workspaces: { packages: [], catalog: { typescript: '~5.9.3' } },
       });
+      const found = yield* failures(typescript7, files);
       assert.deepStrictEqual(
         Arr.map(found, (f) => f.fix),
         [
@@ -239,26 +238,23 @@ describe('tooling doctor checks', () => {
         ],
       );
       assert.include(found[2]?.message ?? '', '~5.9.3');
-      assert.lengthOf(
-        yield* failures(typescript7, {
-          'package.json': rootWith({
-            scripts: { typecheck: 'tsc --noEmit' },
-            devDependencies: { typescript: '^7.0.2' },
-          }),
-        }),
-        0,
-      );
+      const current = yield* rootOnly({
+        scripts: { typecheck: 'tsc --noEmit' },
+        devDependencies: { typescript: '^7.0.2' },
+      });
+      const typescript7Failures = yield* failures(typescript7, current);
+      assert.lengthOf(typescript7Failures, 0);
     }),
   );
 
   it.effect('bun-version: packageManager, flake pin, Dockerfile', () =>
     Effect.gen(function* () {
-      assert.lengthOf(
-        yield* failures(bunVersion, { 'package.json': rootWith({}) }),
-        0,
-      );
+      const root = yield* rootOnly({});
+      const bunVersionFailures = yield* failures(bunVersion, root);
+      assert.lengthOf(bunVersionFailures, 0);
+      const oldBun = yield* rootOnly({ packageManager: 'bun@1.3.5' });
       const found = yield* failures(bunVersion, {
-        'package.json': rootWith({ packageManager: 'bun@1.3.5' }),
+        ...oldBun,
         'flake.nix':
           'url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip";',
         'apps/api/Dockerfile': 'FROM oven/bun:1.3.5\n',
@@ -272,9 +268,10 @@ describe('tooling doctor checks', () => {
 
   it.effect('bun-version: devEngines.packageManager is required', () =>
     Effect.gen(function* () {
-      const found = yield* failures(bunVersion, {
-        'package.json': rootWith({ devEngines: undefined }),
+      const files = yield* jsonFiles({
+        'package.json': Rec.remove(rootWith({}), 'devEngines'),
       });
+      const found = yield* failures(bunVersion, files);
       assert.deepStrictEqual(
         Arr.map(found, (f) => f.message),
         ['devEngines.packageManager is not bun 1.4.4'],
@@ -284,8 +281,8 @@ describe('tooling doctor checks', () => {
 
   it.effect('turbo-fix-uncached: every fix task sets cache: false', () =>
     Effect.gen(function* () {
-      const found = yield* failures(turboFixUncached, {
-        'turbo.jsonc': json({
+      const files = yield* jsonFiles({
+        'turbo.jsonc': {
           tasks: {
             'oxlint:fix': {},
             '//#oxfmt:fix': { cache: false },
@@ -293,13 +290,14 @@ describe('tooling doctor checks', () => {
             'oxlint:check': {},
             prefix: {},
           },
-        }),
-        'apps/web/turbo.jsonc': json({ tasks: { 'lint:fix': {} } }),
+        },
+        'apps/web/turbo.jsonc': { tasks: { 'lint:fix': {} } },
         // Opted out: the package runs nothing for this task.
-        'packages/config/turbo.jsonc': json({
+        'packages/config/turbo.jsonc': {
           tasks: { 'oxlint:fix': { command: null } },
-        }),
+        },
       });
+      const found = yield* failures(turboFixUncached, files);
       assert.lengthOf(found, 1);
       for (const task of [
         'turbo.jsonc#oxlint:fix',
@@ -315,8 +313,9 @@ describe('tooling doctor checks', () => {
 
   it.effect('nix-dev-shell: flake.lock, .envrc, copied description', () =>
     Effect.gen(function* () {
+      const portfolio = yield* rootOnly({ name: 'portfolio' });
       const found = yield* failures(nixDevShell, {
-        'package.json': rootWith({ name: 'portfolio' }),
+        ...portfolio,
         'flake.nix':
           '{ description = "Elden Ring Compass development environment"; }',
       });
@@ -326,46 +325,44 @@ describe('tooling doctor checks', () => {
         ),
         ['run `nix fla', 'add `use fla', 'update the f'],
       );
-      assert.lengthOf(
-        yield* failures(nixDevShell, {
-          'flake.nix': '{ description = "Expo RN devshells"; }',
-          'flake.lock': '{}',
-          '.envrc': 'use flake\n',
-        }),
-        0,
-      );
+      const nixShellFailures = yield* failures(nixDevShell, {
+        'flake.nix': '{ description = "Expo RN devshells"; }',
+        'flake.lock': '{}',
+        '.envrc': 'use flake\n',
+      });
+      assert.lengthOf(nixShellFailures, 0);
     }),
   );
 
   it.effect('jscpd and knip', () =>
     Effect.gen(function* () {
-      const jscpdFound = yield* failures(jscpd, {
-        '.jscpd.json': json({ threshold: 0, minTokens: 40, minLines: 33 }),
+      const jscpdFiles = yield* jsonFiles({
+        '.jscpd.json': { threshold: 0, minTokens: 40, minLines: 33 },
         'package.json': rootWith({ scripts: { 'jscpd:check': 'jscpd' } }),
       });
+      const jscpdFound = yield* failures(jscpd, jscpdFiles);
       assert.include(jscpdFound[0]?.message ?? '', 'minTokens 40 (want 50)');
+      const knipScript = yield* rootOnly({ scripts: { 'knip:check': 'knip' } });
       const knipFound = yield* failures(knip, {
         'knip.json': '{}',
-        'package.json': rootWith({ scripts: { 'knip:check': 'knip' } }),
+        ...knipScript,
       });
       assert.lengthOf(knipFound, 2);
-      assert.lengthOf(
-        yield* failures(knip, {
-          'knip.ts': '',
-          'package.json': rootWith({
-            scripts: { 'knip:check': 'knip --no-config-hints --cache' },
-          }),
-        }),
-        0,
-      );
+      const knipFlags = yield* rootOnly({
+        scripts: { 'knip:check': 'knip --no-config-hints --cache' },
+      });
+      const knipFailures = yield* failures(knip, {
+        'knip.ts': '',
+        ...knipFlags,
+      });
+      assert.lengthOf(knipFailures, 0);
     }),
   );
 
   it.effect('catalog: summarises the catalog check', () =>
     Effect.gen(function* () {
-      const found = yield* failures(catalog, {
-        'package.json': rootWith({ devDependencies: { effect: '4.0.6' } }),
-      });
+      const files = yield* rootOnly({ devDependencies: { effect: '4.0.6' } });
+      const found = yield* failures(catalog, files);
       assert.include(
         found[0]?.message ?? '',
         '1 dep(s) missing from the catalog',
@@ -389,24 +386,24 @@ describe('tooling doctor checks', () => {
 
   it.effect('monorepo-layout: workspaces, scope, root deps', () =>
     Effect.gen(function* () {
+      const single = yield* jsonFiles({ 'package.json': { name: 'x' } });
       assert.include(
-        (yield* failures(monorepoLayout, {
-          'package.json': json({ name: 'x' }),
-        }))[0]?.message ?? '',
+        (yield* failures(monorepoLayout, single))[0]?.message ?? '',
         'not a monorepo',
       );
-      const found = yield* failures(monorepoLayout, {
+      const files = yield* jsonFiles({
         'package.json': rootWith({
           devDependencies: {
             '@repo/db': 'workspace:*',
             '@repo/typescript-config': 'workspace:*',
           },
         }),
-        'packages/db/package.json': json({ name: '@repo/db' }),
-        'packages/typescript-config/package.json': json({
+        'packages/db/package.json': { name: '@repo/db' },
+        'packages/typescript-config/package.json': {
           name: '@repo/typescript-config',
-        }),
+        },
       });
+      const found = yield* failures(monorepoLayout, files);
       assert.deepStrictEqual(
         Arr.map(found, (f) => f.message),
         [
@@ -419,21 +416,19 @@ describe('tooling doctor checks', () => {
 
   it.effect('no-git-hooks and vscode', () =>
     Effect.gen(function* () {
-      assert.lengthOf(
-        yield* failures(gitHooks, {
-          'package.json': rootWith({ devDependencies: { husky: '^9' } }),
-          '.husky/pre-commit': '',
-        }),
-        1,
-      );
-      assert.lengthOf(
-        yield* failures(vscode, {
-          '.vscode/settings.json':
-            '{ "editor.defaultFormatter": "oxc.oxc-vscode" }',
-        }),
-        0,
-      );
-      assert.lengthOf(yield* failures(vscode, {}), 1);
+      const husky = yield* rootOnly({ devDependencies: { husky: '^9' } });
+      const huskyFailures = yield* failures(gitHooks, {
+        ...husky,
+        '.husky/pre-commit': '',
+      });
+      assert.lengthOf(huskyFailures, 1);
+      const vscodeFormatterFailures = yield* failures(vscode, {
+        '.vscode/settings.json':
+          '{ "editor.defaultFormatter": "oxc.oxc-vscode" }',
+      });
+      assert.lengthOf(vscodeFormatterFailures, 0);
+      const emptyVscodeFailures = yield* failures(vscode, {});
+      assert.lengthOf(emptyVscodeFailures, 1);
     }),
   );
 });

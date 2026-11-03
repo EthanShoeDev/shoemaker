@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Record as Rec } from 'effect';
+import { Effect, Record as Rec } from 'effect';
 
 import {
   canonicalJson,
@@ -107,12 +107,13 @@ describe('json-merge', () => {
     });
   });
 
-  it('canonical JSON ignores key order', () => {
-    assert.strictEqual(
-      canonicalJson({ b: 1, a: { d: 2, c: [3] } }),
-      canonicalJson({ a: { c: [3], d: 2 }, b: 1 }),
-    );
-  });
+  it.effect('canonical JSON ignores key order', () =>
+    Effect.gen(function* () {
+      const shuffled = yield* canonicalJson({ b: 1, a: { d: 2, c: [3] } });
+      const sorted = yield* canonicalJson({ a: { c: [3], d: 2 }, b: 1 });
+      assert.strictEqual(shuffled, sorted);
+    }),
+  );
 
   it('parses JSONC objects only', () => {
     assert.deepStrictEqual(parseJsonObject('{ "a": 1, // c\n }'), { a: 1 });

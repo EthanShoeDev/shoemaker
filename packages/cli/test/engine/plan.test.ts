@@ -7,6 +7,7 @@ import {
   String as Str,
 } from 'effect';
 
+import { encodeJson } from '../../src/engine/json.ts';
 import type { Lock } from '../../src/engine/lock.ts';
 import {
   type Action,
@@ -18,26 +19,25 @@ import {
   type Plan,
 } from '../../src/engine/plan.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
-import type { FileStrategy, GeneratedFile } from '../../src/engine/types.ts';
-import { region } from '../../src/generators/shared.ts';
+import { GeneratedFile, type RenderedFile } from '../../src/engine/types.ts';
+import { jsonMerge, region } from '../../src/generators/shared.ts';
 
 const file = (
   path: string,
   content: string,
-  strategy: FileStrategy = 'owned',
-): GeneratedFile => ({ path, content, strategy });
+  strategy: 'owned' | 'seed' | 'managed' = 'owned',
+) => GeneratedFile.Text({ path, content, strategy });
 
-const lockOf = (
-  entries: ReadonlyArray<readonly [GeneratedFile, string]>,
-): Lock => ({
-  cliVersion: '0.0.0',
-  files: Rec.fromEntries(
-    Arr.map(
-      entries,
-      ([generated, written]) =>
-        [generated.path, lockEntry(generated, written)] as const,
+const lockOf = Effect.fnUntraced(function* (
+  entries: ReadonlyArray<readonly [RenderedFile, string]>,
+) {
+  const files = yield* Effect.forEach(entries, ([generated, written]) =>
+    Effect.map(
+      lockEntry(generated, written),
+      (entry) => [generated.path, entry] as const,
     ),
-  ),
+  );
+  return { cliVersion: '0.0.0', files: Rec.fromEntries(files) } satisfies Lock;
 });
 
 const actions = (plan: Plan) =>
@@ -65,7 +65,7 @@ describe('plan', () => {
         'adopted.txt': 'theirs\n',
         'README.md': '# my readme\n',
       });
-      const lock = lockOf([
+      const lock = yield* lockOf([
         [file('same.txt', 'same\n'), 'same\n'],
         [file('safe.txt', 'v1\n'), 'v1\n'],
         [file('edited.txt', 'v1\n'), 'v1\n'],
@@ -101,17 +101,26 @@ describe('plan', () => {
     () =>
       Effect.gen(function* () {
         const manifest = (workspaces: ReadonlyArray<string>) =>
-          file('package.json', JSON.stringify({ workspaces }), 'json-merge');
+          jsonMerge('package.json', { workspaces });
         const generated = manifest(['apps/*', 'packages/*']);
-        const text = (workspaces: ReadonlyArray<string>) =>
-          `${JSON.stringify({ name: 'x', workspaces })}\n`;
-        const disk = (workspaces: ReadonlyArray<string>) =>
-          makeMemoryRepo({ 'package.json': text(workspaces) });
+        const text = Effect.fnUntraced(function* (
+          workspaces: ReadonlyArray<string>,
+        ) {
+          const json = yield* encodeJson({ name: 'x', workspaces });
+          return `${json}\n`;
+        });
+        const disk = Effect.fnUntraced(function* (
+          workspaces: ReadonlyArray<string>,
+        ) {
+          const content = yield* text(workspaces);
+          return makeMemoryRepo({ 'package.json': content });
+        });
         const extended = ['apps/*', 'packages/*', 'tools/*'];
         const force = { force: ['**'] };
 
+        const extendedRepo = yield* disk(extended);
         const adopted = yield* makePlan(
-          disk(extended),
+          extendedRepo,
           [generated],
           undefined,
           force,
@@ -122,12 +131,8 @@ describe('plan', () => {
         assert.isUndefined(clash?.forced);
 
         // Adding entries drops nothing, so --force applies.
-        const grown = yield* makePlan(
-          disk(['apps/*']),
-          [generated],
-          undefined,
-          force,
-        );
+        const shortRepo = yield* disk(['apps/*']);
+        const grown = yield* makePlan(shortRepo, [generated], undefined, force);
         assert.strictEqual(actionOf(grown, 'package.json'), 'update');
 
         // Owned files are shoemaker's whole: --force still replaces them.
@@ -141,11 +146,10 @@ describe('plan', () => {
         assert.strictEqual(actionOf(owned, 'turbo.jsonc'), 'update');
 
         // With a baseline the list is shoemaker's own, so it may shorten it.
-        const tracked = yield* makePlan(
-          disk(extended),
-          [generated],
-          lockOf([[manifest(extended), text(extended)]]),
-        );
+        const trackedRepo = yield* disk(extended);
+        const written = yield* text(extended);
+        const baseline = yield* lockOf([[manifest(extended), written]]);
+        const tracked = yield* makePlan(trackedRepo, [generated], baseline);
         assert.strictEqual(actionOf(tracked, 'package.json'), 'update');
       }),
   );
@@ -175,7 +179,7 @@ describe('plan', () => {
     it.effect('ignores edits outside regions', () =>
       Effect.gen(function* () {
         const repo = makeMemoryRepo({ 'AGENTS.md': onDisk('v1') });
-        const lock = lockOf([[generated('v1'), onDisk('v1')]]);
+        const lock = yield* lockOf([[generated('v1'), onDisk('v1')]]);
         const plan = yield* makePlan(repo, [generated('v1')], lock);
         assert.strictEqual(actionOf(plan, 'AGENTS.md'), 'unchanged');
       }),
@@ -184,7 +188,7 @@ describe('plan', () => {
     it.effect('updates region bodies when they match the baseline', () =>
       Effect.gen(function* () {
         const repo = makeMemoryRepo({ 'AGENTS.md': onDisk('v1') });
-        const lock = lockOf([[generated('v1'), onDisk('v1')]]);
+        const lock = yield* lockOf([[generated('v1'), onDisk('v1')]]);
         const plan = yield* makePlan(repo, [generated('v2')], lock);
         const planned = plan.files[0];
         assert.strictEqual(planned?.action, 'update');
@@ -195,7 +199,7 @@ describe('plan', () => {
     it.effect('conflicts on a hand-edited region body', () =>
       Effect.gen(function* () {
         const repo = makeMemoryRepo({ 'AGENTS.md': onDisk('v1 edited') });
-        const lock = lockOf([[generated('v1'), onDisk('v1')]]);
+        const lock = yield* lockOf([[generated('v1'), onDisk('v1')]]);
         const plan = yield* makePlan(repo, [generated('v2')], lock);
         assert.strictEqual(actionOf(plan, 'AGENTS.md'), 'conflict');
       }),
@@ -204,7 +208,7 @@ describe('plan', () => {
     it.effect('conflicts when a region is missing on disk', () =>
       Effect.gen(function* () {
         const repo = makeMemoryRepo({ 'AGENTS.md': '# no regions\n' });
-        const lock = lockOf([[generated('v1'), onDisk('v1')]]);
+        const lock = yield* lockOf([[generated('v1'), onDisk('v1')]]);
         const plan = yield* makePlan(repo, [generated('v1')], lock);
         const planned = plan.files[0];
         assert.strictEqual(planned?.action, 'conflict');
@@ -215,11 +219,7 @@ describe('plan', () => {
 
   describe('json-merge', () => {
     const owned = (version: string) =>
-      file(
-        'config.json',
-        JSON.stringify({ name: 'x', scripts: { build: version } }),
-        'json-merge',
-      );
+      jsonMerge('config.json', { name: 'x', scripts: { build: version } });
     const disk = (build: string, extra = '') =>
       `{\n  "name": "x",\n  "scripts": {\n    "build": "${build}"${extra}\n  }\n}\n`;
 
@@ -228,7 +228,7 @@ describe('plan', () => {
         const repo = makeMemoryRepo({
           'config.json': disk('tsdown', ',\n    "mine": "echo"'),
         });
-        const lock = lockOf([[owned('tsdown'), disk('tsdown')]]);
+        const lock = yield* lockOf([[owned('tsdown'), disk('tsdown')]]);
         const plan = yield* makePlan(repo, [owned('tsdown')], lock);
         assert.strictEqual(actionOf(plan, 'config.json'), 'unchanged');
       }),
@@ -239,7 +239,7 @@ describe('plan', () => {
         const repo = makeMemoryRepo({
           'config.json': disk('tsdown', ',\n    "mine": "echo"'),
         });
-        const lock = lockOf([[owned('tsdown'), disk('tsdown')]]);
+        const lock = yield* lockOf([[owned('tsdown'), disk('tsdown')]]);
         const plan = yield* makePlan(repo, [owned('tsdown --watch')], lock);
         const planned = plan.files[0];
         assert.strictEqual(planned?.action, 'update');
@@ -251,16 +251,12 @@ describe('plan', () => {
     );
 
     const manifest = (build: string) =>
-      file(
-        'package.json',
-        JSON.stringify({
-          name: 'x',
-          version: '0.0.0',
-          scripts: { build },
-          dependencies: { a: '^1.0.0' },
-        }),
-        'json-merge',
-      );
+      jsonMerge('package.json', {
+        name: 'x',
+        version: '0.0.0',
+        scripts: { build },
+        dependencies: { a: '^1.0.0' },
+      });
     const manifestOnDisk = (version: string, build: string) =>
       `{\n  "name": "x",\n  "version": "${version}",\n  "scripts": {\n    "build": "${build}"\n  },\n  "dependencies": {\n    "a": "^1.0.0"\n  }\n}\n`;
 
@@ -269,7 +265,7 @@ describe('plan', () => {
         const repo = makeMemoryRepo({
           'package.json': manifestOnDisk('0.2.0', 'tsdown'),
         });
-        const lock = lockOf([
+        const lock = yield* lockOf([
           [manifest('tsdown'), manifestOnDisk('0.0.0', 'tsdown')],
         ]);
         const same = yield* makePlan(repo, [manifest('tsdown')], lock);
@@ -288,20 +284,17 @@ describe('plan', () => {
         const written = manifestOnDisk('0.0.0', 'tsdown');
         const owned = ownedSet(manifest('tsdown')) ?? [];
         const repo = makeMemoryRepo({ 'package.json': written });
+        const sha = yield* fingerprint(
+          'json-merge',
+          'package.json',
+          written,
+          { owned },
+          'dependencies',
+        );
         const lock: Lock = {
           cliVersion: '0.0.0',
           files: {
-            'package.json': {
-              strategy: 'json-merge',
-              sha256: fingerprint(
-                'json-merge',
-                'package.json',
-                written,
-                { owned },
-                'dependencies',
-              ),
-              owned,
-            },
+            'package.json': { strategy: 'json-merge', sha256: sha, owned },
           },
         };
         const plan = yield* makePlan(repo, [manifest('tsdown -w')], lock);
@@ -312,7 +305,7 @@ describe('plan', () => {
     it.effect('conflicts when an owned value was hand-edited', () =>
       Effect.gen(function* () {
         const repo = makeMemoryRepo({ 'config.json': disk('custom build') });
-        const lock = lockOf([[owned('tsdown'), disk('tsdown')]]);
+        const lock = yield* lockOf([[owned('tsdown'), disk('tsdown')]]);
         const plan = yield* makePlan(repo, [owned('tsdown --watch')], lock);
         assert.strictEqual(actionOf(plan, 'config.json'), 'conflict');
       }),
@@ -325,13 +318,13 @@ describe('plan', () => {
       Effect.gen(function* () {
         const files = [file('a.txt', 'a\n'), file('b.txt', 'b2\n')];
         const repo = makeMemoryRepo({ 'b.txt': 'edited\n', 'gone.txt': 'x' });
-        const previous = lockOf([
+        const previous = yield* lockOf([
           [file('b.txt', 'b1\n'), 'b1\n'],
           [file('gone.txt', 'x'), 'x'],
         ]);
         const plan = yield* makePlan(repo, files, previous);
         assert.deepStrictEqual(plan.orphans, ['gone.txt']);
-        const next = nextLock(previous, plan, '9.9.9');
+        const next = yield* nextLock(previous, plan, '9.9.9');
         assert.strictEqual(next.cliVersion, '9.9.9');
         assert.deepStrictEqual(Arr.sort(Rec.keys(next.files), Str.Order), [
           'a.txt',
