@@ -4,6 +4,7 @@ import {
   owned,
   packageTsconfig,
   seed,
+  withSecrets,
   workspacePackageJson,
 } from '../shared.ts';
 import {
@@ -225,9 +226,12 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
           ...(served ? { './handlers': './src/handlers.ts' } : {}),
           ...(worker ? { './worker': './src/worker.ts' } : {}),
         },
+        // `dev` runs Bun directly, so the repo's secrets tool loads its env;
+        // varlock reads `.env.schema` from the cwd unless told otherwise, and
+        // the schema lives at the repo root.
         scripts: bun
           ? {
-              dev: 'bun --watch src/bin.ts',
+              dev: withSecrets(ctx.config, 'bun --watch src/bin.ts'),
               build: 'tsdown',
               start: 'bun dist/bin.mjs',
             }
@@ -235,6 +239,9 @@ export const effectApi = (ctx: GenContext, app: App): Contribution => {
         dependencies,
         devDependencies,
         workspaceDependencies: [contractName(app)],
+        ...(bun && ctx.config.secrets === 'varlock'
+          ? { extra: { varlock: { loadPath: '../../' } } }
+          : {}),
       }),
       packageTsconfig(dir),
       vitestConfig(dir),

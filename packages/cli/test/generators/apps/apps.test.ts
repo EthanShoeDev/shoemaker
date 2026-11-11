@@ -222,6 +222,37 @@ describe('kind specifics', () => {
     assert.isUndefined(record(manifest.dependencies)['@sample/env']);
   });
 
+  it('effect-api runs dev under the secrets tool, from the root schema', () => {
+    const apps: ReadonlyArray<App> = [{ name: 'api', kind: 'effect-api' }];
+    const varlock = allApps(sampleConfig({ apps })).json(
+      'apps/api/package.json',
+    );
+    assert.strictEqual(
+      record(varlock.scripts).dev,
+      'varlock run -- bun --watch src/bin.ts',
+    );
+    assert.deepStrictEqual(varlock.varlock, { loadPath: '../../' });
+    const secretspec = allApps(
+      sampleConfig({ apps, secrets: 'secretspec' }),
+    ).json('apps/api/package.json');
+    assert.strictEqual(
+      record(secretspec.scripts).dev,
+      'secretspec run --profile development -- bun --watch src/bin.ts',
+    );
+    assert.isUndefined(secretspec.varlock);
+  });
+
+  it('typechecks scripts/ alongside src/ and test/', () => {
+    const { json } = allApps(
+      sampleConfig({ apps: [{ name: 'api', kind: 'effect-api' }] }),
+    );
+    for (const path of [
+      'apps/api/tsconfig.json',
+      'packages/api-contract/tsconfig.json',
+    ])
+      assert.include(json(path).include, 'scripts/**/*');
+  });
+
   it('effect-api keeps its HttpApi in a contract package clients share', () => {
     const { text, json } = allApps(
       sampleConfig({ apps: [{ name: 'api', kind: 'effect-api' }] }),
@@ -373,6 +404,17 @@ describe('kind specifics', () => {
     assert.isUndefined(record(pkg.dependencies).alchemy);
   });
 
+  it('tanstack-start denies server platforms in the browser bundle', () => {
+    const vite = allApps(
+      sampleConfig({ apps: [{ name: 'web', kind: 'tanstack-start' }] }),
+    ).text('apps/web/vite.config.ts');
+    assert.include(vite, "behavior: 'error'");
+    assert.include(
+      vite,
+      "specifiers: ['@effect/platform-bun/**', '@effect/platform-node/**']",
+    );
+  });
+
   it('tanstack-start wires varlock only outside Cloudflare', () => {
     const apps: ReadonlyArray<App> = [{ name: 'web', kind: 'tanstack-start' }];
     const vite = (config: ShoemakerConfig) =>
@@ -447,10 +489,12 @@ describe('tanstack-start serving an effect-api app', () => {
     assert.include(served.text('apps/web/src/routes/index.tsx'), 'callApi(');
   });
 
-  it("denies the API's handlers in the browser bundle", () => {
+  it('denies the API and alchemy in the browser bundle', () => {
+    const vite = served.text('apps/web/vite.config.ts');
+    assert.include(vite, "behavior: 'error'");
     assert.include(
-      served.text('apps/web/vite.config.ts'),
-      "client: { specifiers: ['@sample/api/handlers'] }",
+      vite,
+      "specifiers: ['@sample/api/**', '@effect/platform-bun/**', '@effect/platform-node/**', 'alchemy/**', '@alchemy.run/**']",
     );
   });
 
@@ -487,10 +531,7 @@ describe('tanstack-start serving an effect-api app', () => {
       plain.text('packages/api-contract/src/index.ts'),
       'prefix',
     );
-    assert.notInclude(
-      plain.text('apps/web/vite.config.ts'),
-      'importProtection',
-    );
+    assert.notInclude(plain.text('apps/web/vite.config.ts'), '@sample/api');
   });
 
   it.effect('emits TypeScript that parses', () =>

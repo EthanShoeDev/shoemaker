@@ -565,7 +565,7 @@ export const foldkitApp = (ctx: GenContext, app: App): Contribution => {
           lib: ['ES2024', 'DOM', 'DOM.Iterable'],
           types: ['node', 'vite/client'],
         },
-        include: ['src/**/*', '*.ts'],
+        include: ['src/**/*', 'scripts/**/*', '*.ts'],
       }),
       // As in the template: tests sit next to the code and run in happy-dom,
       // with foldkit inlined so vitest transforms its ESM source.

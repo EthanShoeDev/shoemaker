@@ -158,7 +158,12 @@ export const packageTsconfig = (
     ...(options.compilerOptions === undefined
       ? {}
       : { compilerOptions: options.compilerOptions }),
-    include: options.include ?? ['src/**/*', 'test/**/*', '*.ts'],
+    include: options.include ?? [
+      'src/**/*',
+      'test/**/*',
+      'scripts/**/*',
+      '*.ts',
+    ],
   });
 
 // Wrap a command so it runs with the repo's env/secrets loaded.

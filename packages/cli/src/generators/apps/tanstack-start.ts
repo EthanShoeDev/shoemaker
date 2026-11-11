@@ -1,3 +1,5 @@
+import { Array as Arr } from 'effect';
+
 import type { App } from '../../config/schema.ts';
 import type { Contribution, GenContext } from '../../engine/types.ts';
 import { deployTarget } from '../infra/target.ts';
@@ -45,15 +47,34 @@ const usesVarlockPlugin = (ctx: GenContext) =>
   ctx.config.secrets === 'varlock' && deployTarget(ctx.config) !== 'cloudflare';
 
 // Import protection keeps \`*.server.*\` files out of the browser bundle, but
-// a served API's handlers come from another package, so they are denied by
-// name: a build that would ship them to the browser fails.
+// server-only packages are denied by name: a served API (its handlers and
+// Worker), Effect's Bun and Node platforms, and alchemy. \`behavior: 'error'\`
+// fails \`vite dev\` too, where the default only mocks the import.
 // https://tanstack.com/start/latest/docs/framework/react/guide/import-protection
-const tanstackStartPlugin = (apiPackage: string | undefined) =>
-  apiPackage === undefined
-    ? 'tanstackStart()'
-    : `tanstackStart({
+const clientDeniedSpecifiers = (
+  ctx: GenContext,
+  apiPackage: string | undefined,
+) => [
+  ...(apiPackage === undefined ? [] : [`${apiPackage}/**`]),
+  '@effect/platform-bun/**',
+  '@effect/platform-node/**',
+  ...(ctx.config.infra.kind === 'alchemy'
+    ? ['alchemy/**', '@alchemy.run/**']
+    : []),
+];
+
+const tanstackStartPlugin = (
+  ctx: GenContext,
+  apiPackage: string | undefined,
+) => `tanstackStart({
       importProtection: {
-        client: { specifiers: ['${apiPackage}/handlers'] },
+        behavior: 'error',
+        client: {
+          specifiers: [${Arr.join(
+            Arr.map(clientDeniedSpecifiers(ctx, apiPackage), (s) => `'${s}'`),
+            ', ',
+          )}],
+        },
       },
     })`;
 
@@ -68,7 +89,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 ${varlock ? '  // oxlint-disable-next-line typescript/no-unsafe-assignment -- @varlock/vite-integration types its plugin as `any`\n' : ''}  plugins: [
 ${varlock ? '    varlockVitePlugin(),\n' : ''}    tailwindcss(),
-    ${tanstackStartPlugin(apiPackage)},
+    ${tanstackStartPlugin(ctx, apiPackage)},
     react(),
     babel({ presets: [reactCompilerPreset()] }),
   ],
