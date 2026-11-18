@@ -1,5 +1,9 @@
 # shoemaker-oxfmt-config
 
+## 0.2.8
+
+No changes in this release.
+
 ## 0.2.7
 
 No changes in this release.
