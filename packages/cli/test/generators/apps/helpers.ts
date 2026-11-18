@@ -77,5 +77,5 @@ export const assertSourcesParse = (files: ReadonlyArray<GeneratedFile>) =>
           ),
         ),
       ),
-    { discard: true },
+    { concurrency: 1, discard: true },
   );

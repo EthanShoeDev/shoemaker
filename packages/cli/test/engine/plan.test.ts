@@ -31,11 +31,14 @@ const file = (
 const lockOf = Effect.fnUntraced(function* (
   entries: ReadonlyArray<readonly [RenderedFile, string]>,
 ) {
-  const files = yield* Effect.forEach(entries, ([generated, written]) =>
-    Effect.map(
-      lockEntry(generated, written),
-      (entry) => [generated.path, entry] as const,
-    ),
+  const files = yield* Effect.forEach(
+    entries,
+    ([generated, written]) =>
+      Effect.map(
+        lockEntry(generated, written),
+        (entry) => [generated.path, entry] as const,
+      ),
+    { concurrency: 1 },
   );
   return { cliVersion: '0.0.0', files: Rec.fromEntries(files) } satisfies Lock;
 });

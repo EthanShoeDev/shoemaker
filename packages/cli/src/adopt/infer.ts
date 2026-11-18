@@ -161,8 +161,10 @@ const inferInfra = Effect.fnUntraced(function* (repo: Repo) {
       'apps/*/infra/**/*.ts',
     ])),
   ].slice(0, MAX_SOURCE_FILES);
-  const sources = yield* Effect.forEach(files, (file) =>
-    Effect.map(repo.read(file), (source) => source ?? ''),
+  const sources = yield* Effect.forEach(
+    files,
+    (file) => Effect.map(repo.read(file), (source) => source ?? ''),
+    { concurrency: 1 },
   );
   const first = <A>(table: ReadonlyArray<readonly [A, RegExp]>) =>
     Arr.findFirst(table, ([, pattern]) =>
@@ -252,18 +254,24 @@ export const inferConfig = (
     );
 
     const infra = yield* inferInfra(repo);
-    const served = yield* Effect.forEach(found, ({ app, manifest }) =>
-      app.kind === 'tanstack-start'
-        ? Effect.map(servedApiOf(repo, manifest, found), (api) =>
-            api === undefined ? app : { ...app, api },
-          )
-        : Effect.succeed(app),
+    const served = yield* Effect.forEach(
+      found,
+      ({ app, manifest }) =>
+        app.kind === 'tanstack-start'
+          ? Effect.map(servedApiOf(repo, manifest, found), (api) =>
+              api === undefined ? app : { ...app, api },
+            )
+          : Effect.succeed(app),
+      { concurrency: 1 },
     );
-    const apps = yield* Effect.forEach(served, (app) =>
-      appOptionsOf(repo, app, {
-        cloudflare: infra.kind === 'alchemy' && infra.deploy === 'cloudflare',
-        served: Arr.some(served, (site) => site.api === app.name),
-      }),
+    const apps = yield* Effect.forEach(
+      served,
+      (app) =>
+        appOptionsOf(repo, app, {
+          cloudflare: infra.kind === 'alchemy' && infra.deploy === 'cloudflare',
+          served: Arr.some(served, (site) => site.api === app.name),
+        }),
+      { concurrency: 1 },
     );
 
     const taskRunner =

@@ -30,7 +30,7 @@ const assertParses = (files: ReadonlyArray<GeneratedFile>) =>
       const parsed: unknown = parseJsonObject(text);
       assert.deepStrictEqual(parsed, jsonOf(file), file.path);
     }),
-    { discard: true },
+    { concurrency: 1, discard: true },
   );
 
 const withRunner = (

@@ -19,13 +19,16 @@ describe('doctor on shoemaker itself', () => {
           path.resolve(import.meta.dirname, '../../../..'),
         );
         const checks = Arr.filter(doctorChecks, (c) => c.id !== ACCEPTED);
-        const found = yield* Effect.forEach(checks, (check) =>
-          Effect.map(check.run(repo), (findings) =>
-            Arr.map(
-              Arr.filter(findings, (f) => !f.ok),
-              (f) => `${check.id}: ${f.message}`,
+        const found = yield* Effect.forEach(
+          checks,
+          (check) =>
+            Effect.map(check.run(repo), (findings) =>
+              Arr.map(
+                Arr.filter(findings, (f) => !f.ok),
+                (f) => `${check.id}: ${f.message}`,
+              ),
             ),
-          ),
+          { concurrency: 1 },
         );
         assert.deepStrictEqual(Arr.flatten(found), []);
       }).pipe(Effect.provide(BunServices.layer)),

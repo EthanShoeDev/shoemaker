@@ -324,6 +324,7 @@ const droppedReason = Effect.fnUntraced(function* (
     dropped.slice(0, SHOWN),
     ({ pointer, entry }) =>
       Effect.map(canonicalJson(entry), (text) => `${pointer}: ${text}`),
+    { concurrency: 1 },
   );
   const more =
     dropped.length > SHOWN ? ` and ${dropped.length - SHOWN} more` : '';
@@ -393,6 +394,7 @@ const classify = Effect.fnUntraced(function* (
       ? (['masked', 'dependencies', 'exact'] as const)
       : (['masked'] as const),
     (versions) => fingerprint(file.strategy, file.path, disk, scope, versions),
+    { concurrency: 1 },
   );
   const blocked = blocker(problem, baseline, current);
   if (blocked === undefined) {

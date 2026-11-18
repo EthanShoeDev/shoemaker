@@ -180,18 +180,22 @@ const kebab = (label: string, allowBlank: boolean) => (value: string) =>
 
 // `--apps tanstack-start,effect-api:server`
 const parseApps = (value: string) =>
-  Effect.forEach(splitList(value), (entry) => {
-    const [kind, name] = Str.split(entry, ':');
-    return isAppKind(kind) && (name === undefined || KEBAB.test(name))
-      ? Effect.succeed(name === undefined ? { kind } : { kind, name })
-      : Effect.fail(
-          invalid(
-            'apps',
-            entry,
-            `<kind>[:<name>], kind one of ${Arr.join(APP_KINDS, ', ')}`,
-          ),
-        );
-  }).pipe(
+  Effect.forEach(
+    splitList(value),
+    (entry) => {
+      const [kind, name] = Str.split(entry, ':');
+      return isAppKind(kind) && (name === undefined || KEBAB.test(name))
+        ? Effect.succeed(name === undefined ? { kind } : { kind, name })
+        : Effect.fail(
+            invalid(
+              'apps',
+              entry,
+              `<kind>[:<name>], kind one of ${Arr.join(APP_KINDS, ', ')}`,
+            ),
+          );
+    },
+    { concurrency: 1 },
+  ).pipe(
     Effect.map((requested): AppsAnswer => ({
       apps: serveApi(nameApps(requested), true),
       frontend: true,

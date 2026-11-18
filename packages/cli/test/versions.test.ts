@@ -20,11 +20,14 @@ const readRepo = Effect.gen(function* () {
   );
   const config = yield* Schema.decodeEffect(ChangesetConfig)(configText);
   const dirs = yield* fs.readDirectory(path.join(root, 'packages'));
-  const manifests = yield* Effect.forEach(dirs, (dir) =>
-    Effect.flatMap(
-      fs.readFileString(path.join(root, 'packages', dir, 'package.json')),
-      Schema.decodeEffect(Manifest),
-    ),
+  const manifests = yield* Effect.forEach(
+    dirs,
+    (dir) =>
+      Effect.flatMap(
+        fs.readFileString(path.join(root, 'packages', dir, 'package.json')),
+        Schema.decodeEffect(Manifest),
+      ),
+    { concurrency: 1 },
   );
   return { config, manifests };
 }).pipe(Effect.provide(BunServices.layer));

@@ -53,7 +53,7 @@ const inline = Effect.fnUntraced(function* (
   if (isScalar(value)) return yield* encodeJson(value);
   if (value instanceof Commented) return undefined;
   if (isList(value)) {
-    const items = yield* Effect.forEach(value, inline);
+    const items = yield* Effect.forEach(value, inline, { concurrency: 1 });
     return Arr.every(items, Predicate.isNotUndefined)
       ? `[${Arr.join(items, ', ')}]`
       : undefined;
@@ -77,11 +77,14 @@ const print = Effect.fnUntraced(function* (
       i === lines.length - 1 ? `${line}${comma}` : `${line},`,
     );
   if (isList(value)) {
-    const lines = yield* Effect.forEach(value, (item) =>
-      Effect.map(
-        print(item, inner, inner.length, comma),
-        (printed) => `${inner}${printed}`,
-      ),
+    const lines = yield* Effect.forEach(
+      value,
+      (item) =>
+        Effect.map(
+          print(item, inner, inner.length, comma),
+          (printed) => `${inner}${printed}`,
+        ),
+      { concurrency: 1 },
     );
     return `[\n${Arr.join(items(lines), '\n')}\n${indent}]`;
   }
@@ -105,6 +108,7 @@ const print = Effect.fnUntraced(function* (
       const printed = yield* print(entry, inner, head.length, comma);
       return { comments, line: `${head}${printed}` };
     }),
+    { concurrency: 1 },
   );
   const lines = items(Arr.map(entries, (e) => e.line));
   const body = Arr.flatMap(entries, (e, i) => [...e.comments, lines[i] ?? '']);

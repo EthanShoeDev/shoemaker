@@ -6,7 +6,7 @@ import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
 
 // Fixture files from JSON values, each written the way shoemaker writes JSON.
 export const jsonFiles = (files: Readonly<Record<string, unknown>>) =>
-  Effect.all(Rec.map(files, renderJson));
+  Effect.all(Rec.map(files, renderJson), { concurrency: 1 });
 
 export const runCheck = (
   check: DoctorCheck,

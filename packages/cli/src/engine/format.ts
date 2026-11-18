@@ -40,10 +40,11 @@ export const formatContent = (path: string, content: string) =>
   matchesAny(path, ignorePatterns)
     ? Effect.succeed(content)
     : Effect.promise(() =>
-        format(path, content, optionsFor(path)).then(
-          (result) => (result.errors.length === 0 ? result.code : content),
-          () => content,
-        ),
+        format(path, content, optionsFor(path))
+          .then((result) =>
+            result.errors.length === 0 ? result.code : content,
+          )
+          .catch(() => content),
       );
 
 const asText = (
