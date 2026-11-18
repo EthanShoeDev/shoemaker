@@ -239,6 +239,8 @@ const jscpdIgnore = [
   '**/README.md',
   '**/AGENTS.md',
   '**/CLAUDE.md',
+  // changesets writes it; a fixed group's runs of "No changes" entries clone.
+  '**/CHANGELOG.md',
 ];
 
 export const jscpdConfig: Renderer = (_ctx, aggregate) => [

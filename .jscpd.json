@@ -12,7 +12,8 @@
     "**/docs/**",
     "**/mnt/**",
     ".external/**",
-    "bun.lock"
+    "bun.lock",
+    "**/CHANGELOG.md"
   ],
   "threshold": 0,
   "minTokens": 50,
