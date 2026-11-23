@@ -8,7 +8,7 @@ import { cliVersion } from './engine/meta.ts';
 // as one edit. `bun run update:generated-versions` moves every pin here to
 // npm's latest.
 
-const effect = '4.1.4';
+const effect = '4.1.5';
 const oxlint = '1.94.0';
 const alchemy = '2.0.0-beta.87';
 const tanstackRouter = '^1.170.46';
@@ -29,9 +29,9 @@ export const shoemakerFamily = [
 ] as const;
 
 // Every runtime package Effect-TS/effect-smol publishes in lockstep with
-// `effect` (all exist at 4.1.0). Dependencies such as alchemy pull these with
-// caret ranges that drift past the exact effect pin, so the root package.json
-// overrides every one of them to `effect`'s version.
+// `effect` (update-versions moves them only together). Dependencies such as
+// alchemy pull these with caret ranges that drift past the exact effect pin,
+// so the root package.json overrides every one of them to `effect`'s version.
 export const effectFamily = [
   'effect',
   '@effect/ai-anthropic',
@@ -83,20 +83,20 @@ export const versions = {
   '@effect/opentelemetry': effect,
   '@effect/atom-react': effect,
   '@effect/sql-pg': effect,
-  // @effect/tsgo 0.70 supports oxlint 1.91-1.94, tsgolint 7.0.2005-2007, TS 7.0.2.
-  '@effect/tsgo': '0.70.0',
+  // @effect/tsgo 0.73 supports oxlint 1.91-1.94, tsgolint 7.0.2005, 2006 and 2008, TS 7.0.2.
+  '@effect/tsgo': '0.73.4',
   '@effect/language-service': '^0.87.5',
 
   // Lint / format family: oxlint, its plugin API and tsgolint move together.
   oxlint,
   '@oxlint/plugins': oxlint,
-  'oxlint-tsgolint': '7.0.2007',
-  oxfmt: '0.79.0',
-  knip: '^6.45.1',
+  'oxlint-tsgolint': '7.0.2008',
+  oxfmt: '0.80.0',
+  knip: '^6.48.0',
   jscpd: '^5.4.3',
-  '@tanstack/eslint-plugin-query': '^5.108.0',
+  '@tanstack/eslint-plugin-query': '^5.108.4',
   'eslint-plugin-playwright': '^2.12.2',
-  'eslint-plugin-testing-library': '^7.16.2',
+  'eslint-plugin-testing-library': '^7.16.3',
 
   // Toolchain
   typescript: '^7.0.2',
@@ -106,7 +106,7 @@ export const versions = {
   vitest: '^5.1.1',
   'happy-dom': '^21.0.4',
   '@types/node': '^26.6.6',
-  'bun-types': '^1.4.4',
+  'bun-types': '^1.4.5',
   '@changesets/cli': '^3.0.3',
   '@changesets/changelog-github': '^1.0.1',
 
@@ -139,10 +139,10 @@ export const versions = {
   '@babel/core': '^7.29.0',
   tailwindcss: '^4.3.5',
   '@tailwindcss/vite': '^4.3.5',
-  '@tanstack/react-start': '^1.169.5',
+  '@tanstack/react-start': '^1.169.7',
   '@tanstack/react-router': tanstackRouter,
   '@tanstack/router-plugin': '^1.169.0',
-  '@tanstack/react-query': '^5.108.0',
+  '@tanstack/react-query': '^5.108.4',
   '@tanstack/react-router-ssr-query': '^1.167.3',
   // Pre-1.0: pin minor.
   'raf-effect-atom': '~0.3.3',

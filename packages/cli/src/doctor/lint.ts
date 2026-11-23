@@ -45,8 +45,9 @@ const OxlintRc = Schema.Struct({
   categories: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   options: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   rules: Schema.optional(Rules),
-  overrides: Schema.optional(
-    Schema.Array(Schema.Struct({ rules: Schema.optional(Rules) })),
+  overrides: Schema.Struct({ rules: Schema.optional(Rules) }).pipe(
+    Schema.Array,
+    Schema.optional,
   ),
 });
 

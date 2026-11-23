@@ -31,7 +31,7 @@ import { fail, listSome, manifestsOf, pass, scriptsOf } from './shared.ts';
 import type { DoctorCheck, Finding } from './types.ts';
 
 // Keep in step with `bun-types` in versions.ts and the generated flake.
-export const CURRENT_BUN = '1.4.4';
+export const CURRENT_BUN = '1.4.5';
 
 export const turboJsonc: DoctorCheck = {
   id: 'turbo-jsonc',

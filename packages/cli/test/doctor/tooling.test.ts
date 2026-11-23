@@ -26,8 +26,8 @@ import { failures, jsonFiles } from './helpers.ts';
 const rootWith = (extra: Record<string, unknown>) => ({
   name: 'demo',
   type: 'module',
-  packageManager: 'bun@1.4.4',
-  devEngines: { packageManager: { name: 'bun', version: '1.4.4' } },
+  packageManager: 'bun@1.4.5',
+  devEngines: { packageManager: { name: 'bun', version: '1.4.5' } },
   workspaces: { packages: ['apps/*', 'packages/*'] },
   ...extra,
 });
@@ -274,7 +274,7 @@ describe('tooling doctor checks', () => {
       const found = yield* failures(bunVersion, files);
       assert.deepStrictEqual(
         Arr.map(found, (f) => f.message),
-        ['devEngines.packageManager is not bun 1.4.4'],
+        ['devEngines.packageManager is not bun 1.4.5'],
       );
     }),
   );

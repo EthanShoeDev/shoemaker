@@ -118,10 +118,10 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
   it('keeps the root free of internal workspace dependencies', () => {
     const root = json('package.json');
     assert.strictEqual(Rec.keys(root)[0], 'name');
-    assert.strictEqual(root.packageManager, 'bun@1.4.4');
+    assert.strictEqual(root.packageManager, 'bun@1.4.5');
     assert.deepStrictEqual(record(root.devEngines).packageManager, {
       name: 'bun',
-      version: '1.4.4',
+      version: '1.4.5',
     });
     const internal = Arr.flatMap(dependencyFields, (field) =>
       Arr.filter(

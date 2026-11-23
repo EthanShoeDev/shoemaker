@@ -72,7 +72,7 @@ runs:
     - uses: oven-sh/setup-bun@v2
       with:
         # Keep in lockstep with package.json packageManager and flake.nix.
-        bun-version: 1.4.4
+        bun-version: 1.4.5
     # --frozen-lockfile: CI must never mutate the lockfile. Retried because it
     # reaches the npm registry, which fails independently of the diff.
     - name: Install

@@ -20,9 +20,10 @@ instead of a codemod.
 - Verify before a PR, not after every edit:
   `bunx turbo run lint:check --filter=<pkg>` and `bunx turbo run test`.
   `lint` mutates; `lint:check` does not.
-- Effect 4.1.0 everywhere. `effect/cli` for CLIs, `Effect.fn` for effectful
-  functions, tagged errors, `Clock` instead of `Date.now`, `Effect.log` instead
-  of `console`.
+- Effect v4 everywhere, at the one exact version `versions.ts` and the root
+  catalog pin. `effect/cli` for CLIs, `Effect.fn` for effectful functions,
+  tagged errors, `Clock` instead of `Date.now`, `Effect.log` instead of
+  `console`.
 - Inferred return types. Comments only for a non-obvious *why*.
 - Zero warnings: every oxlint rule is `error` or `off`, and every rule change
   carries a one-line reason above it. Every disable directive needs a

@@ -5,7 +5,7 @@ import { Array as Arr, Effect, FileSystem, Option, Path, Schema } from 'effect';
 import { shoemakerFamily, versions } from '../src/versions.ts';
 
 const ChangesetConfig = Schema.fromJsonString(
-  Schema.Struct({ fixed: Schema.Array(Schema.Array(Schema.String)) }),
+  Schema.Struct({ fixed: Schema.String.pipe(Schema.Array, Schema.Array) }),
 );
 const Manifest = Schema.fromJsonString(
   Schema.Struct({ name: Schema.String, version: Schema.String }),

@@ -255,7 +255,10 @@ describe('effect-versions check for alchemy', () => {
         (f) => f.path === 'package.json',
       );
       const { catalog } = pkgIn(
-        Option.getOrUndefined(Option.map(root, (f) => f.content ?? '')),
+        root.pipe(
+          Option.map((f) => f.content ?? ''),
+          Option.getOrUndefined,
+        ),
       );
       assert.deepStrictEqual(catalog, {
         '@alchemy.run/stripe': '2.0.0-beta.85',

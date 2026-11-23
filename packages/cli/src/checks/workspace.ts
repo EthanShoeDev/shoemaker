@@ -42,7 +42,7 @@ const StringRecord = Schema.Record(Schema.String, Schema.String);
 const Workspaces = Schema.Union([
   Schema.Array(Schema.String),
   Schema.Struct({
-    packages: Schema.optional(Schema.Array(Schema.String)),
+    packages: Schema.String.pipe(Schema.Array, Schema.optional),
     catalog: Schema.optional(StringRecord),
   }),
 ]);
@@ -64,7 +64,7 @@ export const PackageJson = Schema.Struct({
   optionalDependencies: Schema.optional(StringRecord),
   workspaces: Schema.optional(Workspaces),
   catalog: Schema.optional(StringRecord),
-  catalogSkip: Schema.optional(Schema.Array(Schema.String)),
+  catalogSkip: Schema.String.pipe(Schema.Array, Schema.optional),
   patchedDependencies: Schema.optional(StringRecord),
 });
 export type PackageJson = typeof PackageJson.Type;

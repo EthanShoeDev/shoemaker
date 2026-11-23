@@ -64,7 +64,7 @@ describe('json-merge', () => {
   it('keeps dependency and package versions a repo has raised', () => {
     const owned = {
       version: '0.0.0',
-      devEngines: { packageManager: { version: '1.4.4' } },
+      devEngines: { packageManager: { version: '1.4.5' } },
       dependencies: { a: '^1.2.0', b: '^1.2.0', c: 'catalog:', d: '1.0.0' },
       workspaces: { catalog: { e: '2.0.0-beta.84' } },
     };
@@ -78,7 +78,7 @@ describe('json-merge', () => {
       // changesets owns the package's own version once it moves.
       version: '9.9.9',
       // Any other version outside a dependency map is an ordinary value.
-      devEngines: { packageManager: { version: '1.4.4' } },
+      devEngines: { packageManager: { version: '1.4.5' } },
       // Raised specs stay; lower ones and non-version specs take shoemaker's.
       dependencies: { a: '^1.3.0', b: '^1.2.0', c: 'catalog:', d: '~1.0.1' },
       workspaces: { catalog: { e: '2.0.0-beta.100' } },

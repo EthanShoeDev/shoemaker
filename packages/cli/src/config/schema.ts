@@ -113,7 +113,7 @@ export const Infra = Schema.Union([
     kind: Schema.Literal('alchemy'),
     deploy: DeployTarget,
     state: StateStore,
-    providers: Schema.optionalKey(Schema.Array(AlchemyProvider)),
+    providers: AlchemyProvider.pipe(Schema.Array, Schema.optionalKey),
   }),
 ]);
 export type Infra = typeof Infra.Type;

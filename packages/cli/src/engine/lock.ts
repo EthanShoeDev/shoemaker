@@ -21,7 +21,7 @@ export const LockEntry = Schema.Struct({
   // What the fingerprint covered when it was taken: region ids (managed) or
   // owned key pointers (json-merge). Locks written before this was recorded
   // lack it; their fingerprints cover the current generator's set instead.
-  owned: Schema.optional(Schema.Array(Schema.String)),
+  owned: Schema.String.pipe(Schema.Array, Schema.optional),
 });
 export type LockEntry = typeof LockEntry.Type;
 

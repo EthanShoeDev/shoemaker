@@ -32,27 +32,27 @@ const nixString = (text: string) =>
 // Prebuilt bun release archives for the version in `packageManager`
 // (package-json.ts) and the CI setup action. nixpkgs lags bun releases, so
 // the flake swaps the source; bump all three together.
-const BUN_VERSION = '1.4.4';
+const BUN_VERSION = '1.4.5';
 const BUN_SOURCES = [
   [
     'aarch64-darwin',
     'darwin-aarch64',
-    'sha256-wkDX8My5DCY6hJ/NsJt+5iYw2SE0jtaq/ahrnVd7xRA=',
+    'sha256-tda8LhPK8U5XyJZh6J79Bz/xYWW0G/5DiCYWQQYJzRA=',
   ],
   [
     'x86_64-darwin',
     'darwin-x64',
-    'sha256-UKNJH3Orwv6BZzFxqFdi07wswWgMzsrdmD3pmt93l34=',
+    'sha256-pJcud4zOS2oZTX0onzJqphV21x2At6U+naLzc5Vm5f0=',
   ],
   [
     'aarch64-linux',
     'linux-aarch64',
-    'sha256-uqa7NvUdblhWHgK76oJQOKnfRU9nPW13bou/hvjHhQ4=',
+    'sha256-GGVqO/DqVkH1eWrkITt1JVV5pwoP3tLzN5M3hVaM34Q=',
   ],
   [
     'x86_64-linux',
     'linux-x64',
-    'sha256-v4zL+ysLgBWeD5ptFcVTF63YB3U028YTCj7bUvzLOVw=',
+    'sha256-lFWbO1KJlaSUUvnyQEzsdPLv19BuCgAKjNIUsCw2Zus=',
   ],
 ] as const;
 

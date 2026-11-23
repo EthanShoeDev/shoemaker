@@ -5,7 +5,7 @@ import type { Generator, Renderer } from '../../engine/types.ts';
 import { effectFamily } from '../../versions.ts';
 import { catalogDeps, jsonMerge } from '../shared.ts';
 
-const BUN_VERSION = '1.4.4';
+const BUN_VERSION = '1.4.5';
 export const PACKAGE_MANAGER = `bun@${BUN_VERSION}`;
 
 // What the root itself runs: linters, formatters, checkers and the configs

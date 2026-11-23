@@ -50,4 +50,4 @@ const program = Effect.gen(function* () {
   });
 });
 
-runScript(Effect.scoped(program));
+program.pipe(Effect.scoped, runScript);

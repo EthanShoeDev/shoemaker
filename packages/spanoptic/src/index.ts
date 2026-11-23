@@ -625,19 +625,14 @@ const runKeys = (
       () => Effect.sync(() => renderer.keyInput.off('keypress', onKey)),
     );
     const quit = yield* Deferred.make<void>();
-    yield* Effect.forkScoped(
-      Effect.forever(
-        Effect.gen(function* () {
-          const key = yield* Queue.take(keys);
-          if (key.name === 'up' || key.name === 'k') tui.moveSelection(-1);
-          else if (key.name === 'down' || key.name === 'j')
-            tui.moveSelection(1);
-          else if (key.name === 'e') onExport?.(tui.exportTrace());
-          else if ((key.name === 'q' || key.name === 'escape') && tui.complete)
-            yield* Deferred.succeed(quit, undefined);
-        }),
-      ),
-    );
+    yield* Effect.gen(function* () {
+      const key = yield* Queue.take(keys);
+      if (key.name === 'up' || key.name === 'k') tui.moveSelection(-1);
+      else if (key.name === 'down' || key.name === 'j') tui.moveSelection(1);
+      else if (key.name === 'e') onExport?.(tui.exportTrace());
+      else if ((key.name === 'q' || key.name === 'escape') && tui.complete)
+        yield* Deferred.succeed(quit, undefined);
+    }).pipe(Effect.forever, Effect.forkScoped);
     return { quit };
   });
 
@@ -670,15 +665,11 @@ export const traceVisualize = <A, E, R>(
       const { renderer, tui } = yield* acquireTui(options.serviceName);
       const { quit } = yield* runKeys(renderer, tui, options.onExport);
 
-      yield* Effect.forkScoped(
-        Effect.forever(
-          Effect.gen(function* () {
-            yield* Effect.sleep('80 millis');
-            const now = yield* Clock.currentTimeMillis;
-            tui.tick(now);
-          }),
-        ),
-      );
+      yield* Effect.gen(function* () {
+        yield* Effect.sleep('80 millis');
+        const now = yield* Clock.currentTimeMillis;
+        tui.tick(now);
+      }).pipe(Effect.forever, Effect.forkScoped);
 
       const processor = liveSpanProcessor((event) => {
         tui.handleEvent(event);
