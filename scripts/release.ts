@@ -1,8 +1,10 @@
 // Publishes every publishable package whose version is not on npm yet, then
 // tags the release. Used by .github/workflows/release.yml as the changesets
-// `publish` step (`changeset publish` runs npm on the package directory, which
-// cannot resolve bun's catalog: and workspace: specs; publish-package.ts packs
-// with bun first).
+// `publish-script` (`changeset publish` runs npm on the package directory,
+// which cannot resolve bun's catalog: and workspace: specs; publish-package.ts
+// packs with bun first). `changeset git-tag` inherits CHANGESETS_OUTPUT from
+// the action and records each new tag there; the action pushes those tags and
+// makes a GitHub release for each.
 //
 // Turbo runs each package's `release:publish` (scripts/publish-package.ts)
 // after its build and its dependencies' publishes, so no order is kept here.

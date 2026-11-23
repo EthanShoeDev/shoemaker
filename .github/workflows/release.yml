@@ -23,14 +23,16 @@ jobs:
         with:
           node-version: 24
       # Opens a "Version packages" PR from pending changesets; once that PR is
-      # merged, publishes every package whose version is not on npm yet.
-      - uses: changesets/action@v1
+      # merged, publishes every package whose version is not on npm yet, then
+      # pushes the new tags and makes a GitHub release for each. v2 is the line
+      # for Changesets 3: it learns the tags from what `changeset git-tag`
+      # writes to CHANGESETS_OUTPUT. v1 parsed `New tag:` lines from stdout,
+      # which Changesets 3 no longer prints, so it pushed no tags and made no
+      # releases. No NPM_TOKEN: npm authenticates through trusted publishing
+      # (OIDC, the id-token permission above).
+      - uses: changesets/action@v2
         with:
-          version: bun run changeset:version
-          publish: bun scripts/release.ts
-          commit: 'chore: version packages'
-          title: 'chore: version packages'
-        # No NPM_TOKEN: npm authenticates through trusted publishing (OIDC,
-        # the id-token permission above).
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version-script: bun run changeset:version
+          publish-script: bun scripts/release.ts
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
