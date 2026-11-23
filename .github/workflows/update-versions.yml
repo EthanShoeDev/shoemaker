@@ -2,9 +2,11 @@ name: Update generated versions
 
 # Weekly: move packages/cli/src/versions.ts to npm's latest, prove it with lint
 # and the tests (e2e generates and builds every preset), and open a PR with a
-# patch changeset. A PR opened with GITHUB_TOKEN does not trigger CI, so the
-# checks run here and their result goes in the PR; a failing run opens a
-# draft.
+# patch changeset. The checks run here too, so their result goes in the PR
+# body and a failing run opens a draft. The PR is pushed with RELEASE_TOKEN, a
+# fine-grained PAT (this repo only; Contents and Pull requests read/write):
+# GitHub holds CI on a PR that github-actions[bot] pushed until someone
+# approves it, so with the PAT the PR's own CI runs on its own.
 on:
   schedule:
     - cron: '0 14 * * 1'
@@ -60,6 +62,7 @@ jobs:
       - if: steps.update.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
+          token: ${{ secrets.RELEASE_TOKEN }}
           branch: update-generated-versions
           commit-message: Update generated dependency versions
           title: Update generated dependency versions

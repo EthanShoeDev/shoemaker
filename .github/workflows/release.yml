@@ -30,8 +30,14 @@ jobs:
       # which Changesets 3 no longer prints, so it pushed no tags and made no
       # releases. No NPM_TOKEN: npm authenticates through trusted publishing
       # (OIDC, the id-token permission above).
+      #
+      # RELEASE_TOKEN is a fine-grained PAT (this repo only; Contents and Pull
+      # requests read/write). GitHub holds CI on a PR that github-actions[bot]
+      # pushed until someone approves it; pushed with the PAT, the version PR
+      # runs CI on its own.
       - uses: changesets/action@v2
         with:
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           version-script: bun run changeset:version
           publish-script: bun scripts/release.ts
           commit-message: 'chore: version packages'
