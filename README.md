@@ -131,10 +131,20 @@ Don't want the scaffold? The configs are published on their own:
 | `shoemaker-typescript-config` | `"extends": "shoemaker-typescript-config/tsconfig.base.json"` |
 | `shoemaker-knip-config` | `knip.ts`: `export default defineKnipConfig({ ... })` |
 
+## Products
+
+Libraries a project calls, versioned together and apart from the CLI. Nothing
+generates their wiring yet.
+
+| Package | What it is |
+|---|---|
+| [`shoemaker-admin`](packages/admin/README.md) | The core of an admin panel, without UI: access checks, the audit log, and what admins do to users, over Effect and Better Auth. |
+| [`shoemaker-edgehog`](packages/edgehog/README.md) | Feature flags through OpenFeature, defined in the admin and evaluated in process. Error tracking is being built. |
+
 ## Contributing
 
 ```sh
-direnv allow                  # nix dev shell (bun, node)
+direnv allow                  # nix dev shell (bun, node, postgres)
 bun install
 bun run test                  # includes generating and building sample repos
 bunx turbo run lint:check '//#lint:check:root'

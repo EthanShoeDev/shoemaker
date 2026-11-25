@@ -24,7 +24,20 @@ Facts from Cloudflare's documentation, read 2026-11-25:
 | Rate-limit binding | approximate, per location, 10 or 60 seconds |
 | Zone rate-limit rules | one on the Free plan, by IP address, 10 seconds. "Only requests that hit a Worker" are billed; nothing found says so for blocked ones |
 
-Not verified: how the Cloudflare Sentry SDK retries, whether it can send through a service binding, and whether a blocked request is billed.
+D1 storage is $0.75 per GB-month. The Durable Objects page rounds usage past the included amount up to the next unit; no other page says so.
+
+Recorded from the Sentry Cloudflare SDK 11.17.0 in workerd (`scripts/record-sentry.ts`):
+
+- It never resends: a 429, 500, 413, a hang and an unreachable host each drop the event.
+- A bare 429, `Retry-After` or a limit header without categories stops everything; one that names errors stops errors only, on a 200 too. An isolate remembers it.
+- It sends through a service binding with `transportOptions: { fetch: env.INGEST.fetch.bind(env.INGEST) }`.
+- Its key comes in the query string, or in the envelope header's `dsn` through a tunnel. It never sends `X-Sentry-Auth`.
+- It continues `sentry-trace` and not `traceparent`.
+- It drops an error identical to the one before, across an isolate's requests.
+- Each envelope holds one item. In a bundle every frame is marked as the app's, the SDK's included, and some names carry the bundler's suffix.
+- It collects cookies, headers, bodies and IP addresses by default, and a JSON body's password and card number arrive unfiltered.
+
+Not verified: whether a blocked request is billed, and whether D1 bills deletes from indexes (local D1 does not count them; the costs here do).
 
 ## Goals / Non-Goals
 
@@ -50,7 +63,7 @@ Issues have opaque ids, and a fingerprint table maps (project, fingerprint, rule
 
 Grouping per chained exception: type plus the project's frames (module, function), never line numbers; without usable frames, type plus the message with ids, numbers, addresses and dates replaced. Written from behavior, not from Sentry's code.
 
-**Which frames are the project's.** Where paths tell project from library, the project's. A bundled Worker is one file, so there the frames say nothing, and library internals must not decide the group: the fingerprint is the type, the innermost named function without the suffix a bundler adds, and the message with its variable parts replaced. For a report from Effect, the failing span's name takes the place of the function, since the author wrote it and no bundler changes it. Source maps bring real frames later, as a new rules version.
+**Which frames are the project's.** Where paths tell project from library, the project's. A bundled Worker is one file, so there the frames say nothing (the SDK marks every one as the app's), and library internals must not decide the group: the fingerprint is the type, the innermost named function without the suffix a bundler adds, and the message with its variable parts replaced. For a report from Effect, the failing span's name takes the place of the function, since the author wrote it and no bundler changes it. Source maps bring real frames later, as a new rules version.
 
 ### 3. A collector per project decides, the store records
 
@@ -75,7 +88,7 @@ The reason for this product is to cost less than an always-on server, so a loop 
 | Reports accepted | 20,000 an hour | refused with a limit until the hour ends, less a sample of ten a minute |
 | Details of one issue | 100 an hour | counted only, using none of the other errors' allowance |
 | New issues | 50 an hour | counted under one overflow issue |
-| Rows written, deletes included | 100,000 a day: 50,000 for ingest, 40,000 for cleanup, 10,000 for usage, alerts and one counted row | occurrences counted in that one row |
+| Rows written, deletes included | 100,000 a day: 45,000 for ingest, 45,000 for cleanup, 10,000 for usage, alerts and one counted row | occurrences counted in that one row |
 | Stored data | 1 GB | counted only, until cleanup makes room |
 | One occurrence | 64 KB after scrubbing | trimmed, and marked as trimmed |
 | Emails | 20 a day | one summary a day |
@@ -91,9 +104,9 @@ Where each is enforced, from the cheapest:
 
 It fails closed: if the collector or its usage can't be read, or it is overloaded, the isolate refuses for a minute. Limits reset by themselves. The first time one is reached in a day, the admin shows it and one email says so; that email is inside the email limit. An admin can pause a project, which is audited and holds within a minute.
 
-**Loops inside Edgehog.** Ingest, delivery and cleanup only log their failures. Queue and delivery retries are finite. Cleanup deletes in batches of 1,000 up to its share of the rows, and that share is more than a day's ingest can need, which a test proves from the limits. Off Cloudflare, timers run only while something waits to be sent or written, so an idle database that bills for being awake can sleep; cleanup runs at start and once a day.
+**Loops inside Edgehog.** Ingest, delivery and cleanup only log their failures. Queue and delivery retries are finite. Cleanup deletes in batches of 1,000 up to its share of the rows, and that share is as much as a day's ingest can need, which a test proves from the limits. Counted rows cost as much to delete as to write, so the shares are equal and a project's may not be less. Off Cloudflare, timers run only while something waits to be sent or written, so an idle database that bills for being awake can sleep; cleanup runs at start and once a day.
 
-**The worst case is a number.** A test multiplies every limit by the prices above, recorded with their date, and fails above 20 dollars a month for a project whose account has used up every included amount. From these limits it is about 16.50: D1 writes 3.10, accepted requests 4.50, CPU 1.50 (5 ms each), the collector 6.50, storage and email 1.00. At ordinary volume all of it is inside the included amounts.
+**The worst case is a number.** A test multiplies every limit by the prices above, recorded with their date, and fails above 20 dollars a month for a project whose account has used up every included amount. From these limits it is 17.03: D1 writes 3.10, accepted requests 4.60, CPU 1.55 (5 ms each), the collector 6.64, storage and email 1.02, queue and reads 0.12. If Cloudflare rounds Durable Object usage up as its page says, and nothing else in the account uses any, it is 26.29; see Open question. At ordinary volume all of it is inside the included amounts.
 
 **What code can't bound.** A request refused by a Worker still costs a request: a thousand a second for a day is about 28 dollars. Only the edge rule, Cloudflare's own flood protection and the account's settings stop that. The README lists them: the rule, a budget alert, and Workers and Durable Object spending limits, with the warning that the Workers limit stops every Worker in the account, the app's too.
 
@@ -117,7 +130,7 @@ Decode, replace impossible times, scrub, mark the project's frames, fingerprint 
 
 Ingest is its own server: a Worker on Cloudflare, a separate process elsewhere. Retention hides expired events from reads at once; the daily cleanup deletes them.
 
-**Event shape:** one shape for every reporter, with optional trace and span ids as each reporter sends them: Sentry's trace context, or the current Effect span. They agree when both continue the same incoming `traceparent`, or when the program starts its Effect span from Sentry's trace, for which the reporter has a helper. Neither is forced. They cost two columns now and cannot be added to stored events later.
+**Event shape:** one shape for every reporter, with optional trace and span ids as each reporter sends them: Sentry's trace context, or the current Effect span. They agree when both continue one trace: the SDK continues only `sentry-trace` unless configured otherwise, so a shared `traceparent` alone is not enough. Or when the program starts its Effect span from Sentry's trace, for which the reporter has a helper. Neither is forced. They cost two columns now and cannot be added to stored events later.
 
 ### 9. Protocols
 
@@ -154,6 +167,14 @@ It is for local-first state: each device writes its own journal and syncs. Its p
 - [Two ways to be atomic] → Kept inside one service, behind one shared suite.
 - [PGlite can't race] → Races run against the Postgres that `add-admin-core` gives the tests.
 - [Stored personal data] → Scrubbing and retention from the first release.
+
+- [Occurrences that arrive before their new issue is stored are each charged as new, and a resend is charged though it writes nothing] → Errs toward refusing; a detail is charged 10 rows and writes 6, so at most 4,500 a day are kept.
+- [`AtomicWrites` returns no rows, so learning whether this attempt stored the event costs a query] → Group 2 makes it return them.
+- [D1 allows 1,000 queries per invocation] → Counts are written in chunks.
+
+## Open question
+
+Does the 20 dollars mean proportional use, or the bill of an account that uses no other Durable Objects, where rounding alone is 12.50 (worst case 26.29)? Decide before group 2; `usage-limits` "The worst case is known" must say which. A test pins both numbers.
 
 ## Migration Plan
 

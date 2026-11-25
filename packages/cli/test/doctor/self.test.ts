@@ -5,9 +5,13 @@ import { Array as Arr, Effect, Path } from 'effect';
 import { doctorChecks } from '../../src/doctor/index.ts';
 import { makeRepo } from '../../src/engine/repo-live.ts';
 
-// Shoemaker reads env (publish and release scripts) without a secrets manager,
-// by choice.
-const ACCEPTED = 'secrets-manager';
+const ACCEPTED = [
+  // Shoemaker reads env (publish and release scripts) without a secrets
+  // manager, by choice.
+  'secrets-manager',
+  // It deploys no Worker: packages/admin only tests against Cloudflare's client.
+  'cloudflare-observability-mcp',
+];
 
 describe('doctor on shoemaker itself', () => {
   it.effect(
@@ -18,7 +22,10 @@ describe('doctor on shoemaker itself', () => {
         const repo = yield* makeRepo(
           path.resolve(import.meta.dirname, '../../../..'),
         );
-        const checks = Arr.filter(doctorChecks, (c) => c.id !== ACCEPTED);
+        const checks = Arr.filter(
+          doctorChecks,
+          (c) => !Arr.contains(ACCEPTED, c.id),
+        );
         const found = yield* Effect.forEach(
           checks,
           (check) =>

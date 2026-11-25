@@ -15,7 +15,8 @@
       "shoemaker-oxfmt-config",
       "shoemaker-typescript-config",
       "shoemaker-knip-config"
-    ]
+    ],
+    ["shoemaker-admin", "shoemaker-edgehog"]
   ],
   "access": "public",
   "baseBranch": "main",

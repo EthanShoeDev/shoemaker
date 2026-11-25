@@ -1,0 +1,28 @@
+{
+  "recordedFrom": "@sentry/cloudflare",
+  "answer": "unreachable",
+  "steps": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/first"
+      },
+      "worker": {
+        "status": 200,
+        "says": "flushed: true"
+      },
+      "sent": []
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/second"
+      },
+      "worker": {
+        "status": 200,
+        "says": "flushed: true"
+      },
+      "sent": []
+    }
+  ]
+}

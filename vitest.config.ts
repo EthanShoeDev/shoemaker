@@ -5,7 +5,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     projects: [
+      'packages/admin',
       'packages/cli',
+      'packages/edgehog',
       'packages/oxfmt-config',
       'packages/oxlint-config',
       'packages/oxlint-plugins',

@@ -4,11 +4,11 @@ Tasks marked **[React project]** happen in that repo's own checkout, never in `.
 
 ## 1. Operations
 
-- [ ] 1.1 Set roles, with unknown and own roles refused; verify each scenario against the in-memory directory and in-memory Better Auth, with audit entries
-- [ ] 1.2 Declared optional operations, readable by a client; verify an undeclared one is refused and reported as unsupported
-- [ ] 1.3 Invite with name and roles, and password link; verify each scenario, one with a verified email required, and that no response, log or audit entry holds a link or token
-- [ ] 1.4 Delete; verify each scenario, and that the audit log keeps the user's id
-- [ ] 1.5 README and changeset with numbered adoption steps that name the breaking one; verify a fresh reader can follow them
+- [x] 1.1 Set roles, with unknown and own roles refused; verify each scenario against the in-memory directory and in-memory Better Auth, with audit entries
+- [x] 1.2 Declared optional operations, readable by a client; verify an undeclared one is refused and reported as unsupported
+- [x] 1.3 Invite with name and roles, and password link; verify each scenario, one with a verified email required, and that no response, log or audit entry holds a link or token
+- [x] 1.4 Delete; verify each scenario, and that the audit log keeps the user's id
+- [x] 1.5 README and changeset with numbered adoption steps that name the breaking one; verify a fresh reader can follow them
 
 ## 2. Adoption
 

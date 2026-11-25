@@ -31,6 +31,12 @@ Facts checked in source, at the CLI's pins (Effect 4.1.5, Alchemy 2.0.0-beta.87,
 - `release.ts` publishes no package npm has never seen from CI; the first publish is by hand. `^0.0.1` admits no other version.
 - The adopting projects pin Effect 4.1.2 and Alchemy beta.85.
 
+Found while building, each now a test:
+
+- Better Auth does not trim role names, in a caller's permissions or in a target's admin roles; `getSession` does not check a ban; a ban leaves the sessions the banned admin started by impersonation; and an impersonated session is extended to a full one when its `dont_remember` cookie is dropped.
+- `HttpApi` answers some bad requests with a response and not an error, so success is judged by status too.
+- Effect builds a layer once, so a second `mountAt` of one product layer in one host adds no routes.
+
 ## Goals / Non-Goals
 
 **Goals:** a security core that cannot drift; early choices that later changes don't have to undo (a caller type that can carry an agent's key, access that does not depend on the transport).
@@ -61,23 +67,27 @@ The users API returns account data only. A plan column comes from the project's 
 
 `defineAccess({ products, statements, roles })` returns `ac`, `roles`, `can` and a typed `requires(...)`. `RequiredPermissions` is a structural record, so product contracts don't depend on one project's statements. Startup checks every mounted endpoint against the defined statements and dies on an unknown one. The admin app decides by `can`, never by the name `admin`. 
 
-The project lists the permissions its public app also checks in `publicStatements`. A role is an admin role when it grants anything else, so the safe answer is the default. `adminRoles` for Better Auth is every admin role, so impersonating any of them needs `impersonate-admins`; the React project's `host` role, whose one permission is public, can be impersonated as it can today. Startup refuses an admin endpoint that needs only public permissions.
+The project lists the permissions its public app also checks in `publicStatements`. A role is an admin role when it grants anything else, so the safe answer is the default. `adminRoles` for Better Auth is every admin role, so impersonating any of them needs `impersonate-admins`; the React project's `host` role, whose one permission is public, can be impersonated as it can today. Startup refuses an admin endpoint that needs only public permissions, and one that is not behind `AdminAuth`, has a middleware outside it, or audits a target without an `id` in its path. It checks the endpoints the handlers really serve, not the contract it was given. So the React project's `event:update`, which its public app also checks, stays out of the list: admin endpoints need it alone.
+
+The default `admin` grants everything defined but `impersonate-admins`; in a role the project names `admin`, a resource it lists replaces that resource's default.
 
 ### 4. One access core, with an `HttpApi` middleware as its adapter
 
 `AdminAccess` takes headers, required permissions and an optional audit action, and returns the caller or a refusal. Its caller type leaves room for a key acting for a user; only sessions exist now. It takes headers and not an `HttpApi` request, so the agents change can put an MCP gate and a CLI over the same core. Every product API is an `HttpApi`, so one adapter is enough.
 
-The core refuses impersonated sessions, banned users and undeclared endpoints, and requires an `Audited` action on anything that writes. Writes are every method but GET and HEAD, unless the endpoint is annotated `ReadOnly` (a structured query sent by POST). It provides `CurrentAdmin` and a request-scoped `AuditTrail`, and after success writes one entry. The target is a kind and an id, and the id defaults to the `id` parameter; handlers add target or detail, or say that nothing changed, which writes no entry. A read may declare an action too.
+The core refuses impersonated sessions, banned users and undeclared endpoints, and requires an `Audited` action on anything that writes. Writes are every method but GET and HEAD, unless the endpoint is annotated `ReadOnly` (a structured query sent by POST). Only an endpoint's own annotations count, not its group's. It provides `CurrentAdmin` and a request-scoped `AuditTrail`, and after success writes one entry. The target is a kind and an id, and the id defaults to the `id` parameter; handlers add target or detail, or say that nothing changed, which writes no entry. A read may declare an action too.
 
 A cookie session may use a method other than GET or HEAD only from an origin the host lists, and a request without an `Origin` is refused. The list is the admin's own origins, narrower than Better Auth's trusted origins, which may include every subdomain. A later key is not a cookie, so the check does not apply to it.
 
-If the audit write fails after the action happened, the request fails and everything is logged. Writing first would record actions that never happened, and D1 has no transaction that spans Better Auth and our table.
+If the audit write fails after the action happened, the request fails and everything is logged. An operation that breaks after it started (a defect, a response that cannot be encoded) leaves no entry, and the log says its outcome is unknown. Writing first would record actions that never happened, and D1 has no transaction that spans Better Auth and our table.
 
 *Alternative.* Effect's `EventLog` for the audit log: Better Auth changes the user outside any `EventLog` handler, so action and entry could not commit together, the entries would be binary, and its SQL journal uses transactions, which D1 lacks.
 
 ### 5. Better Auth stays behind two ports
 
-`AdminSessions` and `UserDirectory` are core services; `/better-auth` implements them and wraps the auth handler: 404 for admin paths except stop-impersonating, which it audits. The wrapper decides on the decoded, collapsed, lower-cased pathname. Only `/access` and `/better-auth` import Better Auth.
+`AdminSessions` and `UserDirectory` are core services; `/better-auth` implements them and wraps the auth handler: 404 for admin paths except stop-impersonating, which it audits. The wrapper decides on the decoded, collapsed, lower-cased pathname of the very request Better Auth gets. The directory calls Better Auth's internal adapter, except to impersonate, which needs its cookies. A stop is recorded only by the request whose call ended the session row, so a replay or a race leaves one entry.
+
+Projects install our `adminPlugin` in place of Better Auth's `admin`; without it a host does not typecheck. It wraps the database adapter, below every hook, because the project's own hooks run last and can undo a plugin's: there an impersonation is never extended and roles are read trimmed. It also closes the admin routes itself, so a host that keeps `auth.fetch` loses only the record of a stop. A second admin plugin, or secondary storage that does not also keep sessions in the database, fails when Better Auth starts. Only `/access` and `/better-auth` import Better Auth.
 
 The endpoints close from the first release rather than in a follow-up. Adopting the core must never leave a project with less than it had, and leaving the endpoints open but audited would be code written only to be deleted. A project with pages that call them moves those pages in the same commit, which is why the React project is a change of its own (`extend-admin-users`).
 
@@ -93,7 +103,7 @@ As in [Alchemy Git][git], a product's contract carries no prefix and the host ow
 | `/contract` | `HttpApi`s | `.` |
 | `/access` (admin) | `defineAccess` | `.`, better-auth access |
 | `/server` | handlers, the access adapter, `mountAt` | `.`, `/contract` |
-| `/better-auth` (admin) | decision 5 | `/server`, `@alchemy.run/better-auth` |
+| `/better-auth` (admin) | decision 5 | `.`, `better-auth`, `@alchemy.run/better-auth`, `alchemy/RuntimeContext` |
 | `/sql` | stores and migrations over `SqlClient` | `.` |
 | `/alchemy` | deploy Actions, for any cloud | `.`, `/sql`, `alchemy` |
 
@@ -101,11 +111,11 @@ Another product's entry may also import the same entry of `shoemaker-admin`. Edg
 
 ### 8. Migrations without transactions
 
-Each product exports ordered migrations, and a small runner applies each one together with its record in `<product>_migrations` as one unit: `batch` on D1, a transaction on SQLite and Postgres. So none is half recorded, a rerun skips what is done, and a migration may add a column. The record's name is unique, so of two deploys at once one rolls back. The service behind that unit is shared with products that need atomic writes.
+Each product exports ordered migrations, and a small runner applies each one together with its record in `<product>_migrations` as one unit: `batch` on D1, a transaction on SQLite and Postgres. So none is half recorded, a rerun skips what is done, and a migration may add a column. The record's name is unique, so of two deploys at once one rolls back. After any failure the runner reads the record again and believes it, because a lost reply looks like a failure and drivers name the errors differently. On Postgres deploys take turns by a lock on the history table. The service behind that unit is shared with products that need atomic writes.
 
-It runs before the server that needs it: through an Alchemy Action whose input holds the migration names and the database's identity, or from the host's own deploy script where there is no Alchemy.
+It runs before the server that needs it: through an Alchemy Action whose input holds the migration names and the database's identity, or from the host's own deploy script where there is no Alchemy. A Worker registers it from its init (`migrateHost`), which makes it wait for the tables: a class Worker's props are evaluated in the deployed bundle too, so an Action cannot go there. Order is expressed by outputs an Action captures, which are not part of its input.
 
-The audit table keeps the name and columns an existing project already has, so adoption copies nothing. Migrations add `target_kind` and `target_id`, since an issue or a flag is a target too. New entries about users also fill `target_user_id`, so old code still reads them after a rollback, and old entries are read as user targets. The core owns the table, under the prefix `admin_`.
+The audit table keeps the name and columns an existing project already has, so adoption copies nothing. Migrations add `target_kind` and `target_id`, since an issue or a flag is a target too. New entries about users also fill `target_user_id`, so old code still reads them after a rollback, and old entries are read as user targets. The core owns the table, under the prefix `admin_`. Paging is by the stored time and id, compared bytewise on every database.
 
 `promoteAdmins` is an Action whose input is the list and the database's identity. It does not undo a demotion made in the admin while the list is unchanged.
 
@@ -126,6 +136,13 @@ Description, mounting, migrations and references live in one folder of `shoemake
 - [Wired by hand now, then again by generators] → Accepted: the second wiring deletes the first, and is right.
 - [Adopting the core changes behavior: promotion keeps other roles, users and plan data load separately, writes need a listed origin, the audit cursor no longer skips entries with one timestamp] → Listed in the changeset.
 - [Projects pin older Effect, Alchemy and Foldkit] → Each upgrades before adopting. Foldkit 0.171 requires result messages on every command.
+- [Cloudflare does not document that D1's REST API, which the deploy-time client uses, runs a batch atomically] → Proven for the binding and for local workerd, not hosted. The record is last in the batch, so an interruption that is not rolled back makes the next deploy fail on the repeated column, loudly. Checked on the first adoption deploy (4.3).
+- [With Better Auth's cookie cache, a banned user's public requests may pass until it expires] → Admin endpoints read the database. The Foldkit project has no such cache; the React project does, so `extend-admin-users` decides.
+- [An impersonated session can mint what other plugins offer, such as API keys, that outlive it] → Projects refuse it with `impersonatedBy`, as the Foldkit project already does.
+- [Better Auth's adapter sorts by one field, so users created in one instant have no stable order across pages] → Accepted.
+- [Searching for `%`, `_` or `\` scans every match, since Better Auth escapes no wildcard] → Accepted: admin only.
+- [Signing out of an impersonated session ends it without an entry; only the stop endpoint records] → As in the Foldkit project today.
+- [The startup check reads an Effect-internal shape, and the plugin an adapter's methods] → Both fail at startup or in tests when those change, never silently open.
 - [Better Auth minor releases change admin routes] → The wrapper denies by prefix, and a test lists the installed plugin's routes.
 - [Cookies cross subdomains when deployed but not under `alchemy dev`, where each app has its own localhost port] → The listed origins include the dev ones; the impersonation scenario is checked deployed.
 - [Roles can't be changed through the API until `extend-admin-users`] → The Foldkit project has no such page; `ADMIN_EMAILS` grants the first admins.

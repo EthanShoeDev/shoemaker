@@ -5,10 +5,23 @@
   "type": "module",
   "exports": {
     "./cli-utils": "./src/cli-utils.ts",
+    "./testing/assertions": "./src/testing/assertions.ts",
+    "./testing/browser-bundle": "./src/testing/browser-bundle.ts",
+    "./testing/databases": "./src/testing/databases.ts",
+    "./testing/import-graph": "./src/testing/import-graph.ts",
+    "./testing/install": "./src/testing/install.ts",
+    "./testing/postgres": "./src/testing/postgres.ts",
     "./ts-utils": "./src/ts-utils.ts",
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@alchemy.run/cloudflare": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-d1": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "@effect/sql-pglite": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
+    "@effect/vitest": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {

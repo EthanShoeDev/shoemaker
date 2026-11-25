@@ -1,0 +1,38 @@
+{
+  "recordedFrom": "@sentry/cloudflare",
+  "answer": {
+    "status": 200
+  },
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/orders?id=4711&token=query-secret",
+        "headers": {
+          "authorization": "Bearer header-secret",
+          "cookie": "theme=dark; session=cookie-secret",
+          "content-type": "application/json",
+          "user-agent": "recorder/1.0",
+          "x-forwarded-for": "203.0.113.7",
+          "cf-connecting-ip": "203.0.113.7"
+        },
+        "body": "{\"item\":\"book\",\"password\":\"body-secret\",\"card\":\"4111111111111111\"}"
+      },
+      "worker": {
+        "status": 200,
+        "says": "captured"
+      },
+      "sent": [
+        {
+          "method": "POST",
+          "url": "https://ingest.test/api/1/envelope/?sentry_version=7&sentry_key=00112233445566778899aabbccddeeff&sentry_client=sentry.javascript.cloudflare%2F11.17.0",
+          "headers": {
+            "content-type": "text/plain;charset=UTF-8",
+            "user-agent": "sentry.javascript.cloudflare/11.17.0"
+          },
+          "body": "{\"event_id\":\"00000000000000000000000000000001\",\"sent_at\":\"2023-11-14T22:13:20.500Z\",\"sdk\":{\"name\":\"sentry.javascript.cloudflare\",\"version\":\"11.17.0\"},\"trace\":{\"environment\":\"production\",\"public_key\":\"00112233445566778899aabbccddeeff\",\"trace_id\":\"00000000000000000000000000000002\"}}\n{\"type\":\"event\"}\n{\"exception\":{\"values\":[{\"type\":\"Error\",\"value\":\"With a request\",\"stacktrace\":{\"frames\":[{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"withScope2\",\"lineno\":1283,\"colno\":14,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"Object.withScope\",\"lineno\":7705,\"colno\":25,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"?\",\"lineno\":7709,\"colno\":14,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"?\",\"lineno\":3791,\"colno\":12,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"?\",\"lineno\":9642,\"colno\":26,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"?\",\"lineno\":9813,\"colno\":14,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"?\",\"lineno\":11645,\"colno\":21,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"Object.fetch\",\"lineno\":12356,\"colno\":23,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"request-nothing\",\"lineno\":12237,\"colno\":22,\"in_app\":true,\"abs_path\":\"/worker.js\"},{\"filename\":\"worker.js\",\"module\":\"worker\",\"function\":\"failure\",\"lineno\":12183,\"colno\":28,\"in_app\":true,\"abs_path\":\"/worker.js\"}]},\"mechanism\":{\"type\":\"generic\",\"handled\":true}}]},\"event_id\":\"00000000000000000000000000000001\",\"level\":\"error\",\"platform\":\"javascript\",\"contexts\":{\"trace\":{\"trace_id\":\"00000000000000000000000000000002\",\"span_id\":\"0000000000000003\"},\"cloud_resource\":{\"cloud.provider\":\"cloudflare\"},\"culture\":{},\"runtime\":{\"name\":\"cloudflare\"}},\"timestamp\":1700000000.5,\"environment\":\"production\",\"sdk\":{\"integrations\":[\"Dedupe\",\"EventFilters\",\"FunctionToString\",\"ConversationId\",\"LinkedErrors\",\"Fetch\",\"HttpServer\",\"RequestData\",\"Console\",\"SpanStreaming\"],\"name\":\"sentry.javascript.cloudflare\",\"version\":\"11.17.0\",\"packages\":[{\"name\":\"npm:@sentry/cloudflare\",\"version\":\"11.17.0\"}]},\"request\":{\"method\":\"POST\",\"url\":\"http://shop.test/orders\"}}"
+        }
+      ]
+    }
+  ]
+}

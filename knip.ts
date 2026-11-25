@@ -19,6 +19,19 @@ export default defineKnipConfig({
     // Not imported: pinned so installs of the published package resolve
     // @effect/platform-bun's `^` range to the same version as `effect`.
     'packages/cli': { ignoreDependencies: ['@effect/platform-node-shared'] },
+    'packages/edgehog': {
+      // Run by path: the recorder, the Worker it bundles, the benchmark, and
+      // what a test runs under Bun.
+      entry: [
+        'scripts/record-sentry.ts',
+        'scripts/sentry/worker.ts',
+        'bench/local.ts',
+        'bench/scratch/alchemy.run.ts',
+        'bench/scratch/drive.ts',
+        'test/support/bun-smoke.ts',
+        'test/workers/{run,plain,kept,alchemy}.ts',
+      ],
+    },
     'packages/spanoptic': {
       ignoreDependencies: ['@effect/platform-node-shared'],
     },

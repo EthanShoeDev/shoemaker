@@ -54,6 +54,8 @@
           git
           gh
           alejandra
+          # packages/admin's tests start a throwaway server from it.
+          postgresql
           # The OpenSpec bun.lock pins, as the command its skills call.
           (writeShellScriptBin "openspec" ''
             root="$(git rev-parse --show-toplevel)" || exit 1

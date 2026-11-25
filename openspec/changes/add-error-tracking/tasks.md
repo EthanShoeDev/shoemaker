@@ -4,10 +4,10 @@ Tasks marked **[Foldkit project]** happen in that repo's own checkout, never in 
 
 ## 1. Package and proofs
 
-- [ ] 1.1 Scaffold `packages/edgehog` at 0.1.0 if `add-feature-flags` has not, in the products' changesets group, with the subpaths in design.md; verify `bun install` and `lint:check` pass, and an install test that pulls no UI framework and no Cloudflare package
-- [ ] 1.2 Record fixtures from the pinned Sentry Cloudflare SDK with a refresh script, its retries included, and find out whether it can send through a service binding; verify the script reproduces them, with the finding recorded in design.md
-- [ ] 1.3 Limits with their defaults and recorded prices, and the test that computes the worst case and that cleanup keeps up; verify it fails when a default is raised past the amount, and update design.md's figures from it
-- [ ] 1.4 A benchmark of the collector and the atomic write with a fixed number of occurrences: one hot issue, many issues, details and counts; verify it runs locally on D1, SQLite and Postgres, that its own cost is computed first, and that it stops by itself
+- [x] 1.1 Scaffold `packages/edgehog` at 0.1.0 if `add-feature-flags` has not, in the products' changesets group, with the subpaths in design.md; verify `bun install` and `lint:check` pass, and an install test that pulls no UI framework and no Cloudflare package
+- [x] 1.2 Record fixtures from the pinned Sentry Cloudflare SDK with a refresh script, its retries included, and find out whether it can send through a service binding; verify the script reproduces them, with the finding recorded in design.md
+- [x] 1.3 Limits with their defaults and recorded prices, and the test that computes the worst case and that cleanup keeps up; verify it fails when a default is raised past the amount, and update design.md's figures from it
+- [x] 1.4 A benchmark of the collector and the atomic write with a fixed number of occurrences: one hot issue, many issues, details and counts; verify it runs locally on D1, SQLite and Postgres, that its own cost is computed first, and that it stops by itself
 - [ ] 1.5 **[Ethan]** Deploy the benchmark to a scratch stage and destroy it after; record the numbers and the D1 rows really written in design.md, and whether blocked requests were billed. Groups 2 to 4 start only then; revise design.md if the collector or D1 does not keep up
 
 ## 2. Storage and limits
