@@ -54,6 +54,23 @@ Config gains `auth`, an `admin` role on an app and a `modules` map; `init`, `syn
 - Under `alchemy dev` cookies stay on localhost; deployed they cross subdomains. A TanStack Start admin gets the forwarding route, a Foldkit one the zone route.
 - Generate the ingest Worker's edge rule only into a ruleset the project owns, since Alchemy's resource owns a zone's whole phase. `doctor` reports an ingest Worker with a `workers.dev` address and no such rule.
 
+### Database and ORM selector
+
+A project picks the SQL library of an API. Independent of the products, and possible rather than decided. What the candidates do today is under "Open question: the SQL library".
+
+- Options: `drizzle`, `effect-orm`, and none, which is plain `SqlClient` and what a config without the key means.
+- Shoemaker generates no database today, so the database is the first choice and the ORM the second. One key on an `effect-api` app holds both, say `database: { kind: 'd1', orm: 'effect-orm' }`: an API owns its database, and one repo may have several. `schema.ts` refuses pairs that cannot work, as it does for `api`.
+- D1 on a `worker` API comes first, since both adopters run it. Postgres follows, and brings a second runtime and a dev database.
+- Generated: the dependencies, a schema with one table, one query through the existing `HttpApi`, a test on local SQLite or Miniflare, migrations that Alchemy's D1 resource applies, and an `AGENTS.md` line naming the library. Schema and queries are seeds, so switching later is a migration by hand.
+- Both write drizzle-kit 1.0 folders, so the infra generator needs one path. Drizzle's are generated at deploy by Alchemy's `Drizzle.Schema`; effect-orm's by `effect-orm generate`, whose folder `check` needs a CI step.
+- The wizard says what `effect-orm` lacks on SQLite (foreign keys, CHECK, AUTOINCREMENT, partial indexes).
+- `adopt` infers the option from dependencies. `doctor` compares it with them.
+- Products work with every option: they use `SqlClient` only.
+- With `auth`, D1 gives Better Auth the raw binding under every option. Drizzle also has its adapter, when the tables should live in the Drizzle schema.
+- Versions: the Effect drivers are in `drizzle-orm` 1.0, under `rc` on npm; `latest` is 0.45. `update-versions.ts` reads only `latest`, so it leaves an rc pin alone (it never downgrades) and someone moves it by hand until 1.0 is `latest`.
+- A preset per option in `packages/cli/test/presets.ts`.
+- Wait until effect-orm 1.0.0 is out and its port in the Foldkit project has been judged. Drizzle needs no such wait, since the React project runs it, but the key is designed for both at once.
+
 ### Agents (was step 6)
 
 Keys that belong to a user, MCP and a CLI for issues.
@@ -106,6 +123,37 @@ Performance tracing was out of scope. It is open, because Effect programs alread
 - Effect has an OTLP exporter, and a proxy that forwards payloads undecoded, so receiving OTLP needs a decoder of ours. `shoemaker-spanoptic` shows spans in process and receives none.
 - Spans outnumber errors by orders of magnitude, so the storage and sampling that suit errors may not suit them.
 - The alternative is linking an error's trace id to a tracing service the project already has.
+
+## Open question: the SQL library
+
+Researched 2026-11-25; nothing is adopted. Ran: Effect 4.1.5, Better Auth 1.7.28, `better-auth-effect` 1.0.1, `drizzle-orm` 1.0.0-rc.6, `@maple-dev/effect-orm` 0.11.0, on Postgres 18 and Miniflare's D1. Versions move fast here, so check again before acting.
+
+**One connection for the app and Better Auth.** Better Auth's Drizzle adapter awaits promises and cannot take an Effect Drizzle client; support was [declined](https://github.com/better-auth/better-auth/issues/7234).
+
+- Postgres: [`better-auth-effect`](https://github.com/alex-golubev/better-auth-effect-adapter) runs Better Auth on the app's `SqlClient`. With Drizzle's `effect-postgres` and with effect-orm, 60 concurrent calls stayed within a pool of 5, and a rollback undid the sign-up.
+  - Auth calls go through `EffectSqlAdapter.bind`. A plain `Effect.tryPromise` escaped the transaction, and the user stayed.
+  - Better Auth's `after` hooks run before the outer transaction commits.
+  - Small, with one main author: pin or vendor it.
+- Postgres, official packages only: one pool of `drizzle-orm/postgres` behind both a promise client and an Effect client. It shares the pool but not the transaction. Its Effect client [connects eagerly](https://github.com/drizzle-team/drizzle-orm/issues/6708) and [runs after-commit hooks early](https://github.com/drizzle-team/drizzle-orm/issues/6731).
+- D1: `better-auth-effect` fails at sign-up, which opens a transaction. Keep the official adapter on the raw binding: there is no pool to share.
+
+**[effect-orm](https://effect-orm.maple.dev)** is the candidate for queries. It runs on any `SqlClient`, column types are Schemas, rows are decoded, and errors are typed.
+
+- Ran on D1: a conditional insert as a quota, filters, aggregates, and a `Db.batch` that rolled back whole. `Db.transaction` fails with a typed error there, before sending anything.
+- Not run: Alchemy's D1 client (it has the `batch` that effect-orm looks for), bundle size, and how the types feel, since the trial code was loosely typed.
+- SQLite tables cannot declare foreign keys, CHECK, AUTOINCREMENT or partial indexes, and effect-orm does not apply SQLite migrations. It generates drizzle-kit 1.0 folders, which Alchemy's D1 resource applies.
+- A table is `external: true` when something else owns its DDL, so queries can be adopted without moving migrations.
+- Alpha, MIT, first published October 2026, two main authors; its known users, Maple and Hazel, are its own company's. [1.0.0](https://github.com/MapleTechLabs/effect-orm/pull/146) was open.
+
+Leaning:
+
+- The Foldkit project first: it has plain SQL on D1, SQL migrations and no foreign keys, so external tables change only queries. Start with one read-mostly store.
+- The React project stays on Drizzle: its tables need foreign keys and AUTOINCREMENT.
+- Products here stay on plain `SqlClient`, so no host has to take an ORM. `Db.batch` and our `AtomicWrites` do the same job.
+
+Before deciding: 1.0.0 is out, one store in the Foldkit project has been ported with its tests, and the Worker's size before and after is known.
+
+Others looked at: `effect-qb` (one main author, requires `effect <4.1`), TypeSQL (SQL strings; repo from October 2026, already v9), `effect-linq` (one day of commits, Postgres only), `@effect/sql-drizzle` (Effect 3 only).
 
 ## Out of scope
 
