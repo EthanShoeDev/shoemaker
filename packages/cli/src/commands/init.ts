@@ -728,7 +728,7 @@ export const runInit = Effect.fnUntraced(function* (input: InitInput) {
     }
   }
 
-  const relative = path.relative(process.cwd(), root);
+  const relative = path.relative(path.resolve(), root);
   const cd = Str.startsWith('..')(relative) ? root : relative;
   yield* Console.log(
     Arr.join(

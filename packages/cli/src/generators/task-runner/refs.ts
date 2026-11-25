@@ -1,4 +1,4 @@
-import { Option, pipe, String as Str } from 'effect';
+import { Array as Arr, Option, pipe, String as Str } from 'effect';
 
 import type { TaskDef } from './model.ts';
 
@@ -43,7 +43,7 @@ const union = (
 ) =>
   a === undefined && b === undefined
     ? undefined
-    : [...new Set([...(a ?? []), ...(b ?? [])])];
+    : Arr.dedupe([...(a ?? []), ...(b ?? [])]);
 
 // Two generators may contribute the same task (an app adding outputs to
 // `build`): arrays union, later scalars win.

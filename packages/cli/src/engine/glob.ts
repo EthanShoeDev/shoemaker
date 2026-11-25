@@ -1,26 +1,12 @@
-// Minimal glob matcher for `--force <glob>` (`**`, `*`, `?`), so the engine
-// does not depend on Bun-only APIs.
-import { Array as Arr, Option, String as Str } from 'effect';
+import { Array as Arr, Glob } from 'effect';
 
-const toRegExp = (glob: string) => {
-  const charAt = (i: number) => Option.getOrElse(Str.charAt(glob, i), () => '');
-  let source = '';
-  for (let i = 0; i < glob.length; i++) {
-    const char = charAt(i);
-    if (char === '*' && charAt(i + 1) === '*') {
-      const slash = charAt(i + 2) === '/';
-      source += slash ? '(?:.*/)?' : '.*';
-      i += slash ? 2 : 1;
-    } else if (char === '*') {
-      source += '[^/]*';
-    } else if (char === '?') {
-      source += '[^/]';
-    } else {
-      source += Str.replaceAll(/[.+^${}()|[\]\\]/gu, '\\$&')(char);
-    }
-  }
-  return new RegExp(`^${source}$`, 'u');
-};
+// FileSystem.glob's syntax, dotfiles included. Experimental in Effect, so this
+// is the one place that uses it.
+// oxlint-disable-next-line effecttsgo/experimental-api-usage -- wrapped here only; FileSystem.glob shares its matcher
+const compile = (glob: string) => Glob.make(glob, { dot: true });
 
 export const matchesAny = (path: string, globs: ReadonlyArray<string>) =>
-  Arr.some(globs, (glob) => toRegExp(glob).test(path));
+  Arr.some(globs, (glob) =>
+    // oxlint-disable-next-line effecttsgo/experimental-api-usage -- wrapped here only; FileSystem.glob shares its matcher
+    Glob.match(compile(glob), path),
+  );

@@ -10,7 +10,7 @@ import {
 } from 'effect';
 
 import { isGitignored, sourceFiles } from '../checks/sources.ts';
-import { isRecord, parseJsonc } from '../checks/workspace.ts';
+import { parseJsonc } from '../engine/json.ts';
 import type { Repo } from '../engine/repo.ts';
 import { fail, globAll, listSome, pass } from './shared.ts';
 import type { DoctorCheck, Finding } from './types.ts';
@@ -83,7 +83,7 @@ const findSecrets = (
     return Arr.flatMap(value, (item, index) =>
       findSecrets(item, [...path, String(index)]),
     );
-  if (isRecord(value)) {
+  if (Predicate.isObject(value)) {
     return Arr.flatMap(Rec.toEntries(value), ([key, item]) =>
       findSecrets(item, [...path, key]),
     );

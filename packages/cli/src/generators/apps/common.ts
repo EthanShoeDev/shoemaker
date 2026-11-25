@@ -35,9 +35,8 @@ export const effectTestDevDependencies = [
 
 // Catalog names for a package: its own deps plus the tsconfig base that
 // `workspacePackageJson` always adds.
-export const catalogOf = (...groups: ReadonlyArray<ReadonlyArray<string>>) => [
-  ...new Set([...groups.flat(), 'shoemaker-typescript-config']),
-];
+export const catalogOf = (...groups: ReadonlyArray<ReadonlyArray<string>>) =>
+  Arr.dedupe([...groups.flat(), 'shoemaker-typescript-config']);
 
 export const mergeContributions = (
   contributions: ReadonlyArray<Contribution>,
@@ -45,7 +44,7 @@ export const mergeContributions = (
   files: Arr.flatMap(contributions, (c) => c.files ?? []),
   tasks: Arr.flatMap(contributions, (c) => c.tasks ?? []),
   env: Arr.flatMap(contributions, (c) => c.env ?? []),
-  catalog: [...new Set(Arr.flatMap(contributions, (c) => c.catalog ?? []))],
+  catalog: Arr.dedupe(Arr.flatMap(contributions, (c) => c.catalog ?? [])),
   nixPackages: Arr.flatMap(contributions, (c) => c.nixPackages ?? []),
   gitignore: Arr.flatMap(contributions, (c) => c.gitignore ?? []),
   ignore: Arr.flatMap(contributions, (c) => c.ignore ?? []),

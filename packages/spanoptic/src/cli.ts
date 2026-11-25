@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Spanoptic CLI - TUI OTEL visualizer for Effect programs
+ * Spanoptic CLI - TUI trace visualizer for Effect programs
  *
  * Usage:
  *   spanoptic demo [--output <file>]  - Run a demo trace visualization
@@ -91,10 +91,10 @@ const replayCommand = Command.make(
 
 const spanoptic = Command.make('spanoptic', {}, () =>
   Console.log(
-    'Spanoptic - TUI OTEL visualizer for Effect programs\n\nUse --help to see available commands.',
+    'Spanoptic - TUI trace visualizer for Effect programs\n\nUse --help to see available commands.',
   ),
 ).pipe(
-  Command.withDescription('TUI OTEL visualizer for Effect programs'),
+  Command.withDescription('TUI trace visualizer for Effect programs'),
   Command.withSubcommands([demoCommand, replayCommand]),
 );
 

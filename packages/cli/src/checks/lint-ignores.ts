@@ -3,6 +3,7 @@ import { Array as Arr, Effect, Order, String as Str } from 'effect';
 import type { Repo } from '../engine/repo.ts';
 import { sourceFiles } from './sources.ts';
 import type { RepoCheck } from './types.ts';
+import { countsOf } from './workspace.ts';
 
 // Report of every lint/format/type disable directive and whether it says why.
 // A directive without a reason is the thing reviewers cannot judge.
@@ -80,20 +81,8 @@ const runLintIgnores = Effect.fnUntraced(function* (repo: Repo) {
     if (source !== undefined) directives.push(...findDirectives(file, source));
   }
   const undescribed = Arr.filter(directives, (d) => !d.described);
-  const count = (key: (d: Directive) => string) => {
-    const counts = new Map<string, number>();
-    for (const d of directives)
-      counts.set(key(d), (counts.get(key(d)) ?? 0) + 1);
-    return Arr.sort(
-      [...counts],
-      Order.flip(
-        Order.mapInput(
-          Order.Number,
-          (entry: readonly [string, number]) => entry[1],
-        ),
-      ),
-    );
-  };
+  const count = (key: (d: Directive) => string) =>
+    countsOf(Arr.map(directives, key));
 
   const lines = [
     '# Lint Ignore Report',

@@ -39,8 +39,6 @@ export const deepMerge = (
       : value,
   );
 
-const uniq = (values: ReadonlyArray<string>) => [...new Set(values)];
-
 const aggregate = (contributions: ReadonlyArray<Contribution>): Aggregate => ({
   tasks: Arr.flatMap(contributions, (c) => c.tasks ?? []),
   env: [
@@ -52,12 +50,14 @@ const aggregate = (contributions: ReadonlyArray<Contribution>): Aggregate => ({
     ).values(),
   ],
   catalog: Arr.sort(
-    uniq(Arr.flatMap(contributions, (c) => c.catalog ?? [])),
+    Arr.dedupe(Arr.flatMap(contributions, (c) => c.catalog ?? [])),
     Str.Order,
   ),
-  nixPackages: uniq(Arr.flatMap(contributions, (c) => c.nixPackages ?? [])),
-  gitignore: uniq(Arr.flatMap(contributions, (c) => c.gitignore ?? [])),
-  ignore: uniq(Arr.flatMap(contributions, (c) => c.ignore ?? [])),
+  nixPackages: Arr.dedupe(
+    Arr.flatMap(contributions, (c) => c.nixPackages ?? []),
+  ),
+  gitignore: Arr.dedupe(Arr.flatMap(contributions, (c) => c.gitignore ?? [])),
+  ignore: Arr.dedupe(Arr.flatMap(contributions, (c) => c.ignore ?? [])),
 });
 
 const mergeFiles = (

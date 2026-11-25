@@ -1,7 +1,7 @@
 {
   "name": "shoemaker-spanoptic",
   "version": "0.0.3",
-  "description": "TUI OTEL visualizer for Effect programs",
+  "description": "TUI trace visualizer for Effect programs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EthanShoeDev/shoemaker.git",
@@ -44,12 +44,8 @@
     "postpack": "bun ../../scripts/publish-manifest.ts restore"
   },
   "dependencies": {
-    "@effect/opentelemetry": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node-shared": "catalog:",
-    "@opentelemetry/api": "catalog:",
-    "@opentelemetry/resources": "catalog:",
-    "@opentelemetry/sdk-trace": "catalog:",
     "@opentui/core": "catalog:",
     "effect": "catalog:"
   },

@@ -11,12 +11,12 @@ import {
 
 import { analyzeCatalog } from '../checks/catalog.ts';
 import {
+  admits,
   allManifests,
   catalogOf,
   decodeJsonc,
   hasDep,
   invokes,
-  isRecord,
   kebab,
   majorOf,
   readWorkspace,
@@ -84,7 +84,7 @@ export const turboFixUncached: DoctorCheck = {
       for (const [key, task] of Rec.toEntries(turbo.value.tasks ?? {})) {
         // `"command": null` opts a package out: nothing runs, so nothing caches.
         const runs = !(
-          isRecord(task) &&
+          Predicate.isObject(task) &&
           (task.cache === false || task.command === null)
         );
         if (isFixTask(key) && runs) {
@@ -300,7 +300,7 @@ export const typescript7: DoctorCheck = {
     const old = Arr.filter(versions, (v) => (majorOf(v) ?? 7) < 7);
     if (old.length > 0) {
       findings.push(
-        fail(`typescript ${listSome([...new Set(old)])} (want ^7)`, {
+        fail(`typescript ${listSome(Arr.dedupe(old))} (want ^7)`, {
           fix: 'bump typescript to ^7',
         }),
       );
@@ -322,8 +322,10 @@ const pinnedBun = (flake: string) =>
   /bun[\s\S]{0,400}?version\s*=\s*"(\d+\.\d+\.\d+)"/u.exec(flake)?.[1];
 
 const devEnginesBun = (devEngines: unknown) => {
-  const manager = isRecord(devEngines) ? devEngines.packageManager : undefined;
-  return isRecord(manager) &&
+  const manager = Predicate.isObject(devEngines)
+    ? devEngines.packageManager
+    : undefined;
+  return Predicate.isObject(manager) &&
     manager.name === 'bun' &&
     Predicate.isString(manager.version)
     ? manager.version
@@ -627,7 +629,7 @@ export const shoemakerVersions: DoctorCheck = {
       ({ name, range }) =>
         family.has(name) &&
         !/^(?:catalog|workspace|link|file):/u.test(range) &&
-        !Bun.semver.satisfies(cliVersion, range),
+        !admits(range, cliVersion),
     );
     if (stale.length === 0) {
       return [pass(`shoemaker-* ranges admit ${cliVersion}`)];

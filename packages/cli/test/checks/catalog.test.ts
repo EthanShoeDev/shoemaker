@@ -1,5 +1,12 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, Option, Record as Rec, Schema } from 'effect';
+import {
+  Array as Arr,
+  Effect,
+  Option,
+  Record as Rec,
+  Schema,
+  String as Str,
+} from 'effect';
 
 import { catalogCheck } from '../../src/checks/catalog.ts';
 import { makeMemoryRepo } from '../../src/engine/repo-memory.ts';
@@ -153,6 +160,7 @@ describe('catalog check', () => {
           ),
         )?.content ?? '';
       assert.include(web, '\t"dependencies": {\n\t\t"effect": "catalog:"');
+      assert.strictEqual(web, Str.replace('"4.0.1"', '"catalog:"')(tabbed));
     }),
   );
 });

@@ -4,13 +4,19 @@ import * as BunChildProcessSpawner from '@effect/platform-bun/BunChildProcessSpa
 import * as BunFileSystem from '@effect/platform-bun/BunFileSystem';
 import * as BunPath from '@effect/platform-bun/BunPath';
 import { expect, layer } from '@effect/vitest';
-import { Effect, FileSystem, Layer, Path, Stream } from 'effect';
+import { Effect, FileSystem, Layer, Path, Schema, Stream } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
+const encodeJson = Schema.encodeUnknownEffect(
+  Schema.fromJsonString(Schema.Json),
+);
 const entry = fileURLToPath(new URL('../src/index.ts', import.meta.url));
-const config =
-  `import { defineShoemakerFormat } from ${JSON.stringify(entry)};\n` +
-  'export default defineShoemakerFormat();\n';
+const config = Effect.map(
+  encodeJson(entry),
+  (from) =>
+    `import { defineShoemakerFormat } from ${from};\n` +
+    'export default defineShoemakerFormat();\n',
+);
 const oxfmtBin = fileURLToPath(
   new URL('bin/oxfmt', import.meta.resolve('oxfmt/package.json')),
 );
@@ -33,7 +39,8 @@ layer(services)((it) => {
         prefix: 'shoemaker-oxfmt-config-',
       });
 
-      yield* fs.writeFileString(path.join(dir, 'oxfmt.config.ts'), config);
+      const text = yield* config;
+      yield* fs.writeFileString(path.join(dir, 'oxfmt.config.ts'), text);
       yield* fs.writeFileString(
         path.join(dir, 'probe.ts'),
         'import { z } from "zeta";\nimport { a } from "alpha";\nexport const v = [a, z]\n',

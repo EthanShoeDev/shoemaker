@@ -1,8 +1,6 @@
-// oxlint-disable-next-line effecttsgo/node-builtin-import -- effect's Path has no glob matcher, and Bun.Glob is missing under node vitest.
-import { matchesGlob } from 'node:path';
-
 import { Array as Arr, Effect, Record as Rec, String as Str } from 'effect';
 
+import { matchesAny } from './glob.ts';
 import type { Repo } from './repo.ts';
 
 // In-memory Repo for tests: path -> contents.
@@ -21,7 +19,7 @@ export const makeMemoryRepo = (
   glob: (pattern) =>
     Effect.succeed(
       Arr.sort(
-        Arr.filter(Rec.keys(files), (f) => matchesGlob(f, pattern)),
+        Arr.filter(Rec.keys(files), (f) => matchesAny(f, [pattern])),
         Str.Order,
       ),
     ),

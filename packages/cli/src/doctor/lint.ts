@@ -373,13 +373,11 @@ export const retiredPlugins: DoctorCheck = {
     ];
     for (const path of configs) {
       const source = stripComments((yield* repo.read(path)) ?? '');
-      const rules = [
-        ...new Set(
-          Arr.map([...Str.matchAll(RETIRED)(source)], (m) =>
-            Str.slice(1, -1)(m[0]),
-          ),
+      const rules = Arr.dedupe(
+        Arr.map([...Str.matchAll(RETIRED)(source)], (m) =>
+          Str.slice(1, -1)(m[0]),
         ),
-      ];
+      );
       if (rules.length > 0) {
         findings.push(
           fail(`${path} enables retired rules: ${listSome(rules)}`, {

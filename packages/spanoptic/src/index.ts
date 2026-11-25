@@ -1,15 +1,10 @@
 /**
  * @module shoemaker-spanoptic
  *
- * TUI OTEL visualizer for Effect programs.
+ * TUI trace visualizer for Effect programs.
  * Inspired by Kit Langton's spanoptic.
  */
 
-import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
-import { SpanStatusCode } from '@opentelemetry/api';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { TracerProvider } from '@opentelemetry/sdk-trace';
-import type { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace';
 import {
   BoxRenderable,
   RGBA,
@@ -33,6 +28,7 @@ import {
 } from 'effect';
 import type { Tracer } from 'effect';
 
+import { liveTracer } from './live-tracer.ts';
 import {
   appendLog,
   applySpanEvent,
@@ -40,7 +36,6 @@ import {
   flattenTree,
   formatDuration,
   formatLogMessage,
-  hrTimeToMillis,
 } from './trace.ts';
 import type { LogEntry, SpanEvent, SpanInfo, TraceExport } from './trace.ts';
 
@@ -232,10 +227,12 @@ class SpanopticTUI {
   }
 
   handleEvent(event: SpanEvent) {
-    this.#now = event.type === 'start' ? event.span.startTime : event.endTime;
+    if (event.type === 'start') this.#now = event.span.startTime;
+    if (event.type === 'end') this.#now = event.endTime;
     applySpanEvent(this.#spans, event);
     this.#updateFlatSpans();
     this.render();
+    this.renderDetails();
   }
 
   handleLog(spanId: string, entry: LogEntry) {
@@ -515,64 +512,6 @@ class SpanopticTUI {
   }
 }
 
-const liveSpanProcessor = (
-  onEvent: (event: SpanEvent) => void,
-): SpanProcessor => ({
-  onStart: (span: ReadableSpan) => {
-    onEvent({
-      type: 'start',
-      span: {
-        spanId: span.spanContext().spanId,
-        ...(span.parentSpanContext === undefined
-          ? {}
-          : { parentSpanId: span.parentSpanContext.spanId }),
-        name: span.name,
-        startTime: hrTimeToMillis(span.startTime),
-        endTime: null,
-        status: 'running',
-        attributes: { ...span.attributes },
-        logs: [],
-      },
-    });
-  },
-  onEnd: (span) => {
-    const isError = span.status.code === SpanStatusCode.ERROR;
-    onEvent({
-      type: 'end',
-      spanId: span.spanContext().spanId,
-      endTime: hrTimeToMillis(span.endTime),
-      status: isError ? 'error' : 'ok',
-      errorMessage: isError ? span.status.message : undefined,
-    });
-  },
-  shutdown: () => Promise.resolve(),
-  forceFlush: () => Promise.resolve(),
-});
-
-// Spans reach the TUI through a span processor on a private tracer provider,
-// so tracing is scoped to the visualized program rather than registered
-// globally.
-const tracingLayer = (serviceName: string, processor: SpanProcessor) =>
-  OtelTracer.layer.pipe(
-    Layer.provide(
-      Layer.effect(
-        OtelTracer.OtelTracerProvider,
-        Effect.acquireRelease(
-          Effect.sync(
-            () =>
-              new TracerProvider({
-                resource: resourceFromAttributes({
-                  'service.name': serviceName,
-                }),
-                spanProcessors: [processor],
-              }),
-          ),
-          (provider) => Effect.promise(() => provider.shutdown()),
-        ),
-      ),
-    ),
-  );
-
 // Replaces the console loggers so nothing is printed over the TUI; the tracer
 // logger stays so logs are still recorded as span events.
 const tuiLoggerLayer = (tui: SpanopticTUI) =>
@@ -637,7 +576,7 @@ const runKeys = (
   });
 
 /**
- * Wraps an Effect program with OTEL tracing and visualizes the trace
+ * Wraps an Effect program with tracing and visualizes the trace
  * in a real-time TUI with spinners for active spans.
  *
  * @example
@@ -671,18 +610,12 @@ export const traceVisualize = <A, E, R>(
         tui.tick(now);
       }).pipe(Effect.forever, Effect.forkScoped);
 
-      const processor = liveSpanProcessor((event) => {
+      const tracer = liveTracer((event) => {
         tui.handleEvent(event);
       });
-      // Built in this scope, so the tracer provider outlives the program and
-      // shuts down with the TUI.
-      const services = yield* Layer.build(
-        Layer.mergeAll(
-          tracingLayer(options.serviceName, processor),
-          tuiLoggerLayer(tui),
-        ),
-      );
+      const services = yield* Layer.build(tuiLoggerLayer(tui));
       const result = yield* effect.pipe(
+        Effect.withTracer(tracer),
         Effect.provideContext(services),
         Effect.provideService(References.MinimumLogLevel, 'All'),
       );

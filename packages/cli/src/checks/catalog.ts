@@ -138,7 +138,7 @@ const computeFixes = ({
       isNewerVersion(v.current, pinned)
     ) {
       editor.update(root, (text) =>
-        editJson(text, [...catalogAt, v.depName], v.current, true),
+        editJson(text, [...catalogAt, v.depName], v.current),
       );
       log.push(
         `Updated catalog "${v.depName}": "${pinned}" -> "${v.current}" (newer)`,
@@ -154,7 +154,7 @@ const computeFixes = ({
 
   for (const dep of notInCatalog) {
     editor.update(root, (text) =>
-      editJson(text, [...catalogAt, dep.depName], dep.version, true),
+      editJson(text, [...catalogAt, dep.depName], dep.version),
     );
     log.push(`Added "${dep.depName}": "${dep.version}" to catalog`);
     for (const use of dep.usedIn) {

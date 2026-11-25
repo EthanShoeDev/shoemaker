@@ -1,5 +1,5 @@
 /**
- * Demo of spanoptic - TUI OTEL visualizer for Effect programs.
+ * Demo of spanoptic - TUI trace visualizer for Effect programs.
  *
  * Run with: bun packages/spanoptic/src/demo.ts
  */

@@ -2,6 +2,7 @@ import { BunServices } from '@effect/platform-bun';
 import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Effect, FileSystem, Option, Path, Schema } from 'effect';
 
+import { admits } from '../src/checks/workspace.ts';
 import { shoemakerFamily, versions } from '../src/versions.ts';
 
 const ChangesetConfig = Schema.fromJsonString(
@@ -53,7 +54,7 @@ describe('shoemaker family versions', () => {
           Arr.findFirst(manifests, (pkg) => pkg.name === name),
         );
         assert.isTrue(
-          Bun.semver.satisfies(version, versions[name]),
+          admits(versions[name], version),
           `${name}@${version} is outside ${versions[name]}`,
         );
       }

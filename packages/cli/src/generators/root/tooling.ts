@@ -246,14 +246,12 @@ const jscpdIgnore = [
 export const jscpdConfig: Renderer = (_ctx, aggregate) => [
   ownedJson('.jscpd.json', {
     pattern: '**/*',
-    ignore: [
-      ...new Set([
-        ...jscpdIgnore,
-        ...Arr.map(aggregate.ignore, (glob) =>
-          Str.startsWith('**/')(glob) ? glob : `**/${glob}`,
-        ),
-      ]),
-    ],
+    ignore: Arr.dedupe([
+      ...jscpdIgnore,
+      ...Arr.map(aggregate.ignore, (glob) =>
+        Str.startsWith('**/')(glob) ? glob : `**/${glob}`,
+      ),
+    ]),
     threshold: 0,
     minTokens: 50,
     minLines: 33,

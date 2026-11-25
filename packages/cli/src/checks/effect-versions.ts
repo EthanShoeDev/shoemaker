@@ -15,6 +15,7 @@ import {
 } from './lockfile.ts';
 import type { RepoCheck } from './types.ts';
 import {
+  admits,
   catalogPath,
   editJson,
   majorOf,
@@ -210,9 +211,7 @@ const pinProblems = (packages: ReadonlyArray<LockPackage>, pins: Pins) => {
 // island), and a range that already admits the version needs no edit.
 const isBehind = (pinned: string, expected: string) =>
   majorOf(pinned) === majorOf(expected) &&
-  (EXACT.test(pinned)
-    ? pinned !== expected
-    : !Bun.semver.satisfies(expected, pinned));
+  (EXACT.test(pinned) ? pinned !== expected : !admits(pinned, expected));
 
 // Root catalog pins that disagree with their family's version: the fix
 // moves them, and the next `bun install` resolves the family once.

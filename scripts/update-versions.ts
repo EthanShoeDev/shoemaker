@@ -19,7 +19,10 @@ import {
   Option,
   Path,
   Record as Rec,
+  RegExp as Regex,
+  Result,
   Schema,
+  SemVer,
   String as Str,
 } from 'effect';
 import { Command, Flag } from 'effect/cli';
@@ -77,8 +80,6 @@ const latestOf = (name: string) =>
     (tags) => tags.latest,
   );
 
-const escape = Str.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-
 // `name` -> the constant its entry names (`effect,` or `'x': tanstackRouter`).
 const constantsOf = (source: string) => {
   const literals = new Map(
@@ -112,7 +113,11 @@ const targetSpec = (current: string, latest: string) => {
   const spec = SPEC.exec(current);
   if (spec === null) return undefined;
   const [, operator = '', version = ''] = spec;
-  return Bun.semver.order(latest, version) > 0
+  const newer = Result.map(
+    Result.all([SemVer.parse(latest), SemVer.parse(version)]),
+    ([candidate, pinned]) => SemVer.isGreaterThan(candidate, pinned),
+  );
+  return Result.getOrElse(newer, () => false)
     ? `${operator}${latest}`
     : undefined;
 };
@@ -197,9 +202,9 @@ const proposeChanges = Effect.fnUntraced(function* (source: string) {
 const applyChanges = (source: string, changes: ReadonlyArray<Change>) =>
   Arr.reduce(changes, source, (text, { name, from, to }) => {
     const pattern = Str.startsWith('const ')(name)
-      ? new RegExp(`^(${escape(name)} = )'${escape(from)}';$`, 'mu')
+      ? new RegExp(`^(${Regex.escape(name)} = )'${Regex.escape(from)}';$`, 'mu')
       : new RegExp(
-          `^( {2}(?:'${escape(name)}'|${escape(name)}): )'${escape(from)}',$`,
+          `^( {2}(?:'${Regex.escape(name)}'|${Regex.escape(name)}): )'${Regex.escape(from)}',$`,
           'mu',
         );
     const end = Str.startsWith('const ')(name) ? ';' : ',';

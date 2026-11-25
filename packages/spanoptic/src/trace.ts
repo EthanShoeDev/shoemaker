@@ -43,6 +43,12 @@ export const decodeTraceExport = Schema.decodeEffect(TraceExportJson);
 export type SpanEvent =
   | { readonly type: 'start'; readonly span: SpanInfo }
   | {
+      readonly type: 'attribute';
+      readonly spanId: string;
+      readonly key: string;
+      readonly value: unknown;
+    }
+  | {
       readonly type: 'end';
       readonly spanId: string;
       readonly endTime: number;
@@ -50,7 +56,7 @@ export type SpanEvent =
       readonly errorMessage: string | undefined;
     };
 
-/** Applies a span lifecycle event to the span table; an unknown end is ignored. */
+/** Applies a span lifecycle event to the span table; an unknown span is ignored. */
 export const applySpanEvent = (
   spans: Map<string, SpanInfo>,
   event: SpanEvent,
@@ -61,6 +67,13 @@ export const applySpanEvent = (
   }
   const span = spans.get(event.spanId);
   if (span === undefined) return;
+  if (event.type === 'attribute') {
+    spans.set(event.spanId, {
+      ...span,
+      attributes: { ...span.attributes, [event.key]: event.value },
+    });
+    return;
+  }
   spans.set(event.spanId, {
     ...span,
     endTime: event.endTime,
@@ -127,10 +140,6 @@ export const formatDuration = (ms: number) => {
   if (ms < 1000) return `${ms.toFixed(0)}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
 };
-
-/** OpenTelemetry `[seconds, nanoseconds]` to epoch milliseconds. */
-export const hrTimeToMillis = ([seconds, nanos]: readonly [number, number]) =>
-  seconds * 1000 + nanos / 1_000_000;
 
 /** Joins Effect.log's arguments the way the v3 log collector did. */
 export const formatLogMessage = (message: unknown) => {

@@ -43,7 +43,6 @@
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node-shared": "catalog:",
     "effect": "catalog:",
-    "jsonc-parser": "catalog:",
     "oxfmt": "catalog:",
     "shoemaker-oxfmt-config": "workspace:*"
   },

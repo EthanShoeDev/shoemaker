@@ -1,5 +1,3 @@
-import { pathToFileURL } from 'node:url';
-
 import { Effect, FileSystem, Path, Schema, String as Str } from 'effect';
 
 import { sha256 } from '../engine/hash.ts';
@@ -22,9 +20,11 @@ const importDefault = Effect.fnUntraced(function* (
   file: string,
   source: string,
 ) {
+  const path = yield* Path.Path;
   // The query string defeats the module cache after `add` rewrites the file;
   // keyed by content, as two loads can land in the same millisecond.
-  const url = `${pathToFileURL(file).href}?v=${Str.slice(0, 16)(sha256(source))}`;
+  const fileUrl = yield* path.toFileUrl(file);
+  const url = `${fileUrl.href}?v=${Str.slice(0, 16)(sha256(source))}`;
   return yield* Effect.tryPromise({
     // dynamic-import -- shoemaker.config.ts is user code located at runtime
     try: (): Promise<{ readonly default?: unknown }> => import(url),

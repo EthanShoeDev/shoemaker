@@ -10,7 +10,6 @@ import {
   flattenTree,
   formatDuration,
   formatLogMessage,
-  hrTimeToMillis,
 } from '../src/trace.ts';
 import type { SpanInfo, TraceExport } from '../src/trace.ts';
 
@@ -144,10 +143,6 @@ describe('formatting', () => {
     assert.strictEqual(formatDuration(0.5), '500µs');
     assert.strictEqual(formatDuration(42), '42ms');
     assert.strictEqual(formatDuration(1500), '1.50s');
-  });
-
-  it('converts OpenTelemetry hrtime to milliseconds', () => {
-    assert.strictEqual(hrTimeToMillis([2, 500_000_000]), 2500);
   });
 
   it('joins log arguments, JSON-encoding non-strings', () => {

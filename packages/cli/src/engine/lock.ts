@@ -3,10 +3,11 @@ import {
   Effect,
   Order,
   Record as Rec,
+  Result,
   Schema,
   String as Str,
 } from 'effect';
-import { type ParseError, parse } from 'jsonc-parser';
+import { Json5 } from 'effect/encoding';
 
 import type { Repo } from './repo.ts';
 
@@ -39,14 +40,14 @@ export class LockParseError extends Schema.TaggedError<
 const decodeLock = Schema.decodeUnknownEffect(Lock);
 
 export const parseLock = Effect.fnUntraced(function* (text: string) {
-  const errors: Array<ParseError> = [];
-  const value: unknown = parse(text, errors, { allowTrailingComma: true });
-  if (errors.length > 0) {
+  // Json5 for its trailing commas; Effect's Jsonc rejects them.
+  const parsed = Json5.parse(text);
+  if (Result.isFailure(parsed)) {
     return yield* LockParseError.make({
       message: `${LOCK_PATH} is not valid JSONC`,
     });
   }
-  return yield* decodeLock(value).pipe(
+  return yield* decodeLock(parsed.success).pipe(
     Effect.mapError((issue) =>
       LockParseError.make({ message: `${LOCK_PATH}: ${issue.message}` }),
     ),

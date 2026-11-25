@@ -8,7 +8,7 @@ import {
   String as Str,
 } from 'effect';
 
-import { decodeJsonc, isRecord, readWorkspace } from '../checks/workspace.ts';
+import { decodeJsonc, readWorkspace } from '../checks/workspace.ts';
 import type { Repo } from '../engine/repo.ts';
 
 const TurboJsonc = Schema.Struct({
@@ -24,7 +24,7 @@ const TurboJsonc = Schema.Struct({
 const argvOf = (command: unknown) => {
   const argv = Arr.isArray(command)
     ? command
-    : isRecord(command)
+    : Predicate.isObject(command)
       ? command.javascript
       : undefined;
   return Arr.isArray(argv) && Arr.every(argv, Predicate.isString)

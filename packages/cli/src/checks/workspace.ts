@@ -4,30 +4,20 @@ import {
   Option,
   Order,
   pipe,
-  Predicate,
   Record as Rec,
+  RegExp as Regex,
+  Result,
   Schema,
+  SemVer,
+  SemVerRange,
   String as Str,
 } from 'effect';
-import * as Jsonc from 'jsonc-parser';
 
+import { mergeJson, parseJsonc, parseJsonObject } from '../engine/json.ts';
 import type { Repo } from '../engine/repo.ts';
 
 // Shared readers for doctor checks, repo checks and adopt: they all
 // walk the same package.json files and edit them without reformatting.
-
-export const parseJsonc = (text: string): unknown => {
-  const errors: Array<Jsonc.ParseError> = [];
-  const value: unknown = Jsonc.parse(text, errors, {
-    allowTrailingComma: true,
-  });
-  return errors.length === 0 ? value : undefined;
-};
-
-// Non-null, non-array object (a parsed JSON object).
-export const isRecord = (
-  value: unknown,
-): value is Readonly<Record<string, unknown>> => Predicate.isObject(value);
 
 export const decodeJsonc = <S extends Schema.ConstraintDecoder<unknown>>(
   schema: S,
@@ -122,7 +112,7 @@ export const catalogOf = (pkg: PackageJson) =>
 
 // Where `--fix` writes catalog entries: bun reads `workspaces.catalog` or a
 // top-level `catalog` (the only option when `workspaces` is an array).
-export const catalogPath = (pkg: PackageJson): Jsonc.JSONPath =>
+export const catalogPath = (pkg: PackageJson): ReadonlyArray<string> =>
   pkg.workspaces !== undefined &&
   !isList(pkg.workspaces) &&
   (nestedCatalog(pkg) !== undefined || pkg.catalog === undefined)
@@ -190,70 +180,80 @@ export const scopeOf = (name: string | undefined) =>
     : undefined;
 
 export const kebab = (value: string) => {
-  const slug = pipe(
-    value,
-    Str.replaceAll(/([a-z0-9])([A-Z])/gu, '$1-$2'),
-    Str.toLowerCase,
-    Str.replaceAll(/[^a-z0-9]+/gu, '-'),
-    Str.replaceAll(/^-+|-+$/gu, ''),
-  );
+  // Not Str.kebabCase: that splits digits off too (`web2` -> `web-2`), and
+  // keeps letters package names cannot have.
+  const slug = Str.noCase(value, {
+    delimiter: '-',
+    splitRegExp: /([a-z0-9])([A-Z])/gu,
+    stripRegExp: /[^A-Za-z0-9]+/gu,
+  });
   return /^[a-z]/u.test(slug) ? slug : `x-${slug}`;
 };
 
-// Minimal semver-ish ordering: compares the first `x.y.z` in each string and
-// ignores prerelease tags, enough to decide whether a pin is newer.
-const numbers = (version: string) =>
-  Option.getOrUndefined(
-    Option.map(
-      Option.fromNullOr(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/u.exec(version)),
-      (match) => Arr.map(match.slice(1), (part) => Number(part ?? 0)),
+// The version a spec names (`^7`, `~1.2`, `>=1.2.3-rc.1`), missing parts as 0.
+// SemVer.parse takes exact versions only and SemVerRange has no lower bound.
+const SPEC = /(\d+)(?:\.(\d+))?(?:\.(\d+)(-[0-9A-Za-z.-]+)?)?/u;
+
+const versionOf = (spec: string) =>
+  Option.fromNullOr(SPEC.exec(spec)).pipe(
+    Option.flatMap(([, major = '0', minor = '0', patch = '0', pre = '']) =>
+      Result.getSuccess(SemVer.parse(`${major}.${minor}.${patch}${pre}`)),
     ),
   );
 
-export const isNewerVersion = (a: string, b: string) => {
-  const left = numbers(a);
-  const right = numbers(b);
-  if (left === undefined || right === undefined) return false;
-  for (let index = 0; index < 3; index += 1) {
-    const diff = (left[index] ?? 0) - (right[index] ?? 0);
-    if (diff !== 0) return diff > 0;
-  }
-  return false;
-};
+export const isNewerVersion = (a: string, b: string) =>
+  Option.getOrElse(
+    Option.zipWith(versionOf(a), versionOf(b), SemVer.isGreaterThan),
+    () => false,
+  );
 
-export const majorOf = (version: string) => numbers(version)?.[0];
+// Whether a range admits a version. A spec that is not a range (`latest`, a
+// URL) makes no claim, so it admits anything.
+export const admits = (range: string, version: string) =>
+  Result.match(Result.all([SemVerRange.parse(range), SemVer.parse(version)]), {
+    onFailure: () => true,
+    onSuccess: ([parsedRange, parsed]) =>
+      SemVerRange.matches(parsedRange, parsed),
+  });
 
-const indentOf = (text: string) => {
-  const match = /\n([ \t]+)"/u.exec(text);
-  const indent = match?.[1] ?? '  ';
-  return Str.startsWith('\t')(indent)
-    ? { insertSpaces: false, tabSize: 1 }
-    : { insertSpaces: true, tabSize: indent.length };
-};
+export const majorOf = (version: string) =>
+  Option.getOrUndefined(
+    Option.map(versionOf(version), (parsed) => parsed.major),
+  );
 
-// Sets (or, with `undefined`, removes) the value at `path`, keeping the rest of
-// the file byte-for-byte. New keys are inserted in alphabetical position when
-// `sorted` is set (catalogs, dependency maps).
+const indentOf = (text: string) => /\n([ \t]+)"/u.exec(text)?.[1] ?? '  ';
+
+// Sets the value at `path` in a package.json, keeping its key order, indent,
+// line endings and final newline. A new key goes in sorted position when the
+// map around it is sorted (catalogs).
 export const editJson = (
   text: string,
-  path: Jsonc.JSONPath,
-  value: unknown,
-  sorted = false,
+  path: ReadonlyArray<string>,
+  value: string,
 ) => {
-  const key = path.at(-1);
-  const edits = Jsonc.modify(text, path, value, {
-    formattingOptions: { ...indentOf(text), eol: '\n' },
-    ...(sorted && Predicate.isString(key)
-      ? {
-          getInsertionIndex: (properties: Array<string>) =>
-            Option.getOrElse(
-              Arr.findFirstIndex(properties, (property) => property > key),
-              () => properties.length,
-            ),
-        }
-      : {}),
+  const existing = parseJsonObject(text);
+  if (existing === undefined) return text;
+  const [first = '', ...rest] = path;
+  const owned = {
+    [first]: Arr.reduceRight(rest, value as unknown, (inner, key) => ({
+      [key]: inner,
+    })),
+  };
+  const JsonText = Schema.fromJsonString(Schema.Json, {
+    space: indentOf(text),
   });
-  return Jsonc.applyEdits(text, edits);
+  return Option.match(
+    Schema.encodeUnknownOption(JsonText)(mergeJson(existing, owned)),
+    {
+      onNone: () => text,
+      onSome: (json) => {
+        const edited = Str.endsWith('\n')(text) ? `${json}\n` : json;
+        return Str.includes('\r\n')(text)
+          ? Str.replaceAll('\n', '\r\n')(edited)
+          : edited;
+      },
+    },
+  );
 };
 
 // Accumulates edits to many files so several fixes can touch one file.
@@ -294,10 +294,7 @@ const COMMAND_START = String.raw`(^|[\s;&|(]|&&|\|\|)`;
 // Matches `tool` as a command word inside a script (not `effect-tsgo`, not
 // `oxlint-tsgolint`).
 export const commandWord = (tool: string) =>
-  new RegExp(
-    String.raw`${COMMAND_START}${Str.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`)(tool)}(?=\s|$)`,
-    'u',
-  );
+  new RegExp(String.raw`${COMMAND_START}${Regex.escape(tool)}(?=\s|$)`, 'u');
 
 export const invokes = (script: string, tool: string) =>
   commandWord(tool).test(script);
@@ -311,16 +308,13 @@ export const stripComments = (source: string) =>
     Str.replaceAll(/(^|[^:'"`\\])\/\/.*$/gmu, '$1'),
   );
 
-// The workspace scope (most common `@x/` among packages), never `repo`.
-export const scopeFor = (workspace: Workspace) => {
-  const counts = new Map<string, number>();
-  for (const manifest of workspace.packages) {
-    const scope = scopeOf(manifest.pkg.name);
-    if (scope !== undefined && scope !== 'repo')
-      counts.set(scope, (counts.get(scope) ?? 0) + 1);
-  }
-  const [best] = Arr.sort(
-    counts,
+// Each distinct string with how often it occurs, most frequent first.
+export const countsOf = (values: ReadonlyArray<string>) =>
+  Arr.sort(
+    Arr.map(
+      Rec.toEntries(Arr.groupBy(values, (value) => value)),
+      ([value, group]) => [value, group.length] as const,
+    ),
     Order.flip(
       Order.mapInput(
         Order.Number,
@@ -328,6 +322,14 @@ export const scopeFor = (workspace: Workspace) => {
       ),
     ),
   );
+
+// The workspace scope (most common `@x/` among packages), never `repo`.
+export const scopeFor = (workspace: Workspace) => {
+  const scopes = Arr.flatMap(workspace.packages, (manifest) => {
+    const scope = scopeOf(manifest.pkg.name);
+    return scope === undefined || scope === 'repo' ? [] : [scope];
+  });
+  const [best] = countsOf(scopes);
   const rootName = workspace.root.pkg.name ?? 'project';
   return kebab(
     best?.[0] ?? scopeOf(rootName) ?? Str.replace(/^@[^/]+\//u, '')(rootName),

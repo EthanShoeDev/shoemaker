@@ -1,13 +1,17 @@
 import {
   Array as Arr,
   Effect,
+  Option,
   Predicate,
   Record as Rec,
   Result,
+  Schema,
   String as Str,
 } from 'effect';
+import { Yaml } from 'effect/encoding';
 
-import { hasDep, isRecord, parseJsonc } from '../checks/workspace.ts';
+import { hasDep } from '../checks/workspace.ts';
+import { parseJsonc } from '../engine/json.ts';
 import {
   OPENSPEC_PACKAGE,
   openspecSkillFiles,
@@ -57,10 +61,10 @@ const CLOUDFLARE_DEPS = ['@alchemy.run/cloudflare', 'wrangler'];
 
 const mcpUrls = (text: string | undefined) => {
   const config = parseJsonc(text ?? '');
-  const servers = isRecord(config) ? config.mcpServers : undefined;
-  return isRecord(servers)
+  const servers = Predicate.isObject(config) ? config.mcpServers : undefined;
+  return Predicate.isObject(servers)
     ? Arr.filterMap(Rec.values(servers), (server) =>
-        isRecord(server) && Predicate.isString(server.url)
+        Predicate.isObject(server) && Predicate.isString(server.url)
           ? Result.succeed(server.url)
           : Result.failVoid,
       )
@@ -89,7 +93,10 @@ export const cloudflareObservabilityMcp: DoctorCheck = {
   }),
 };
 
-const PROJECT_SCOPE = /^skillsScope:\s*['"]?project['"]?\s*(?:#.*)?$/mu;
+const parseYaml = Option.liftThrowable(Yaml.parse);
+const decodeProjectScope = Schema.decodeUnknownOption(
+  Schema.Struct({ skillsScope: Schema.Literal('project') }),
+);
 
 // Only repos that use OpenSpec: one that doesn't should carry none of it.
 export const openspec: DoctorCheck = {
@@ -100,7 +107,7 @@ export const openspec: DoctorCheck = {
     const config = yield* repo.read('openspec/config.yaml');
     if (config === undefined) return [];
     const findings: Array<Finding> = [];
-    if (!PROJECT_SCOPE.test(config)) {
+    if (Option.isNone(Option.flatMap(parseYaml(config), decodeProjectScope))) {
       findings.push(
         fail('openspec/config.yaml lacks `skillsScope: project`', {
           path: 'openspec/config.yaml',

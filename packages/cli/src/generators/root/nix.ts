@@ -207,14 +207,12 @@ const shellHook = (config: ShoemakerConfig) =>
   );
 
 export const flake: Renderer = (ctx, aggregate) => {
-  const packages = [
-    ...new Set([
-      'bun',
-      'nodejs_24',
-      ...aggregate.nixPackages,
-      ...ctx.config.nixPackages,
-    ]),
-  ];
+  const packages = Arr.dedupe([
+    'bun',
+    'nodejs_24',
+    ...aggregate.nixPackages,
+    ...ctx.config.nixPackages,
+  ]);
   const description =
     ctx.config.description === ''
       ? ctx.config.name

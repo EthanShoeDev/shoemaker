@@ -1,6 +1,6 @@
 # shoemaker-spanoptic
 
-TUI OTEL visualizer for Effect programs. Visualize your Effect traces in real-time with a terminal UI.
+TUI trace visualizer for Effect programs. Visualize your Effect traces in real-time with a terminal UI.
 
 Inspired by [Kit Langton's spanoptic](https://x.com/kitlangton/status/1994799261406695946).
 
@@ -92,7 +92,7 @@ bunx shoemaker-spanoptic replay trace.json
 
 ### `traceVisualize(effect, options)`
 
-Runs an Effect program with OTEL tracing and visualizes it in a TUI. The
+Runs an Effect program with tracing and visualizes it in a TUI. The
 returned effect succeeds with the program's result once the user quits.
 
 ```typescript
@@ -186,7 +186,7 @@ type LogEntry = {
 
 ## Requirements
 
-- Effect 4 (`effect` and `@effect/opentelemetry` 4.1.1)
+- Effect 4 (`effect` 4.1.5)
 - Bun (`@opentui/core` loads its native renderer through `bun:ffi`)
 
 ## License

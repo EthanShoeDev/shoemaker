@@ -28,7 +28,7 @@ const BASE = [
 ];
 
 export const gitignore: Renderer = (_ctx, aggregate) => {
-  const lines = [...new Set([...BASE, ...aggregate.gitignore])];
+  const lines = Arr.dedupe([...BASE, ...aggregate.gitignore]);
   return [
     managed(
       '.gitignore',

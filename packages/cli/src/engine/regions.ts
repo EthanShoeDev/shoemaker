@@ -3,7 +3,13 @@
 // generators/shared.ts). A region body is the lines between its markers.
 // Text is expected with LF line endings (plan.ts normalises CRLF first).
 
-import { Array as Arr, Option, pipe, String as Str } from 'effect';
+import {
+  Array as Arr,
+  Option,
+  pipe,
+  Record as Rec,
+  String as Str,
+} from 'effect';
 
 const MARKER =
   /^\s*(?:\/\/|#|<!--)\s*shoemaker:(?<kind>begin|end)\s+(?<id>[^\s>]+?)\s*(?:-->)?\s*$/u;
@@ -124,14 +130,13 @@ export const replaceRegions = (
     cursor = region.end;
   }
   out.push(...lines.slice(cursor));
-  const counts = new Map<string, number>();
-  for (const r of found) counts.set(r.id, (counts.get(r.id) ?? 0) + 1);
+  const byId = Arr.groupBy(found, (r) => r.id);
   return {
     content: Arr.join(out, '\n'),
-    missing: Arr.filter([...wanted.keys()], (id) => !counts.has(id)),
+    missing: Arr.filter([...wanted.keys()], (id) => !Rec.has(byId, id)),
     duplicates: Arr.filter(
       [...wanted.keys()],
-      (id) => (counts.get(id) ?? 0) > 1,
+      (id) => (byId[id]?.length ?? 0) > 1,
     ),
   };
 };

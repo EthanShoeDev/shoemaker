@@ -4,12 +4,15 @@ import * as BunChildProcessSpawner from '@effect/platform-bun/BunChildProcessSpa
 import * as BunFileSystem from '@effect/platform-bun/BunFileSystem';
 import * as BunPath from '@effect/platform-bun/BunPath';
 import { expect, layer } from '@effect/vitest';
-import { Effect, FileSystem, Layer, Path, Stream } from 'effect';
+import { Effect, FileSystem, Layer, Path, Schema, Stream } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 
 import type { ShoemakerConfigOptions } from '../src/index.ts';
 
-const entry = JSON.stringify(
+const encodeJson = Schema.encodeUnknownEffect(
+  Schema.fromJsonString(Schema.Json),
+);
+const entry = encodeJson(
   fileURLToPath(new URL('../src/index.ts', import.meta.url)),
 );
 const oxlintBin = fileURLToPath(
@@ -41,7 +44,7 @@ const expectLoaded = (output: string) => {
 // order are checked by oxlint itself rather than by a reimplementation.
 const lint = Effect.fnUntraced(function* (
   name: string,
-  config: string,
+  config: Effect.Effect<string, Schema.SchemaError>,
   files: Record<string, string>,
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -50,7 +53,8 @@ const lint = Effect.fnUntraced(function* (
   const dir = yield* fs.makeTempDirectoryScoped({
     prefix: `shoemaker-oxlint-config-${name}-`,
   });
-  yield* fs.writeFileString(path.join(dir, 'oxlint.config.ts'), config);
+  const text = yield* config;
+  yield* fs.writeFileString(path.join(dir, 'oxlint.config.ts'), text);
   for (const [file, source] of Object.entries(files)) {
     yield* fs.makeDirectory(path.dirname(path.join(dir, file)), {
       recursive: true,
@@ -88,8 +92,12 @@ const lint = Effect.fnUntraced(function* (
 });
 
 const facade = (options: ShoemakerConfigOptions) =>
-  `import { defineShoemakerConfig } from ${entry};\n` +
-  `export default defineShoemakerConfig(${JSON.stringify(options)});\n`;
+  Effect.map(
+    Effect.all([entry, encodeJson(options)], { concurrency: 1 }),
+    ([from, text]) =>
+      `import { defineShoemakerConfig } from ${from};\n` +
+      `export default defineShoemakerConfig(${text});\n`,
+  );
 
 /** `file:line` → every rule reported there. */
 const reportsAt = (output: string, file: string) =>
@@ -246,10 +254,14 @@ layer(services)('shoemakerPreset with the composer', (it) => {
     Effect.gen(function* () {
       const { output } = yield* lint(
         'composer',
-        `import { composer, shoemakerPreset } from ${entry};\n` +
-          "export default await composer(shoemakerPreset({ scope: 'probe' }))\n" +
-          "  .override('shoemaker/custom', { rules: { 'env-access/no-raw-env-access': 'off' } })\n" +
-          "  .remove('shoemaker/tests');\n",
+        Effect.map(
+          entry,
+          (from) =>
+            `import { composer, shoemakerPreset } from ${from};\n` +
+            "export default await composer(shoemakerPreset({ scope: 'probe' }))\n" +
+            "  .override('shoemaker/custom', { rules: { 'env-access/no-raw-env-access': 'off' } })\n" +
+            "  .remove('shoemaker/tests');\n",
+        ),
         {
           'probe.ts': envRead,
           'probe.test.ts': unexplainedImport,

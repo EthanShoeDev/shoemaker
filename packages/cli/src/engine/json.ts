@@ -2,23 +2,26 @@ import {
   Array as Arr,
   Effect,
   Equal,
+  JsonPointer,
   Option,
   Predicate,
   Record as Rec,
   Result,
   Schema,
+  SemVer,
   String as Str,
 } from 'effect';
-import { type ParseError, parse } from 'jsonc-parser';
+import { Json5 } from 'effect/encoding';
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  Predicate.isObject(value);
+// Effect's Jsonc rejects trailing commas, which bun.lock always has. Undefined
+// when the text does not parse.
+export const parseJsonc = (text: string) =>
+  Result.getOrUndefined(Json5.parse(text));
 
 // Parses a JSON(C) object, or undefined when the text is not one.
 export const parseJsonObject = (text: string) => {
-  const errors: Array<ParseError> = [];
-  const value: unknown = parse(text, errors, { allowTrailingComma: true });
-  return errors.length === 0 && isPlainObject(value) ? value : undefined;
+  const value = parseJsonc(text);
+  return Predicate.isObject(value) ? value : undefined;
 };
 
 const isSorted = (keys: ReadonlyArray<string>) =>
@@ -76,7 +79,7 @@ export const mergeJson = (
       const value = owned[key];
       return [
         key,
-        isPlainObject(current) && isPlainObject(value)
+        Predicate.isObject(current) && Predicate.isObject(value)
           ? mergeJson(current, value)
           : value,
       ] as const;
@@ -86,18 +89,15 @@ export const mergeJson = (
 
 // RFC 6901 pointers to every owned leaf: what the lock records as the key
 // paths shoemaker owned when it wrote the file.
-const escapeKey = (key: string) =>
-  Str.replaceAll('/', '~1')(Str.replaceAll('~', '~0')(key));
-const unescapeKey = (key: string) =>
-  Str.replaceAll('~0', '~')(Str.replaceAll('~1', '/')(key));
-
 export const ownedPointers = (
   owned: Record<string, unknown>,
   prefix = '',
 ): ReadonlyArray<string> =>
   Arr.flatMap(Rec.toEntries(owned), ([key, value]) => {
-    const pointer = `${prefix}/${escapeKey(key)}`;
-    return isPlainObject(value) ? ownedPointers(value, pointer) : [pointer];
+    const pointer = `${prefix}/${JsonPointer.escapeToken(key)}`;
+    return Predicate.isObject(value)
+      ? ownedPointers(value, pointer)
+      : [pointer];
   });
 
 // List entries in `before` that `after` no longer has, each with the pointer
@@ -115,10 +115,14 @@ export const droppedEntries = (
         : Result.succeed({ pointer: prefix === '' ? '/' : prefix, entry }),
     );
   }
-  if (!isPlainObject(before)) return [];
-  const next = isPlainObject(after) && !Arr.isArray(after) ? after : {};
+  if (!Predicate.isObject(before)) return [];
+  const next = Predicate.isObject(after) && !Arr.isArray(after) ? after : {};
   return Arr.flatMap(Rec.toEntries(before), ([key, value]) =>
-    droppedEntries(value, next[key], `${prefix}/${escapeKey(key)}`),
+    droppedEntries(
+      value,
+      next[key],
+      `${prefix}/${JsonPointer.escapeToken(key)}`,
+    ),
   );
 };
 
@@ -126,15 +130,18 @@ export const droppedEntries = (
 export const shapeOf = (pointers: ReadonlyArray<string>) => {
   const root: Record<string, unknown> = {};
   for (const pointer of pointers) {
-    const keys = Arr.map(Str.split(pointer, '/').slice(1), unescapeKey);
+    const keys = Arr.map(
+      Str.split(pointer, '/').slice(1),
+      JsonPointer.unescapeToken,
+    );
     let node = root;
     Arr.forEach(keys, (key, index) => {
       if (index === keys.length - 1) {
-        if (!isPlainObject(node[key])) node[key] = true;
+        if (!Predicate.isObject(node[key])) node[key] = true;
         return;
       }
       const child = node[key];
-      const next = isPlainObject(child) ? child : {};
+      const next = Predicate.isObject(child) ? child : {};
       node[key] = next;
       node = next;
     });
@@ -153,7 +160,7 @@ export const ownedProjection = (
       const current = existing[key];
       return [
         key,
-        isPlainObject(value) && isPlainObject(current)
+        Predicate.isObject(value) && Predicate.isObject(current)
           ? ownedProjection(current, value)
           : (current ?? null),
       ] as const;
@@ -177,7 +184,11 @@ const VERSION_MAPS = new Set([
 const VERSION_SPEC = /^[~^]?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/u;
 
 const floorOf = (value: unknown) =>
-  Predicate.isString(value) ? VERSION_SPEC.exec(value)?.[1] : undefined;
+  Predicate.isString(value)
+    ? Option.fromNullishOr(VERSION_SPEC.exec(value)?.[1]).pipe(
+        Option.flatMap((version) => Result.getSuccess(SemVer.parse(version))),
+      )
+    : Option.none<SemVer.SemVer>();
 
 // A package's own top-level `version` is a floor too: shoemaker writes 0.0.0
 // and changesets owns it from the first release on.
@@ -195,17 +206,18 @@ export const keepRaisedVersions = (
   Rec.map(owned, (value, key) => {
     const current = existing[key];
     const nested = inMap || VERSION_MAPS.has(key);
-    if (isPlainObject(value)) {
-      return isPlainObject(current)
+    if (Predicate.isObject(value)) {
+      return Predicate.isObject(current)
         ? keepRaisedVersions(value, current, nested, false)
         : value;
     }
     const mine = floorOf(value);
     const theirs = floorOf(current);
     return isFloor(key, inMap, top) &&
-      mine !== undefined &&
-      theirs !== undefined &&
-      Bun.semver.order(theirs, mine) > 0
+      Option.exists(
+        Option.zipWith(theirs, mine, SemVer.isGreaterThan),
+        (raised) => raised,
+      )
       ? current
       : value;
   });
@@ -220,11 +232,11 @@ export const maskVersions = (
   inMap = false,
   top = true,
 ): unknown =>
-  isPlainObject(value)
+  Predicate.isObject(value)
     ? Rec.map(value, (child, key) =>
-        !isPlainObject(child) &&
+        !Predicate.isObject(child) &&
         isFloor(key, inMap, top && own) &&
-        floorOf(child) !== undefined
+        Option.isSome(floorOf(child))
           ? '<version>'
           : maskVersions(child, { own }, inMap || VERSION_MAPS.has(key), false),
       )
@@ -248,7 +260,7 @@ export const renderJson = (value: unknown) =>
 const sortKeys = (value: unknown): unknown => {
   if (value === undefined) return null;
   if (Arr.isArray(value)) return Arr.map(value, sortKeys);
-  if (!isPlainObject(value)) return value;
+  if (!Predicate.isObject(value)) return value;
   return Rec.fromEntries(
     Arr.filterMap(Arr.sort(Rec.keys(value), Str.Order), (key) =>
       value[key] === undefined
