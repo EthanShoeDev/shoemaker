@@ -6,6 +6,8 @@ export default defineConfig(
     ignorePatterns: [
       // Reference clones of the repos shoemaker standardizes; read-only.
       '.external/**',
+      // OpenSpec's own layout.
+      'openspec/**',
     ],
   }),
 );

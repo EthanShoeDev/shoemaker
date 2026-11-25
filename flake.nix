@@ -54,9 +54,18 @@
           git
           gh
           alejandra
+          # The OpenSpec bun.lock pins, as the command its skills call.
+          (writeShellScriptBin "openspec" ''
+            root="$(git rev-parse --show-toplevel)" || exit 1
+            exec "$root/node_modules/.bin/openspec" "$@"
+          '')
         ];
         shellHook = ''
           export TZ=UTC
+          # OpenSpec skills stay in the repo: ones in the home directory load in
+          # every project. Upgrades come from shoemaker.
+          export OPENSPEC_SKILLS_SCOPE=project
+          export OPENSPEC_NO_UPDATE_CHECK=1
         '';
       };
     });

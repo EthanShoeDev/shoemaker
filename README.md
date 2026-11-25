@@ -57,6 +57,12 @@ they're the setup I use for my own repos.
 - **MCP servers**: `.mcp.json` gives coding agents the project's MCP servers:
   Cloudflare's observability server (Workers logs and traces) when the Stack
   registers Cloudflare. Sync merges its servers in, so ones you add stay.
+- **OpenSpec**: `openspec/` for specs and proposed changes, the pinned
+  [OpenSpec](https://github.com/Fission-AI/OpenSpec) CLI, and its agent skills
+  in `.agents/skills` and `.claude/skills`. Sync writes the skills itself, so
+  nothing lands in the home directory, where agents in every other project
+  would load it. Leave `openspec` out of `features` (or `--extras`) for a repo
+  that doesn't use it.
 - **Android**: with an Expo app, `nix develop .#android` adds the Android
   SDK, NDK and JDK that its Gradle builds need, from nix, on NixOS too.
 - **Releases**: changesets. An Expo app with

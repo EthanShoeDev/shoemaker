@@ -306,6 +306,7 @@ export const inferConfig = (
           Rec.has(allDeps(workspace.root.pkg), '@changesets/cli'),
         agents: yield* repo.exists('AGENTS.md'),
         vscode: yield* repo.exists('.vscode'),
+        openspec: yield* repo.exists('openspec/config.yaml'),
       },
       nixPackages: [],
       unmanaged: [],

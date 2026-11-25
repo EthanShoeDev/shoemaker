@@ -70,4 +70,7 @@ jobs:
           draft: ${{ steps.verify.outcome != 'success' }}
           add-paths: |
             packages/cli/src/versions.ts
+            packages/cli/src/generators/openspec/skills.gen.ts
+            .agents/skills
+            .claude/skills
             .changeset/update-versions.md

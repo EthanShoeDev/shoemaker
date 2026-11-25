@@ -50,6 +50,7 @@ export default defineConfig(
         files: [
           'scripts/lib/**',
           'scripts/publish-manifest.ts',
+          'scripts/update-openspec-skills.ts',
           'scripts/update-versions.ts',
         ],
         rules: {

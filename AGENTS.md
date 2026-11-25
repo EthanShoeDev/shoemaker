@@ -3,10 +3,10 @@
 Shared tooling (`shoemaker-*` config packages) plus the `shoemaker` CLI that
 scaffolds new repos and keeps existing ones on Ethan's current preferences.
 
-README.md is the only prose doc; keep it current when behavior changes. The
-preferences live in code, so a preference change usually touches two places:
-the shared package (or generator) that encodes it, and the doctor check that
-detects drift from it.
+README.md is the only prose doc outside `openspec/`; keep it current when
+behavior changes. The preferences live in code, so a preference change usually
+touches two places: the shared package (or generator) that encodes it, and the
+doctor check that detects drift from it.
 
 Repos made by an older shoemaker only pick up what `sync` rewrites; it never
 touches seed files. When a change can't reach them that way, its changeset
@@ -37,6 +37,19 @@ instead of a codemod.
 - Never run `infra:plan`/`deploy`/`destroy` in a generated sample: alchemy
   creates its state bucket even on a plan, and this machine has real cloud
   credentials. Prove infra templates with typecheck and tests only.
+
+## OpenSpec
+
+- Specs live in `openspec/specs`, proposed changes in `openspec/changes`. Use
+  the `openspec-*` skills to propose, apply and archive a change. Without the
+  dev shell, run the CLI as `bun run openspec`.
+- Never run `openspec init` or `openspec update` here. Bump the pin in
+  `versions.ts` and the root catalog, then `bun run update:openspec-skills`
+  rewrites `skills.gen.ts` and this repo's skills.
+- Agent tooling is project-local, here and in generated repos: skills,
+  commands and MCP servers go in the repo, never in `~/.claude`, `~/.agents`,
+  `~/.codex` or a user/global scope, where they load in every other project. A
+  CLI may be global.
 
 ## Proving generator changes
 

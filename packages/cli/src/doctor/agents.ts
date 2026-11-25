@@ -8,8 +8,12 @@ import {
 } from 'effect';
 
 import { hasDep, isRecord, parseJsonc } from '../checks/workspace.ts';
+import {
+  OPENSPEC_PACKAGE,
+  openspecSkillFiles,
+} from '../generators/openspec/index.ts';
 import { CLOUDFLARE_OBSERVABILITY_MCP } from '../generators/root/mcp.ts';
-import { fail, manifestsOf, pass } from './shared.ts';
+import { fail, listSome, manifestsOf, pass } from './shared.ts';
 import type { DoctorCheck, Finding } from './types.ts';
 
 export const agentsMd: DoctorCheck = {
@@ -85,4 +89,62 @@ export const cloudflareObservabilityMcp: DoctorCheck = {
   }),
 };
 
-export const agentChecks = [agentsMd, cloudflareObservabilityMcp];
+const PROJECT_SCOPE = /^skillsScope:\s*['"]?project['"]?\s*(?:#.*)?$/mu;
+
+// Only repos that use OpenSpec: one that doesn't should carry none of it.
+export const openspec: DoctorCheck = {
+  id: 'openspec',
+  description:
+    'A repo that uses OpenSpec pins its CLI and keeps its current skills in the repo, not the home directory',
+  run: Effect.fnUntraced(function* (repo) {
+    const config = yield* repo.read('openspec/config.yaml');
+    if (config === undefined) return [];
+    const findings: Array<Finding> = [];
+    if (!PROJECT_SCOPE.test(config)) {
+      findings.push(
+        fail('openspec/config.yaml lacks `skillsScope: project`', {
+          path: 'openspec/config.yaml',
+          fix: 'add `skillsScope: project`, so openspec update keeps the skills in the repo',
+        }),
+      );
+    }
+    const manifests = yield* manifestsOf(repo);
+    if (!Arr.some(manifests, (m) => hasDep(m.pkg, OPENSPEC_PACKAGE))) {
+      findings.push(
+        fail(`${OPENSPEC_PACKAGE} is not a dependency`, {
+          path: 'package.json',
+          fix: 'set features.openspec in shoemaker.config.ts and run shoemaker sync, or add it as a root devDependency',
+        }),
+      );
+    }
+    const stale = yield* Effect.filter(
+      Rec.toEntries(openspecSkillFiles),
+      ([path, content]) =>
+        Effect.map(
+          repo.read(path),
+          (text) =>
+            text === undefined ||
+            Str.replaceAll('\r\n', '\n')(text) !== content,
+        ),
+      { concurrency: 16 },
+    );
+    if (stale.length > 0) {
+      findings.push(
+        fail(
+          `missing or outdated skill file(s): ${listSome(
+            Arr.map(stale, ([path]) => path),
+            3,
+          )}`,
+          {
+            fix: 'set features.openspec in shoemaker.config.ts and run shoemaker sync',
+          },
+        ),
+      );
+    }
+    return findings.length > 0
+      ? findings
+      : [pass('OpenSpec is pinned, with its skills in the repo')];
+  }),
+};
+
+export const agentChecks = [agentsMd, cloudflareObservabilityMcp, openspec];

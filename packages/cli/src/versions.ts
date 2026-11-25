@@ -110,6 +110,10 @@ export const versions = {
   '@changesets/cli': '^3.0.3',
   '@changesets/changelog-github': '^1.0.1',
 
+  // Spec-driven changes (openspec/)
+  // Exact: generators/openspec/skills.gen.ts is this version's skills.
+  '@fission-ai/openspec': '2.2.0',
+
   // Secrets
   varlock: '^1.25.0',
   '@varlock/vite-integration': '^1.5.6',

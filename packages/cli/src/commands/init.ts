@@ -70,7 +70,7 @@ const DEPLOY_TARGETS: ReadonlyArray<DeployTarget> = [
   'none',
 ];
 const STATE_STORES: ReadonlyArray<StateStore> = ['local', 'cloudflare', 'aws'];
-const EXTRAS = ['changesets', 'agents', 'vscode'] as const;
+const EXTRAS = ['changesets', 'agents', 'vscode', 'openspec'] as const;
 const KEBAB = /^[a-z][a-z0-9-]*$/u;
 
 const isAppKind = (value: string): value is AppKind =>
@@ -259,6 +259,7 @@ const toFeatures = (extras: ReadonlyArray<string>): Features => ({
   changesets: extras.includes('changesets'),
   agents: extras.includes('agents'),
   vscode: extras.includes('vscode'),
+  openspec: extras.includes('openspec'),
 });
 
 const parseExtras = (value: string) => {
@@ -549,7 +550,7 @@ const config = {
   ),
   extras: Flag.String('extras').pipe(
     Flag.withDescription(
-      'Comma list of changesets, agents, vscode, or none (default: agents,vscode)',
+      'Comma list of changesets, agents, vscode, openspec, or none (default: agents,vscode,openspec)',
     ),
     Flag.mapEffect(parseExtras),
     fallback(
@@ -559,7 +560,7 @@ const config = {
         choices: Arr.map(EXTRAS, (extra) => ({
           title: extra,
           value: extra,
-          selected: defaults.features[extra],
+          selected: defaults.features[extra] === true,
         })),
       }).pipe(Prompt.map(toFeatures)),
     ),

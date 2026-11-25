@@ -1,6 +1,7 @@
 import type { Generator, Renderer } from '../engine/types.ts';
 import { appGenerators } from './apps/index.ts';
 import { infraGenerators } from './infra/index.ts';
+import { openspecGenerator } from './openspec/index.ts';
 import { rootGenerators, rootRenderers } from './root/index.ts';
 import { secretsGenerators, secretsRenderers } from './secrets/index.ts';
 import {
@@ -14,6 +15,7 @@ export const generators: ReadonlyArray<Generator> = [
   ...secretsGenerators,
   ...appGenerators,
   ...infraGenerators,
+  openspecGenerator,
 ];
 
 export const renderers: ReadonlyArray<Renderer> = [

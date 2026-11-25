@@ -14,6 +14,7 @@ import {
   androidToolchain,
   nixpkgsLock,
 } from '../../versions.ts';
+import { hasOpenspec } from '../openspec/index.ts';
 import { hasApp, managed, owned, seedJson } from '../shared.ts';
 
 // A Nix double-quoted string: backslash, quote and `${` (which would start an
@@ -181,6 +182,30 @@ in
   }
 `;
 
+// The OpenSpec in node_modules, so the CLI and the skills sync writes are one
+// version, as the `openspec` the skills call.
+const OPENSPEC_BIN = `          # The OpenSpec bun.lock pins, as the command its skills call.
+          (writeShellScriptBin "openspec" ''
+            root="$(git rev-parse --show-toplevel)" || exit 1
+            exec "$root/node_modules/.bin/openspec" "$@"
+          '')`;
+
+const shellHook = (config: ShoemakerConfig) =>
+  Arr.join(
+    [
+      '          export TZ=UTC',
+      ...(hasOpenspec(config)
+        ? [
+            '          # OpenSpec skills stay in the repo: ones in the home directory load in',
+            '          # every project. Upgrades come from shoemaker.',
+            '          export OPENSPEC_SKILLS_SCOPE=project',
+            '          export OPENSPEC_NO_UPDATE_CHECK=1',
+          ]
+        : []),
+    ],
+    '\n',
+  );
+
 export const flake: Renderer = (ctx, aggregate) => {
   const packages = [
     ...new Set([
@@ -217,7 +242,10 @@ ${nixRegion('bun', bunOverlay(), '    ')}
 ${nixRegion(
   'packages',
   Arr.join(
-    Arr.map(packages, (p) => `          ${p}`),
+    [
+      ...Arr.map(packages, (p) => `          ${p}`),
+      ...(hasOpenspec(ctx.config) ? [OPENSPEC_BIN] : []),
+    ],
     '\n',
   ),
   '          ',
@@ -225,7 +253,7 @@ ${nixRegion(
           # Project packages go below the region.
         ];
         shellHook = ''
-${nixRegion('shell-hook', '          export TZ=UTC', '          ')}
+${nixRegion('shell-hook', shellHook(ctx.config), '          ')}
         '';
       };${android ? ANDROID_SHELL : ''}
     });

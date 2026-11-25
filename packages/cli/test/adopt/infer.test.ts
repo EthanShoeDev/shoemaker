@@ -121,6 +121,7 @@ describe('inferConfig', () => {
         changesets: true,
         agents: true,
         vscode: false,
+        openspec: false,
       });
       assert.deepStrictEqual(config.nixPackages, []);
     }),

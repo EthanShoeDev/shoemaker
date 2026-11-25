@@ -12,6 +12,9 @@
     "**/docs/**",
     "**/mnt/**",
     ".external/**",
+    "**/.agents/**",
+    "**/.claude/**",
+    "openspec/**",
     "bun.lock",
     "**/CHANGELOG.md"
   ],

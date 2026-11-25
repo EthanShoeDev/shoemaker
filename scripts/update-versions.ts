@@ -26,6 +26,7 @@ import { Command, Flag } from 'effect/cli';
 import { HttpClient } from 'effect/http';
 
 import { effectFamily, versions } from '../packages/cli/src/versions.ts';
+import { vendorOpenspecSkills } from './lib/openspec-skills.ts';
 import { onNpm, repoRoot } from './lib/packages.ts';
 import { runScript } from './lib/run.ts';
 
@@ -252,6 +253,12 @@ const updateVersions = Command.make(
     }
     if (dryRun) return;
     yield* fs.writeFileString(file, applyChanges(source, changes));
+    const openspec = Arr.findFirst(
+      changes,
+      (change) => change.name === '@fission-ai/openspec',
+    );
+    // The skills sync writes are the pinned CLI's.
+    if (Option.isSome(openspec)) yield* vendorOpenspecSkills(openspec.value.to);
     if (changeset) {
       yield* fs.writeFileString(
         path.join(root, '.changeset/update-versions.md'),

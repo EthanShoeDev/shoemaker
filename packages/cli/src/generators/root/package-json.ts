@@ -3,6 +3,7 @@ import { Array as Arr, Record as Rec, String as Str } from 'effect';
 import type { ShoemakerConfig } from '../../config/schema.ts';
 import type { Generator, Renderer } from '../../engine/types.ts';
 import { effectFamily } from '../../versions.ts';
+import { hasOpenspec, OPENSPEC_PACKAGE } from '../openspec/index.ts';
 import { catalogDeps, jsonMerge } from '../shared.ts';
 
 const BUN_VERSION = '1.4.5';
@@ -34,6 +35,7 @@ export const rootDevDependencies = (config: ShoemakerConfig) => [
   ...(config.features.changesets
     ? ['@changesets/changelog-github', '@changesets/cli']
     : []),
+  ...(hasOpenspec(config) ? [OPENSPEC_PACKAGE] : []),
 ];
 
 // Every repo pins these even when only packages use them (effect,
@@ -69,6 +71,11 @@ const scripts = (config: ShoemakerConfig) => ({
         'changeset:status': 'changeset status',
         'changeset:version': 'changeset version && bun install --lockfile-only',
       }
+    : {}),
+  // For shells without the flake's `openspec`; the variable keeps the skills
+  // out of the home directory there too.
+  ...(hasOpenspec(config)
+    ? { openspec: 'OPENSPEC_SKILLS_SCOPE=project openspec' }
     : {}),
   'update:all': 'nlx taze major -r -I',
   'update:nix-flake': 'nix flake update',

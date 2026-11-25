@@ -122,6 +122,9 @@ export const Features = Schema.Struct({
   changesets: Schema.Boolean,
   agents: Schema.Boolean,
   vscode: Schema.Boolean,
+  // openspec/ and its agent skills, inside the repo. Absent in configs older
+  // than the feature, and off there.
+  openspec: Schema.optionalKey(Schema.Boolean),
 });
 export type Features = typeof Features.Type;
 
@@ -295,7 +298,7 @@ export const defaultConfig = (name: string): ShoemakerConfig => ({
   secrets: 'varlock',
   infra: { kind: 'none' },
   ci: 'github',
-  features: { changesets: false, agents: true, vscode: true },
+  features: { changesets: false, agents: true, vscode: true, openspec: true },
   nixPackages: [],
   unmanaged: [],
 });

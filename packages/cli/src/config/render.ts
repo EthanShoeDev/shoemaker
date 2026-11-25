@@ -120,6 +120,9 @@ const configLines = (config: ShoemakerConfig): ReadonlyArray<Line> => [
     bool('changesets', config.features.changesets),
     bool('agents', config.features.agents),
     bool('vscode', config.features.vscode),
+    ...(config.features.openspec === undefined
+      ? []
+      : [bool('openspec', config.features.openspec)]),
   ]),
   strings('nixPackages', config.nixPackages),
   strings('unmanaged', config.unmanaged),
