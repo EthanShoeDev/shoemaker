@@ -4,7 +4,9 @@
 
 See proposal.md for motivation, and `add-admin-core`'s design for the access core, ports and package layout this builds on.
 
-Checked in Better Auth 1.7.15: `set-role` lets you change your own role. The React project's pages list, ban, unban, impersonate, set roles, invite, send password links and delete; none of them ends a user's sessions, so that operation stays on the roadmap.
+Checked in Better Auth 1.7.15: `set-role` lets you change your own role. The React project's pages list, ban, unban, impersonate, set roles, invite, send password links and delete; none of them ends a user's sessions, so that operation stays on the roadmap. They invite with a name and a role and mark the email verified, ban without a reason, and list 200 users where the API's page holds at most 100.
+
+Resetting a password does not verify the email, so where sign-in requires a verified one, an account invited unverified would be sent a second email at its first sign-in.
 
 ## Goals / Non-Goals
 
@@ -24,7 +26,11 @@ Inviting and password links need passwords, and a project with emailed links has
 
 Own-role changes are refused in the core, not in the Better Auth adapter, so another directory gets the same rule. Roles are checked against `defineAccess`, since Better Auth's list is not the project's.
 
-### 3. Pages and closing land in one commit
+### 3. Inviting keeps what the page does today
+
+An invite carries a name and roles. Giving any role but the default needs the permission to set roles as well as to invite, as in Better Auth. The account is created with its email verified, because only a link sent to that address can give it a password. The project supplies where the links land, since an invite and a reset land on different pages.
+
+### 4. Pages and closing land in one commit
 
 The page moves from Better Auth's client to the users client in the commit that mounts the wrapper. The wrapper alone would break the page. This is the only breaking step in the plan, so it is its own change and can be reverted as one commit.
 

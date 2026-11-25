@@ -8,10 +8,10 @@ What comes after the open changes. Nothing here is specified yet: each entry bec
 | --- | --- | --- | --- |
 | 1 | `add-admin-core` | | the Foldkit project |
 | 2 | `extend-admin-users` | 1 | the React project |
-| 3 | `add-error-tracking` | 1 (2 to adopt in the React project) | one email for a real failure |
+| 3 | `add-error-tracking` | 1 | the Foldkit project: one email for a real failure, inside known limits |
 | 4 | `add-feature-flags` | 1 (2 to adopt in the React project) | one real flag |
 
-3 and 4 are independent and can swap. Archive 1 before 2, because 2 adds to a capability that 1 creates.
+2, 3 and 4 are independent after 1, except that 4's adoption needs 2. Archive 1 before 2, because 2 adds to a capability that 1 creates.
 
 ## The first full plan
 
@@ -28,6 +28,9 @@ git show 13d9f0b:openspec/changes/add-shoemaker-products/specs/<capability>/spec
 - Error issues are plain SQL, not a `domain` aggregate, so telemetry runs on any target and every API is an `HttpApi`. Its decisions 5 (RPC adapter) and 13 (lifecycle, Cloudflare only) no longer hold.
 - Errors come before flags.
 - Products have their own changesets group.
+- Events have their own database, one collector per project decides what is stored, and every use has a limit (`usage-limits`). The per-minute cap in SQL no longer holds.
+- A migration and its record are one unit; `IF NOT EXISTS` is no longer needed.
+- Edgehog's projects and keys are configuration.
 
 ## Next
 
@@ -35,7 +38,7 @@ git show 13d9f0b:openspec/changes/add-shoemaker-products/specs/<capability>/spec
 
 Foldkit and React pages for users, audit, issues and flags, over headless state in `/client`. Each is exported whole, as parts (details, actions, a table that takes extra columns) and as state. Foldkit and React use clients of the same `HttpApi`.
 
-- Specs: `admin-app`, all of it; `admin-user-management` "Project data about users stays in the project"; unsupported operations hidden in the UI.
+- Specs: `admin-app`, all of it; from `admin-user-management` "Project data about users stays in the project", the plan column (its API half is in `add-admin-core`); unsupported operations hidden in the UI. `MODIFIED`: "Products describe themselves" covers pages too.
 - Colors come from the host's tokens, Tailwind classes through `@source`. React and Foldkit are optional peers.
 - Wait until the hand-written issues and flags pages exist.
 
@@ -48,6 +51,8 @@ Config gains `auth`, an `admin` role on an app and a `modules` map; `init`, `syn
 - Product generators sit in `packages/cli/src/generators/products/`. A `/shoemaker` subpath in a product would be a package cycle `^build` cannot order.
 - Products need their own version constant in `versions.ts` and their own `doctor` check: today's derive every `shoemaker-*` range from the CLI's version.
 - Adopts: the Foldkit, React and Expo projects.
+- Under `alchemy dev` cookies stay on localhost; deployed they cross subdomains. A TanStack Start admin gets the forwarding route, a Foldkit one the zone route.
+- Generate the ingest Worker's edge rule only into a ruleset the project owns, since Alchemy's resource owns a zone's whole phase. `doctor` reports an ingest Worker with a `workers.dev` address and no such rule.
 
 ### Agents (was step 6)
 
@@ -57,13 +62,16 @@ Keys that belong to a user, MCP and a CLI for issues.
 - Each request is allowed only what the key and its owner's current roles both allow, less a fixed set that needs a person. Keys come from the admin API, because Better Auth lets only server code set their permissions. A name is a label; claims belong to key and name together.
 - An MCP client needs an HTTP 401 that a tool's middleware cannot give, so MCP gets a gate over the access core. Tools and CLI commands are written over the same `HttpApi`, with Effect's `McpServer` and `effect/cli`.
 - An MCP client sends an unset variable as its literal text, so names are validated.
+- The Foldkit project already has keys and OAuth for its customers, and a ban does not end those. If it needs that sooner, "A ban stops every credential" moves ahead of the rest.
+- A key has its own rate, so an agent in a loop can't run up reads.
 - Considered and refused: one shared token with a self-declared name.
 
 ### Errors from browsers and mobile (was step 7)
 
 Source maps, resolve in a release, archive, merge and split, filters, spikes and webhooks.
 
-- Specs: the rest of `error-tracking` and the Sentry part of `telemetry-ingest`. `MODIFIED`: "Issues have a lifecycle" gains archived and recent states; "Alerts" gains regressions, leaving the archive and an interval; "Secrets are removed before storage" runs again after mapping; "Sentry SDKs are slowed precisely" is readable by a browser.
+- Specs: the rest of `error-tracking` and the Sentry part of `telemetry-ingest`. `MODIFIED`: "Issues have a lifecycle" gains the archived state; "Regressions are real" also considers when a delayed occurrence happened; "Alerts" gains regressions, leaving the archive and an interval; "Secrets are removed before storage" runs again after mapping; "Sentry SDKs are slowed precisely" is readable by a browser.
+- A browser's key is public, so this is where floods by strangers begin. `usage-limits` gains limits by address and by origin, and the edge rule is required, before the first browser sends.
 - Maps are keyed by debug ID, which the SDKs already send. Sentry's MIT bundler plugin can insert the ids with uploading turned off; we write the uploader. Nothing is fetched from the web.
 - Mapping comes before grouping. Grouping gains the normalized source line where a map gives one, as a new rules version.
 - Archive conditions and merges are several rows: conditional updates and ordered, repeatable steps, since D1 has no transactions.
@@ -73,18 +81,20 @@ Source maps, resolve in a release, archive, merge and split, filters, spikes and
 [OFREP](https://github.com/open-feature/protocol) endpoints for browsers and mobile over the same evaluator. Depends only on `add-feature-flags`, so it can move up.
 
 - Specs: `feature-flags` "Clients evaluate remotely". `MODIFIED`: "A project key only sends" also allows reading evaluated flags.
+- Every page view may ask, so it needs limits by key and address, answers from memory, and the polling advice of the protocol, with its worst case in the same test.
 - Where OFREP's schema and examples disagree, accept both and send what the pinned community providers accept.
 
 ## Later
 
 - **Ending a user's sessions** (was in step 1): no admin offers it yet. Better Auth's `revoke-user-sessions` does not check that the user exists, and OAuth grants must end too.
-- **Analytics** (was step 9): capture from the official PostHog SDKs, trends, people, and warnings as storage fills up. Specs: `product-analytics` less funnels and retention, the PostHog part of `telemetry-ingest`, `telemetry-storage` "Nearing capacity is visible". `MODIFIED`: "Queries are structured" and "One event shape" gain its queries and the session case; clocks are corrected, beyond replacing impossible times. Until PostHog flags exist, `posthog-js` gets an empty, valid answer.
+- **Analytics** (was step 9): capture from the official PostHog SDKs, trends, people, and warnings as storage fills up. Specs: `product-analytics` less funnels and retention, the PostHog part of `telemetry-ingest`, `telemetry-storage` "Nearing capacity is visible". `MODIFIED`: "Queries are structured" and "One event shape" gain its queries and the session case; clocks are corrected, beyond replacing impossible times. Until PostHog flags exist, `posthog-js` gets an empty, valid answer. Events are kept in detail, unlike repeated errors, so the row and size limits need their own design first: batches written as one row, sampling, or Iceberg from the start.
 - **Deeper analytics and experiments** (was step 10): funnels, retention, exposures, experiments, PostHog flags, telling clients of changes. Specs: the rest of `product-analytics` and `feature-flags`. Open: how significance is judged, and which push mechanism, since standing connections cost money on Durable Objects.
-- **Replay** (was step 11): recording, playback with its own permission and audited viewing, context beside errors. Specs: `session-replay`, `error-tracking` "Context beside the error". `MODIFIED`: "Data expires" covers blobs.
+- **Replay** (was step 11): recording, playback with its own permission and audited viewing, context beside errors. Specs: `session-replay`, `error-tracking` "Context beside the error". `MODIFIED`: "Data expires" covers blobs; "A missing choice fails before requests are served" gains a missing blob store. The largest data of all: sampling on by default, and limits on sessions, chunks, bytes and object writes a day.
 - **Larger backends** (was step 12): Iceberg, ClickHouse, moving between them. Specs: the rest of `telemetry-storage`. Open: whether DuckDB runs in a Worker or a Container.
 - **Issue tracker** (was step 13): a second product, where people and agents claim work. Here `domain` fits, since a claim needs one place that decides. Specs: `issue-tracker`, `product-composition` "Products link by reference".
   - Starts from Alchemy's [Board](https://github.com/alchemy-run/alchemy/pull/3506) (Apache-2.0, read at [`02e682f`](https://github.com/alchemy-run/alchemy/tree/02e682fcffc3ff54ae1b9c12b9c1d1e562a1dc1f/examples/cloudflare-domain-board)), which needs an Alchemy newer than beta.87. Nothing earlier may depend on it.
-  - `domain` RPC needs its own adapter over the access core.
+  - `domain` RPC needs its own adapter over the access core. `MODIFIED`: "Products share the host's admin auth" gains an RPC call.
+  - [`cloudflare-ai-issues`](https://github.com/alchemy-run/alchemy/tree/7cf8e82ebf/examples/cloudflare-ai-issues) is a reference for agents that work on an issue. Agents that trigger agents need a limit on depth and on runs.
   - Open: whether it works offline. Claims never do.
 - **OAuth for MCP clients** (was in step 13), after one project's existing implementation. Specs: `admin-access` "MCP clients can sign in through the browser".
 - **A shared product package** (was in step 13): once another product proves what is common.
@@ -99,11 +109,13 @@ Performance tracing was out of scope. It is open, because Effect programs alread
 
 ## Out of scope
 
-Admin pages generated from a Drizzle schema, native Edgehog SDKs, PostHog local evaluation (it needs a second, secret key and exposes rules), native crash dumps, and moving off Better Auth.
+Admin pages generated from a Drizzle schema, native Edgehog SDKs, PostHog local evaluation (it needs a second, secret key and exposes rules), native crash dumps, moving off Better Auth, and running a product without a host project.
 
 ## Held by every change
 
 - Useful in a real project at the end of each change.
+- Before a change starts, its design is revised with what the last one taught.
+- Nothing can cost without limit. Whatever a stranger, a loop or a schedule can trigger has a finite default limit, is refused before it costs storage, fails closed, never feeds itself, retries a finite number of times, and shows when it stopped. Each Edgehog change extends the test that computes the worst case, and raising the amount is a decision. A change that needs something always on says what it costs when idle.
 - Sentry and Relay are read for behavior and never copied. PostHog outside `ee/`, OpenFeature and Alchemy's examples may be reused with a notice in `THIRD_PARTY_NOTICES`.
 - `EventLog` is not the base for telemetry, audit or claims. It is the first choice for a native SDK's offline queue, and for drafts, comments and labels if the tracker works offline.
 - Agent tooling stays project-local, and no secret is written to a file.

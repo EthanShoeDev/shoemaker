@@ -25,15 +25,23 @@ Every product endpoint meant for admins SHALL run behind the host's one admin ac
 - **THEN** the response is 401
 
 ### Requirement: Products can share the host's database
-A product SHALL keep its tables under its own name prefix and its migration history in its own table. Its migrations SHALL be safe to run again after a partial failure, including on databases without transactions.
+A product SHALL keep its tables under its own name prefix and its migration history in its own table. A migration and its record SHALL be applied together or not at all, including on databases without interactive transactions.
 
 #### Scenario: Shared database
 - **WHEN** two products and the host use one database
 - **THEN** none of them reads or changes another's tables or migration history
 
 #### Scenario: Interrupted migration
-- **WHEN** a migration fails halfway on D1 and the deploy runs again
-- **THEN** it completes and is recorded once
+- **WHEN** a migration that adds a column is interrupted on D1 and the deploy runs again
+- **THEN** the column exists once and the migration is recorded once
+
+#### Scenario: Two deploys at once
+- **WHEN** two deploys run the same migration
+- **THEN** it is applied and recorded once
+
+#### Scenario: Replaced database
+- **WHEN** the host points the product at a new, empty database
+- **THEN** the next deploy runs every migration there
 
 ### Requirement: Storage is the host's choice
 A product SHALL NOT depend on a particular storage backend. Changing to another backend the product supports on the same host SHALL need only a different storage choice in the host's wiring.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Stores and queries telemetry on the host's own database, with the same answers on every one.
+Stores and queries telemetry on a SQL database the host chooses, with the same answers on every one.
 
 ## ADDED Requirements
 
@@ -12,6 +12,10 @@ The query API SHALL accept structured queries for events and issue statistics, a
 #### Scenario: Daily counts
 - **WHEN** a caller asks for daily counts of one issue over a week
 - **THEN** it gets one count per day, with zero for days without occurrences
+
+#### Scenario: Range too large
+- **WHEN** a caller asks for more than the maximum range or page
+- **THEN** the request is refused or cut to the maximum, and never scans without an index
 
 ### Requirement: Every backend gives the same answers
 Every query backend SHALL pass one shared suite over one fixed dataset with identical results.
@@ -26,6 +30,10 @@ A project on Cloudflare SHALL be able to run Edgehog without any always-on serve
 #### Scenario: Idle project on Cloudflare
 - **WHEN** a project receives no events
 - **THEN** no Edgehog compute runs except a daily cleanup
+
+#### Scenario: Idle project elsewhere
+- **WHEN** a project on another target receives no events
+- **THEN** Edgehog uses its database only as it starts and once a day
 
 ### Requirement: Repeated occurrences are counted compactly
 Storage SHALL be able to hold many occurrences as one counted row, and every count SHALL include them.

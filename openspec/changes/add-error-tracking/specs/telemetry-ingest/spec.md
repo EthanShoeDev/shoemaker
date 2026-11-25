@@ -40,7 +40,7 @@ A limit on one kind of Sentry data SHALL stop the SDK sending that kind only.
 Ingest SHALL translate every report, whichever way it was sent, into one event shape with an id, project, kind, name, person, optional session, optional trace and span, time of occurrence, time of receipt and properties. Nothing past ingest SHALL depend on a vendor's format.
 
 #### Scenario: Same trace, two reporters
-- **WHEN** a Worker reports one exception through the Sentry SDK and another through the Effect reporter within one trace
+- **WHEN** one exception arrives through the Sentry SDK and another through the Effect reporter, both with the same trace id
 - **THEN** both are found by that trace id
 
 #### Scenario: No trace
@@ -48,7 +48,7 @@ Ingest SHALL translate every report, whichever way it was sent, into one event s
 - **THEN** it is stored without one
 
 ### Requirement: Events are stored once
-An event that carries an id SHALL be stored once per project however many times it is sent. Occurrences counted without details SHALL be counted once when resent within ten minutes.
+An event that carries an id SHALL be stored once per project however many times it is sent. Occurrences counted without details SHALL be counted once when resent within ten minutes, unless ingest restarted between.
 
 #### Scenario: Retry
 - **WHEN** an SDK resends a batch after a timeout
@@ -57,6 +57,17 @@ An event that carries an id SHALL be stored once per project however many times 
 #### Scenario: Same id, two projects
 - **WHEN** two projects send events with one id
 - **THEN** both are stored
+
+### Requirement: Projects are declared by the host
+A host SHALL declare each project with its id, its keys, its retention and its alert recipients, and SHALL be able to have two keys valid at once.
+
+#### Scenario: Changing a key
+- **WHEN** a host adds a second key, moves its senders to it and removes the first
+- **THEN** no report is refused in between
+
+#### Scenario: No recipient
+- **WHEN** a project declares alerts without a recipient or an admin address for its issues
+- **THEN** ingest does not start and names what is missing
 
 ### Requirement: A project key only sends
 Ingest SHALL accept only requests with a known project key. The key is public, and SHALL allow nothing but sending data.
@@ -95,7 +106,7 @@ Ingest SHALL run as its own server, so client traffic never reaches the server t
 - **THEN** the admin's server receives none of those requests
 
 ### Requirement: Effect failures are reported in full
-The package SHALL let an Effect program report failures with every cause, the failing span and its parents.
+The package SHALL let an Effect program report failures to ingest with every cause, the failing span and its parents, under the same key, limits and scrubbing as any other report.
 
 #### Scenario: Several causes
 - **WHEN** an Effect fails with two concurrent causes inside nested spans

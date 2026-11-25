@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Lets a project turn features on for some users and measure the effect through OpenFeature, so application code depends on an open standard and not on Edgehog.
+Lets a project turn features on for some users through OpenFeature, so application code depends on an open standard and not on Edgehog.
 
 ## ADDED Requirements
 
@@ -16,6 +16,28 @@ Admins SHALL be able to create flags whose variants are all booleans, all string
 #### Scenario: Falsy value
 - **WHEN** a variant's value is `false`, `0` or an empty string
 - **THEN** evaluating it returns that value
+
+### Requirement: Flags belong to a project
+A flag SHALL belong to one project, and its key SHALL be unique within that project.
+
+#### Scenario: Same key, two projects
+- **WHEN** two projects in one installation have a flag with the same key
+- **THEN** each evaluates its own
+
+### Requirement: The cost of evaluating is bounded
+Reads of definitions SHALL NOT grow with the number of evaluations, whether storage works or not, and evaluating SHALL write nothing. The number and total size of a project's flags SHALL have a finite limit.
+
+#### Scenario: Evaluating in a loop
+- **WHEN** a server evaluates known and unknown flags in an endless loop
+- **THEN** it reads definitions at most once a minute
+
+#### Scenario: Loop while storage is down
+- **WHEN** storage fails and a server evaluates in an endless loop
+- **THEN** it tries to read at most once every ten seconds
+
+#### Scenario: Too many flags
+- **WHEN** an admin creates a flag past the limit
+- **THEN** it is refused
 
 ### Requirement: Flags target by property and by share
 A flag SHALL be able to choose a variant by properties of the evaluation context, by a share of targeting keys, or by both, with rules tried in order.

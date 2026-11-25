@@ -18,11 +18,19 @@ Admins SHALL be able to replace a user's roles with a set of roles the project d
 - **THEN** the response is 403
 
 ### Requirement: Admins can invite users
-Admins SHALL be able to create an account without a password and email its owner a link to choose one, where the project supports passwords.
+Admins SHALL be able to create an account with a name and roles but no password, and email its owner a link to choose one, where the project supports passwords. Giving a role other than the default SHALL also need the permission to set roles.
 
 #### Scenario: Invite
 - **WHEN** an admin invites a new email address
 - **THEN** the account exists, and only the emailed link can set its password
+
+#### Scenario: Signing in after an invite
+- **WHEN** an invited user chooses a password in a project that requires a verified email
+- **THEN** they can sign in without verifying it again
+
+#### Scenario: Invite with a role
+- **WHEN** an admin who may invite but not set roles invites a user as `admin`
+- **THEN** the response is 403 and no account is created
 
 #### Scenario: Email already registered
 - **WHEN** an admin invites an email that already has an account
@@ -36,10 +44,10 @@ Admins SHALL be able to email a user a link to set a new password, where the pro
 - **THEN** the user receives it and the response contains no link or token
 
 ### Requirement: Admins can delete users
-Admins SHALL be able to permanently delete a user after confirming. They SHALL NOT be able to delete themselves.
+Admins SHALL be able to permanently delete a user. They SHALL NOT be able to delete themselves.
 
 #### Scenario: Delete
-- **WHEN** an admin confirms deleting a user
+- **WHEN** an admin deletes a user
 - **THEN** the account and its sessions are gone and the audit log keeps the user's id
 
 #### Scenario: Deleting yourself

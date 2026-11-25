@@ -22,11 +22,26 @@ Exceptions that match SHALL belong to one issue, found by fingerprint. An issue 
 - **THEN** the error stays in its issue
 
 ### Requirement: Grouping can improve without losing issues
-Every stored fingerprint SHALL carry the version of the rules that made it. After the rules change, an exception that matches an existing issue under the old rules SHALL join that issue.
+Every stored fingerprint SHALL carry the version of the rules that made it. After the rules change, an exception whose new fingerprint is unknown SHALL join the issue it matches under the newest earlier rules that still have stored fingerprints.
 
 #### Scenario: New grouping rules
 - **WHEN** a release changes the rules and a known error occurs again
 - **THEN** it joins its existing issue, which gains the new fingerprint
+
+#### Scenario: Unseen for two versions
+- **WHEN** a known error occurs again after the rules changed twice
+- **THEN** it joins its existing issue
+
+### Requirement: Library code does not decide the group
+Grouping SHALL use the project's own code where the stack tells it from library code, and SHALL NOT depend on library frames where the stack does not.
+
+#### Scenario: Bundled server
+- **WHEN** a bundled server without source maps throws the same error after a library it uses is upgraded
+- **THEN** the error stays in its issue
+
+#### Scenario: Effect failure
+- **WHEN** an Effect program fails in the same named span with the same error, in two builds
+- **THEN** both are one issue
 
 ### Requirement: SDK fingerprints are honored
 A fingerprint set by the SDK SHALL replace the computed one, `{{ default }}` alone SHALL mean the computed one, and `{{ default }}` with other values SHALL divide the computed group by those values.
@@ -40,43 +55,55 @@ A fingerprint set by the SDK SHALL replace the computed one, `{{ default }}` alo
 - **THEN** there are two issues
 
 ### Requirement: Issues have a lifecycle
-An issue SHALL be open or resolved, and admins SHALL be able to resolve it. An open issue SHALL be shown as new or regressed while that is recent.
+An issue SHALL be open or resolved, and admins SHALL be able to resolve it. An open issue SHALL be shown as new or regressed for a day after it opened or reopened.
 
 #### Scenario: Resolving twice
 - **WHEN** a resolved issue is resolved again
-- **THEN** nothing changes and no event is recorded
+- **THEN** nothing changes and no audit entry is written
 
 ### Requirement: Regressions are real
-A resolved issue SHALL reopen as a regression only for an occurrence received after it was resolved.
+A resolved issue SHALL reopen as a regression only for a new occurrence received after it was resolved.
 
 #### Scenario: Regression
 - **WHEN** a resolved issue occurs again
 - **THEN** it is open and marked as regressed
+
+#### Scenario: Resend after resolving
+- **WHEN** an event stored before the issue was resolved is sent again after
+- **THEN** the issue stays resolved
 
 #### Scenario: Occurrence already on its way
 - **WHEN** an occurrence received before the issue was resolved is processed after
 - **THEN** the issue stays resolved
 
 ### Requirement: Counts describe retained data
-An issue SHALL show occurrences, people affected, and first and last seen, computed from retained data. A late occurrence SHALL move first seen earlier.
+An issue SHALL show occurrences, people affected and last seen, computed from retained data, and when it was first seen, which is kept with the issue. A late occurrence SHALL move first seen earlier. People SHALL be shown as a minimum when some occurrences were counted without details.
 
 #### Scenario: Late arrival
 - **WHEN** an error from yesterday is reported today, after a delay
 - **THEN** the issue was first seen yesterday
 
+#### Scenario: First occurrence expired
+- **WHEN** an issue's first occurrence is older than the retention period
+- **THEN** it still shows when it was first seen
+
 ### Requirement: A crash loop does not slow ingest
-One error's rate SHALL NOT limit ingest. Beyond a limit per issue and minute, occurrences SHALL be counted without keeping their details.
+Beyond a limit per issue and hour, occurrences SHALL be counted without keeping their details or using the allowance of other errors. If the part that counts them stops, at most the last minute of these counts MAY be lost.
 
 #### Scenario: Crash loop
 - **WHEN** one error occurs ten thousand times in a minute and all are accepted
 - **THEN** the issue shows ten thousand occurrences within two minutes, and details of only some
 
 ### Requirement: Alerts
-A project SHALL be able to be alerted by email for a new issue. Each issue SHALL raise that alert once.
+A project SHALL be able to be alerted by email for a new issue. Each issue SHALL raise that alert once. An alert SHALL be sent again only when a crash hid whether it was sent.
 
 #### Scenario: New issue
 - **WHEN** an issue is first seen
 - **THEN** one email links to it in the admin
+
+#### Scenario: Crash before the hand-over
+- **WHEN** ingest stops after storing a new issue and before its alert is handed over
+- **THEN** the alert is sent after the next stored error or the next daily cleanup
 
 #### Scenario: Delivery fails
 - **WHEN** an alert cannot be delivered

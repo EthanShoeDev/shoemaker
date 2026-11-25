@@ -25,11 +25,15 @@ Admins SHALL be able to see a user's id, name, email, roles, ban status and reas
 - **THEN** the response is 404
 
 ### Requirement: Admins can ban and unban
-Admins SHALL be able to ban a user with a reason, which ends all of that user's sessions, and to unban them. They SHALL NOT be able to ban themselves.
+Admins SHALL be able to ban a user, with or without a reason, which ends all of that user's sessions, and to unban them. They SHALL NOT be able to ban themselves.
 
 #### Scenario: Ban ends sessions
 - **WHEN** an admin bans a signed-in user
 - **THEN** that user's next request is unauthenticated
+
+#### Scenario: No reason
+- **WHEN** an admin bans a user without giving a reason
+- **THEN** the user is banned and the audit entry has no detail
 
 #### Scenario: Banning yourself
 - **WHEN** an admin bans their own account
@@ -40,8 +44,19 @@ Admins SHALL be able to sign in as a user for at most an hour. Impersonating ano
 
 #### Scenario: Impersonating a customer
 - **WHEN** an admin impersonates a user
-- **THEN** the browser is signed in as that user on the site and the admin subdomain
+- **THEN** the browser is signed in as that user wherever the project's session cookie reaches
+
+#### Scenario: Role that only the public app checks
+- **WHEN** an admin without the extra permission impersonates a user whose roles grant only permissions the project marks as public
+- **THEN** it is allowed
 
 #### Scenario: Impersonating an admin
 - **WHEN** an admin without the extra permission impersonates another admin
 - **THEN** the response is 403
+
+### Requirement: The users API returns account data only
+The users API SHALL return no project data, so reading users never needs a project's own permission.
+
+#### Scenario: Admin without the project's permission
+- **WHEN** an admin may list users but not read the project's billing
+- **THEN** the users list works

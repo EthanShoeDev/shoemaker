@@ -9,6 +9,8 @@ Facts checked in source:
 - The OpenFeature provider conformance suite is marked experimental.
 - OpenFeature Remote Evaluation Protocol (OFREP) 0.4.0 allows the reasons `STATIC`, `TARGETING_MATCH`, `SPLIT`, `DISABLED` and `UNKNOWN`, and has a no-value answer for code defaults. Results here use the same reasons, so remote evaluation can be added without changing them.
 
+Reads from D1 cost $0.001 per million rows (2026-11-25), so refreshing 500 flags every minute in a hundred isolates all month is about two dollars.
+
 Not verified: the licence of PostHog's flag test vectors, which it vendors from another repository.
 
 ## Goals / Non-Goals
@@ -21,7 +23,7 @@ Not verified: the licence of PostHog's flag test vectors, which it vendors from 
 
 ### 1. An OpenFeature-shaped model with one evaluator
 
-The evaluator is a pure function from definition and context to an [OpenFeature][openfeature] resolution. Everything else wraps it. An OpenFeature server provider reads definitions from the host's storage and caches them for up to a minute, refreshing when read because Workers have no background timers. No key is involved, since the host reads its own database. Browsers and mobile get values their server evaluated, never rules.
+The evaluator is a pure function from definition and context to an [OpenFeature][openfeature] resolution. Everything else wraps it. An OpenFeature server provider reads definitions from the host's storage and caches them for up to a minute, refreshing when read because Workers have no background timers. While storage fails, it tries again at most once every ten seconds, and an unknown flag never causes a read, so evaluating in a loop costs no more than not. No key is involved, since the host reads its own database. Browsers and mobile get values their server evaluated, never rules.
 
 Compliance means every mandatory provider requirement and the pinned conformance suite with declared capabilities. `@numeric-coercion` may be withheld, since JavaScript cannot tell `10.0` from `10`.
 
@@ -29,7 +31,9 @@ Compliance means every mandatory provider requirement and the pinned conformance
 
 ### 2. Definitions are plain rows
 
-They need no lifecycle, and flags then run on any target. `EventLog` is for devices that write offline; servers here read the host's own database.
+They need no lifecycle, and flags then run on any target. They live in the host's database and not in Edgehog's event database, so a flood of errors can't reach what the app needs to run. A row belongs to a project, since remote evaluation will let a project's key read that project's flags only, and a key is unique within it.
+
+A project may hold 500 flags and 1 MB of definitions, which bounds what a refresh reads. An isolate refreshes once a minute at most, so reads grow with running isolates and not with evaluations, and evaluating writes nothing. `EventLog` is for devices that write offline; servers here read the host's own database.
 
 ### 3. Assignment is PostHog's
 
@@ -49,7 +53,7 @@ Reused with a notice in `THIRD_PARTY_NOTICES`: PostHog's flag hash, from outside
 
 ## Migration Plan
 
-1. Publish; nothing changes for repos that don't install it.
+1. Publish, the first time by hand; nothing changes for repos that don't install it.
 2. Adopting project: add the package, mount its API, register the provider.
 3. Rollback: revert the repo's commit; code defaults apply.
 

@@ -21,6 +21,17 @@ An admin endpoint SHALL refuse a request without a valid session, and SHALL chec
 - **WHEN** an admin is banned and calls an admin endpoint with their old session
 - **THEN** the response is 401
 
+### Requirement: Admin changes come from the admin's own pages
+An admin request that a cookie authenticates and that is not a GET or HEAD SHALL be refused unless it comes from an origin the project lists.
+
+#### Scenario: Another subdomain
+- **WHEN** a page on a subdomain that is not listed sends a ban request with an admin's cookie
+- **THEN** the response is 403 and nothing changes
+
+#### Scenario: No origin
+- **WHEN** such a request carries no origin
+- **THEN** the response is 403 and nothing changes
+
 ### Requirement: Endpoints declare the permissions they need
 An admin endpoint SHALL run only when one of the caller's roles grants every permission the endpoint declares. A user's roles are a comma-separated list, and surrounding spaces are ignored.
 
@@ -53,6 +64,10 @@ A project SHALL be able to add its own permissions and roles to those of Better 
 #### Scenario: Product mounted without its permissions
 - **WHEN** a project mounts a product whose permissions are missing from its access rules
 - **THEN** startup fails with a message naming the product and the missing permission
+
+#### Scenario: Admin endpoint with a public permission
+- **WHEN** an admin endpoint needs only permissions that the project marks as checked by its public app
+- **THEN** startup fails and names the endpoint
 
 #### Scenario: Default admin role
 - **WHEN** a project installs a product and defines no roles of its own for it
@@ -88,7 +103,7 @@ The package SHALL let a project's own endpoints find out that a request comes fr
 - **THEN** the project can refuse the request with its own error
 
 ### Requirement: Listed accounts become admins on deploy
-A deploy SHALL give the admin role to every account whose email is in the `ADMIN_EMAILS` environment value, keeping the account's other roles. Emails match without regard to letter case.
+A deploy in which the `ADMIN_EMAILS` environment value changed, or that follows a failed grant, SHALL give the admin role to every account whose email is listed, keeping the account's other roles. Emails match without regard to letter case.
 
 #### Scenario: Account with another role
 - **WHEN** a listed account holds the role `host`
@@ -97,6 +112,14 @@ A deploy SHALL give the admin role to every account whose email is in the `ADMIN
 #### Scenario: Email with no account
 - **WHEN** a listed email has no account
 - **THEN** the deploy fails and names the email, and the other listed accounts are still granted the role
+
+#### Scenario: Fixed and deployed again
+- **WHEN** a deploy failed for a listed email without an account, the account is created and the deploy runs again
+- **THEN** the account holds `admin`
+
+#### Scenario: Demoted in the admin
+- **WHEN** a listed account loses the role through the admin and the next deploy has the same list
+- **THEN** the role is not given back
 
 #### Scenario: Nobody listed
 - **WHEN** `ADMIN_EMAILS` is empty
