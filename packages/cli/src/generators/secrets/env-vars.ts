@@ -1,4 +1,4 @@
-import { Array as Arr, Option, pipe, String as Str } from 'effect';
+import { Array as Arr, Option, Order, pipe } from 'effect';
 
 import type { Aggregate } from '../../engine/types.ts';
 import type { EnvVar } from './model.ts';
@@ -27,8 +27,9 @@ export const allEnvVars = (aggregate: Aggregate): ReadonlyArray<EnvVar> => {
   );
   return [
     override,
-    ...Arr.sort(contributed, (a: EnvVar, b: EnvVar) =>
-      Str.localeCompare(b.key)(a.key),
+    ...Arr.sort(
+      contributed,
+      Order.mapInput(Order.String, (v: EnvVar) => v.key),
     ),
   ];
 };

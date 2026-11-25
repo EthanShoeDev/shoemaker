@@ -119,10 +119,7 @@ const runLintIgnores = Effect.fnUntraced(function* (repo: Repo) {
         Arr.sort(
           directives,
           Order.combine(
-            Order.mapInput(
-              (a: string, b: string) => Str.localeCompare(b)(a),
-              (d: Directive) => d.file,
-            ),
+            Order.mapInput(Order.String, (d: Directive) => d.file),
             Order.mapInput(Order.Number, (d: Directive) => d.line),
           ),
         ),

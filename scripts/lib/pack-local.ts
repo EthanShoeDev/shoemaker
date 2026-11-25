@@ -6,9 +6,9 @@ import {
   Array as Arr,
   Effect,
   FileSystem,
+  Order,
   Path,
   Record as Rec,
-  String as Str,
 } from 'effect';
 
 import { readJsonObject, stringRecord, writeJson } from './json.ts';
@@ -58,8 +58,7 @@ export const pinTarballs = Effect.fnUntraced(function* (
   manifest.overrides = Rec.fromEntries(
     Arr.sort(
       Rec.toEntries({ ...stringRecord(manifest.overrides), ...overrides }),
-      ([a]: readonly [string, string], [b]: readonly [string, string]) =>
-        Str.localeCompare(b)(a),
+      Order.mapInput(Order.String, ([name]: readonly [string, string]) => name),
     ),
   );
   yield* writeJson(manifestPath, manifest);

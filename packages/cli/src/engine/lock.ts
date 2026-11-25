@@ -5,7 +5,6 @@ import {
   Record as Rec,
   Result,
   Schema,
-  String as Str,
 } from 'effect';
 import { Json5 } from 'effect/encoding';
 
@@ -55,7 +54,7 @@ export const parseLock = Effect.fnUntraced(function* (text: string) {
 });
 
 const byPath = Order.mapInput(
-  (a: string, b: string) => Str.localeCompare(b)(a),
+  Order.String,
   ([path]: readonly [string, LockEntry]) => path,
 );
 

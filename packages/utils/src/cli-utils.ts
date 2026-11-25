@@ -1,4 +1,4 @@
-import { Array as Arr, Effect, Path, Stream } from 'effect';
+import { Array as Arr, Effect, Path } from 'effect';
 import { ChildProcess, ChildProcessSpawner, CommandLine } from 'effect/process';
 
 type StandardOptions = ChildProcess.StandardCommand['options'];
@@ -82,31 +82,6 @@ export const CommandUtils = {
           // Without it a custom env replaces the inherited one, PATH included.
           extendEnv: true,
         }));
-    }),
-
-  /** Decodes a byte stream to one string, optionally tapping each chunk. */
-  bufferStringStream: <E, R, TapE = never, TapR = never>(
-    stream: Stream.Stream<Uint8Array, E, R>,
-    tap?: (value: string) => Effect.Effect<void, TapE, TapR>,
-  ): Effect.Effect<string, E | TapE, R | TapR> =>
-    stream.pipe(
-      Stream.decodeText(),
-      Stream.tap(tap ?? (() => Effect.void)),
-      Stream.mkString,
-    ),
-
-  /** Runs a command and returns its stdout. */
-  runString: (command: ChildProcess.Command) =>
-    Effect.gen(function* () {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      return yield* spawner.string(command);
-    }),
-
-  /** Runs a command and returns its exit code. */
-  runExitCode: (command: ChildProcess.Command) =>
-    Effect.gen(function* () {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      return yield* spawner.exitCode(command);
     }),
 
   /** Runs a command with its output on the terminal; returns the exit code. */

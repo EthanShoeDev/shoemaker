@@ -96,8 +96,10 @@ const effectFamily = Effect.fnUntraced(function* (repo: Repo) {
           `Not on effect ${line ?? '?'}.x, so not compared: ${Arr.join(Arr.sort(otherMajor, Order.String), ', ')}`,
         ];
 
-  const byName: Order.Order<readonly [string, Set<string>]> = ([a], [b]) =>
-    Str.localeCompare(b)(a);
+  const byName = Order.mapInput(
+    Order.String,
+    ([name]: readonly [string, Set<string>]) => name,
+  );
   const problems = Arr.flatMap(
     Arr.sort([...resolved], byName),
     ([name, versions]: readonly [string, Set<string>]) =>

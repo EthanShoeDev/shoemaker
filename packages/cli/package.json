@@ -35,7 +35,6 @@
     "access": "public"
   },
   "scripts": {
-    "test": "bun --bun vitest run",
     "prepack": "bun ../../scripts/publish-manifest.ts swap",
     "postpack": "bun ../../scripts/publish-manifest.ts restore"
   },

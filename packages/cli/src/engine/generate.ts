@@ -1,4 +1,10 @@
-import { Array as Arr, Record as Rec, Schema, String as Str } from 'effect';
+import {
+  Array as Arr,
+  Order,
+  Record as Rec,
+  Schema,
+  String as Str,
+} from 'effect';
 
 import type { ShoemakerConfig } from '../config/schema.ts';
 import { generators, renderers } from '../generators/index.ts';
@@ -80,8 +86,9 @@ const mergeFiles = (
       throw new Error(`Two generators emitted ${file.path}`);
     }
   }
-  return Arr.sort([...byPath.values()], (a: GeneratedFile, b: GeneratedFile) =>
-    Str.localeCompare(b.path)(a.path),
+  return Arr.sort(
+    byPath.values(),
+    Order.mapInput(Order.String, (file: GeneratedFile) => file.path),
   );
 };
 

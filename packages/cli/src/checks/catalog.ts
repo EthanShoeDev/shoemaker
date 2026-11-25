@@ -108,8 +108,7 @@ export const analyzeCatalog = Effect.fnUntraced(function* (repo: Repo) {
           (dep: MissingFromCatalog) => dep.usedIn.length,
         ),
       ),
-      (a: MissingFromCatalog, b: MissingFromCatalog) =>
-        Str.localeCompare(b.depName)(a.depName),
+      Order.mapInput(Order.String, (dep: MissingFromCatalog) => dep.depName),
     ),
   );
 

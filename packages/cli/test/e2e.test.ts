@@ -1,14 +1,6 @@
 import { BunServices } from '@effect/platform-bun';
 import { assert, beforeAll, describe, it } from '@effect/vitest';
-import {
-  Array as Arr,
-  Config,
-  Effect,
-  FileSystem,
-  Path,
-  Record as Rec,
-  String as Str,
-} from 'effect';
+import { Effect, FileSystem, Path, Record as Rec } from 'effect';
 
 import {
   readJsonObject,
@@ -35,20 +27,8 @@ const layout = Effect.gen(function* () {
   const path = yield* Path.Path;
   const root = yield* repoRoot;
   const out = path.join(root, '.e2e');
-  // `bun --bun vitest` puts a `node` -> bun shim first on PATH. The samples run
-  // under the real node, as they do for users: under bun, oxlint's config host
-  // truncates the `oxlint --rules --format json` output it parses.
-  const inheritedPath = yield* Config.String('PATH');
-  const PATH = Arr.join(
-    Arr.filter(
-      Str.split(inheritedPath, ':'),
-      (dir) => !Str.includes('/bun-node-')(dir),
-    ),
-    ':',
-  );
   return {
     out,
-    PATH,
     cli: path.join(root, 'packages/cli/src/bin.ts'),
     overridesFile: path.join(out, 'version-overrides.json'),
   };
@@ -71,12 +51,12 @@ beforeAll(
 const checkPreset = Effect.fnUntraced(function* (name: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const { out, PATH, cli, overridesFile } = yield* layout;
+  const { out, cli, overridesFile } = yield* layout;
   const config = presets[name];
   if (config === undefined) return;
   const overridesJson = yield* readJsonObject(overridesFile);
   const overrides = stringRecord(overridesJson);
-  const env = { PATH, SHOEMAKER_VERSION_OVERRIDES: overridesFile };
+  const env = { SHOEMAKER_VERSION_OVERRIDES: overridesFile };
   const dir = path.join(out, name);
 
   yield* fs.makeDirectory(dir, { recursive: true });

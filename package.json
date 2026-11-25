@@ -33,14 +33,14 @@
       "tsdown": "^0.23.7",
       "turbo": "^2.11.13",
       "typescript": "^7.0.2",
-      "vitest": "5.1.0"
+      "vitest": "^5.1.1"
     }
   },
   "type": "module",
   "scripts": {
     "prepare": "effect-tsgo patch --oxlint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --project '!cli' && bun --bun vitest run --project cli",
+    "test": "vitest run",
     "clean": "rm -rf .turbo",
     "oxlint:check": "oxlint -c oxlint.config.ts *.ts scripts",
     "oxlint:fix": "oxlint -c oxlint.config.ts --fix *.ts scripts",
