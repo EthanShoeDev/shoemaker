@@ -165,10 +165,10 @@ export const APK_PATH = 'android/app/build/outputs/apk/release/app-release.apk';
 const secretsHome = (ctx: GenContext) => {
   switch (ctx.config.secrets) {
     case 'varlock': {
-      return '`.env.local` (or a varlock plugin)';
+      return 'the remote store varlock reads';
     }
     case 'secretspec': {
-      return "secretspec's `production` profile";
+      return "the remote store behind secretspec's `production` profile";
     }
     case 'none': {
       return "your shell's environment";
@@ -203,8 +203,9 @@ base64 -w0 upload.keystore
 | \`${keys.alias}\` | \`upload\` |
 
 Set them as GitHub Actions secrets for the release workflow, and in
-${secretsHome(ctx)} for \`bun run apk:${app.name}\`. That builds the same APK
-locally, in the flake's \`android\` dev shell, which brings the Android SDK.
+${secretsHome(ctx)} for \`bun run apk:${app.name}\`, then delete
+\`upload.keystore\`. That script builds the same APK locally, in the flake's
+\`android\` dev shell, which brings the Android SDK.
 `;
 };
 

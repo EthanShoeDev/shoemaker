@@ -247,6 +247,47 @@ layer(services)('defineShoemakerConfig under oxlint', (it) => {
         expect(output).not.toContain('deep/skipped.ts');
       }),
   );
+
+  it.effect('bans packages Effect replaces, and the repo can add more', () =>
+    Effect.gen(function* () {
+      const { output } = yield* lint(
+        'banned-imports',
+        facade({
+          scope: 'probe',
+          bannedImports: [{ packages: ['left-pad'], message: 'Use padStart.' }],
+        }),
+        {
+          'banned.ts': [
+            "import 'jsonc-parser';",
+            "import 'json5/lib/parse';",
+            "import 'js-yaml';",
+            "import '@iarna/toml';",
+            "import 'zod/mini';",
+            "export * from 'valibot';",
+            "import 'left-pad';",
+            '',
+          ].join('\n'),
+          'allowed.ts': [
+            "import type { Infer } from 'zod';",
+            "import './toml.ts';",
+            "import '@scope/toml';",
+            "import 'zod-to-json-schema';",
+            'export type T = Infer;',
+            '',
+          ].join('\n'),
+          'src/vendor/upstream.ts': "import 'yaml';\n",
+          'probe.test.ts': "import 'yaml';\n",
+        },
+      );
+      const rule = 'eslint(no-restricted-imports)';
+      const bans = (file: string) =>
+        reportsAt(output, file).filter((name) => name === rule).length;
+      expect(bans('banned.ts')).toBe(7);
+      expect(bans('allowed.ts')).toBe(0);
+      expect(bans('src/vendor/upstream.ts')).toBe(0);
+      expect(bans('probe.test.ts')).toBe(1);
+    }),
+  );
 });
 
 layer(services)('shoemakerPreset with the composer', (it) => {

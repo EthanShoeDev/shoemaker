@@ -68,6 +68,15 @@ describe('varlock', () => {
     );
   });
 
+  it('shows the Infisical setup without its URL or a live decorator', () => {
+    const header = Str.split(schema, '\n# ---\n')[0];
+    assert.include(header, 'siteUrl=$INFISICAL_DOMAIN');
+    assert.notMatch(header, /^#\s*@(?:plugin|init|setValuesBulk)/mu);
+    assert.notMatch(header, /\.env\.local \(gitignored\)/u);
+    assert.include(text('AGENTS.md'), 'set up as the comment');
+    assert.include(text('AGENTS.md'), '`.env.schema`');
+  });
+
   it('never commits a secret value', () => {
     for (const v of Arr.filter(allEnvVars(aggregate), (x) => x.sensitive)) {
       assert.match(schema, new RegExp(`^${v.key}=$`, 'mu'), v.key);
@@ -109,9 +118,24 @@ describe('secretspec', () => {
     }
   });
 
+  it('shows a remote provider for every profile, host from the environment', () => {
+    assert.include(
+      toml,
+      '#   infisical = "infisical:///<project uuid>"\n#   [defaults]\n#   providers = ["infisical"]\n',
+    );
+    assert.include(text('AGENTS.md'), '`secretspec.toml`');
+  });
+
   it('puts the secretspec CLI in the nix shell', () => {
     assert.include(aggregate.nixPackages, 'secretspec');
     assert.match(text('flake.nix'), /^\s+secretspec$/mu);
+  });
+});
+
+describe('no secrets manager', () => {
+  it('has no secrets rule in AGENTS.md', () => {
+    const { text } = render(withSecrets(preset('web'), 'none'));
+    assert.notInclude(text('AGENTS.md'), '## Secrets');
   });
 });
 

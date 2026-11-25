@@ -12,10 +12,10 @@ const run = (config: ShoemakerConfig, args: string) =>
 const secretsLine = (config: ShoemakerConfig) => {
   switch (config.secrets) {
     case 'varlock': {
-      return '- Env: varlock (`.env.schema`), read through `ENV` from `varlock/env`\n';
+      return '- Env: varlock (`.env.schema`), read through `ENV` from `varlock/env`; secret values come from a remote store\n';
     }
     case 'secretspec': {
-      return '- Env: secretspec (`secretspec.toml`)\n';
+      return '- Env: secretspec (`secretspec.toml`); secret values come from a remote store\n';
     }
     case 'none': {
       return '';

@@ -29,6 +29,8 @@ export {
   resolvedPlugin,
 } from './helpers.ts';
 export type { OxlintRules } from './helpers.ts';
+export { effectReplacements } from './rules/imports.ts';
+export type { BannedImport } from './rules/imports.ts';
 export {
   declarationOverride,
   playwrightOverride,

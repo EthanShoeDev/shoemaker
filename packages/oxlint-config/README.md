@@ -44,6 +44,7 @@ export default defineShoemakerConfig({
 | `tanstackQuery` | Every `@tanstack/eslint-plugin-query` rule at `error`. |
 | `playwright` | Every `eslint-plugin-playwright` rule at `error` for `playwrightFiles` (default `e2eFiles`), minus the rejected ones. |
 | `testingLibrary` | Every `eslint-plugin-testing-library` rule at `error` for `testingLibraryFiles` (default `testingLibraryFiles`). |
+| `bannedImports` | `{ packages, message }` entries added to the packages `no-restricted-imports` bans because Effect replaces them (JSONC, YAML and TOML parsers, `zod`, `valibot`). Use this rather than `rules['no-restricted-imports']`, which replaces the shared list. Type imports are allowed. |
 | `web` | `env.browser` and `backdrop-filter/no-backdrop-filter`. |
 | `ignorePatterns` | Appended to the shared ignores. They use oxlint's gitignore syntax, so `CLAUDE.md` matches at any depth. |
 | `overrides` | Appended after the shared blocks, so they win over them. An oxlint override (`{ files, excludeFiles?, rules }`) keeps oxlint's glob meaning (`*.ts` matches at any depth). A flat config item, meaning one with a `name`, `ignores`, `basePath` or `extends`, is passed through unchanged with flat-config globs. |
@@ -94,6 +95,7 @@ Blocks, in order:
 | `shoemaker/effect` | global | `effectTsgoRules` and the rejected Effect rules |
 | `shoemaker/custom` | global | The custom plugin rules (`env-access`, `import-boundaries`, …) |
 | `shoemaker/anti-slop` | global | Every anti-slop rule at `error`, minus the rejected ones |
+| `shoemaker/banned-imports` | global | `no-restricted-imports` for `effectReplacements` and `bannedImports` |
 | `shoemaker/tanstack-query` | global | `tanstackQuery` only |
 | `shoemaker/dts` | scoped | `**/*.d.ts` |
 | `shoemaker/tests` | scoped | `testFiles` |
@@ -109,6 +111,7 @@ Order matters as in ESLint: a later block wins. A rule added with `.append()` th
 
 - `everyRuleOf(prefix, plugin)`: every rule of a jsPlugin at `error`.
 - `effectTsgoRules`: every rule from every `@effect/tsgo` oxlint preset at `error`.
+- `effectReplacements`: the shared `bannedImports` entries.
 - `effectVitestTestBlocks`: `it.effect`, `it.live`, … with modifiers, for `vitest/no-standalone-expect`.
 - `resolvedPlugin(name, specifier)`: a `{ name, specifier }` jsPlugins entry resolved to an absolute path.
 - Block builders: `testOverride`, `toolingOverride`, `vendoredOverride`, `declarationOverride`, `playwrightOverride`, `testingLibraryOverride`, `routesOverride`. Each returns the named scoped block and takes the files it applies to.

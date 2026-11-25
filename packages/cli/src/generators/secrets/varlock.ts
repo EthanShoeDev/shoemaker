@@ -18,6 +18,10 @@ import type { EnvVar } from './model.ts';
 // `# ---` divider are read as header too. That is where a repo adds its
 // plugins (`@plugin`, `@initInfisical`, ...); shoemaker has no plugin option
 // because their arguments (a self-hosted site URL, say) can be private.
+//
+// The header's Infisical example is in backticks because a comment line that
+// starts with `@` is a live decorator. Its `enabled` matters: with no site URL
+// the plugin falls back to Infisical's cloud and sends the credential there.
 
 const decorators = (v: EnvVar) =>
   Arr.join(
@@ -41,9 +45,22 @@ export const envSchema = (name: string, vars: ReadonlyArray<EnvVar>) => {
   const header = region(
     'header',
     `# Environment schema (env-spec) for ${name}. Declares every variable the
-# repo reads; values live in .env.local (gitignored) or a varlock plugin, never
-# here. App code reads them through \`ENV\` from varlock/env, never process.env.
-# Docs: https://varlock.dev/env-spec/overview/
+# repo reads. App code reads them through \`ENV\` from varlock/env, never
+# process.env. Docs: https://varlock.dev/env-spec/overview/
+#
+# Secret values live in a remote store that a varlock plugin reads, never here
+# and never in .env.local or another local file, gitignored or not. A private
+# repo uses the self-hosted Infisical: add @varlock/infisical-plugin to the root
+# devDependencies, and these to the slot below, without the backticks:
+#   \`@plugin(@varlock/infisical-plugin)\`
+#   \`@initInfisical(projectId=<uuid>, siteUrl=$INFISICAL_DOMAIN,\`
+#   \`  environment=remap($APP_ENV, development, dev, production, prod),\`
+#   \`  clientId=$INFISICAL_CLIENT_ID, clientSecret=$INFISICAL_CLIENT_SECRET)\`
+#   \`@setValuesBulk(infisicalBulk(), omit=[APP_ENV, INFISICAL_*],\`
+#   \`  enabled=not(isEmpty($INFISICAL_DOMAIN)))\`
+# then declare the three INFISICAL_ variables at the end of this file as
+# \`@optional @sensitive @internal\`. Each machine and CI sets them in its
+# environment. A public repo never contains the server's URL.
 #
 # @defaultSensitive=false @defaultRequired=infer @currentEnv=$APP_ENV`,
     '#',

@@ -45,6 +45,41 @@ const envRule = (config: ShoemakerConfig) =>
   \`no-raw-env-access\` lint rule enforces it).`
     : '';
 
+// How each manager is named in the rule below.
+const SECRETS = {
+  varlock: {
+    file: '.env.schema',
+    source: 'a varlock plugin',
+    local: '`.env.local`, even `varlock("local:...")`',
+    device: 'encrypted with `varlock encrypt`',
+  },
+  secretspec: {
+    file: 'secretspec.toml',
+    source: 'a secretspec provider',
+    local: '`.env`, the `dotenv` or `keyring` provider',
+    device: 'in the keyring',
+  },
+};
+
+const secretsRegion = (config: ShoemakerConfig) => {
+  if (config.secrets === 'none') return '';
+  const { file, source, local, device } = SECRETS[config.secrets];
+  const rule = `## Secrets
+
+- Secret values live in a remote store, read through ${source}. Never
+  keep one in a local file, gitignored or not (${local}).
+  If a value is missing, ask the user to add it to the store.
+- A private repo uses the user's self-hosted Infisical, set up as the comment
+  at the top of \`${file}\` shows. A public repo may use any remote store.
+- Infisical's URL comes from \`INFISICAL_DOMAIN\`. Never write it in a public
+  repo, or its commits, issues and pull requests. If the variable is unset,
+  ask: do not guess, and do not fall back to Infisical's cloud.
+- Only the credential that opens the store may be on a machine, in its
+  environment or ${device}. \`bunx shoemaker doctor\`
+  checks all of this.`;
+  return `\n${region('secrets', rule, '<!--')}\n`;
+};
+
 const codeStyle = (config: ShoemakerConfig) => `## Code style
 
 - Prefer concise, simple solutions. Propose a simpler approach when one exists.
@@ -96,7 +131,7 @@ ${region('workflow', workflow(config), '<!--')}
 ${region('code-style', codeStyle(config), '<!--')}
 
 ${region('tooling', tooling, '<!--')}
-${hasOpenspec(config) ? `\n${region('openspec', openspec, '<!--')}\n` : ''}
+${secretsRegion(config)}${hasOpenspec(config) ? `\n${region('openspec', openspec, '<!--')}\n` : ''}
 ## Project notes
 
 Project-specific rules go here; shoemaker never touches this section.

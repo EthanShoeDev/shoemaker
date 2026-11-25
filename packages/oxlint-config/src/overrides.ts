@@ -114,6 +114,8 @@ export const vendoredOverride = (
     'effecttsgo/return-effect-in-gen': 'off',
     // Nested combinator calls in upstream form.
     'effecttsgo/missed-pipeable-opportunity': 'off',
+    // Upstream picks its own parsers.
+    'no-restricted-imports': 'off',
     // `import` after an `export … from` block.
     'import/first': 'off',
     // `process.env` in upstream credential providers.

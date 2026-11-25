@@ -48,8 +48,14 @@ they're the setup I use for my own repos.
 - **Secrets**: varlock or secretspec. In `.env.schema`, the lines between
   shoemaker's header and the `# ---` divider belong to the repo: varlock
   plugins (`@plugin`, `@initInfisical`, ...) go there and `sync` leaves them
-  alone. A public repo passes private plugin arguments, such as a self-hosted
-  URL, as `$VAR` references instead of writing them in.
+  alone.
+- **Remote secrets only**: secret values come from a remote store, never from a
+  local file, gitignored or not. Private repos use a self-hosted Infisical.
+  `.env.schema` and `secretspec.toml` start with its setup, AGENTS.md tells
+  coding agents the rule, and `doctor` (`secrets-backend`) fails on a manager
+  with no remote backend, a local provider, or a secret left in a `.env*` file.
+  Only the credential that opens the store may be on a machine. Infisical's URL
+  comes from `INFISICAL_DOMAIN`, so a public repo never contains it.
 - **Infra**: alchemy, deploying to Cloudflare or AWS, plus GitHub for repos
   and Actions secrets
 - **Environment**: a Nix dev shell, GitHub Actions CI, and an AGENTS.md for

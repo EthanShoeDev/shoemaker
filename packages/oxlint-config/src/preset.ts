@@ -40,6 +40,8 @@ import {
   vitest,
 } from './rules/base.ts';
 import { antiSlopRules, custom, effect } from './rules/effect.ts';
+import { effectReplacements, restrictedImports } from './rules/imports.ts';
+import type { BannedImport } from './rules/imports.ts';
 import { react, reactCompiler } from './rules/react.ts';
 
 export type ShoemakerPresetOptions = {
@@ -67,6 +69,11 @@ export type ShoemakerPresetOptions = {
    * right way to read env then.
    */
   varlock?: boolean;
+  /**
+   * Added to the packages no-restricted-imports bans because Effect replaces
+   * them. Set here rather than in `rules`, which would replace the shared list.
+   */
+  bannedImports?: Array<BannedImport>;
 };
 
 /** The built-in plugins whose categories are on; react-only ones are added with `react`. */
@@ -101,6 +108,7 @@ export const shoemakerPresetParts = (options: ShoemakerPresetOptions) => {
     testingLibrary = false,
     web = false,
     varlock = false,
+    bannedImports = [],
   } = options;
 
   const global: Array<FlatConfigItem> = [
@@ -215,6 +223,10 @@ export const shoemakerPresetParts = (options: ShoemakerPresetOptions) => {
     { name: 'shoemaker/effect', rules: effect },
     { name: 'shoemaker/custom', rules: custom(scope, varlock) },
     { name: 'shoemaker/anti-slop', rules: antiSlopRules },
+    {
+      name: 'shoemaker/banned-imports',
+      rules: restrictedImports([...effectReplacements, ...bannedImports]),
+    },
     withTanstackQuery && {
       name: 'shoemaker/tanstack-query',
       rules: everyRuleOf('@tanstack/query', tanstackQuery),
