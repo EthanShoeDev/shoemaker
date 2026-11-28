@@ -27,6 +27,7 @@ import {
 import { impersonatedBy } from '../src/server.ts';
 import { Accounts } from './support/accounts.ts';
 import { as, cookieFrom, makeHost, post, serve } from './support/app.ts';
+import { captureLogs } from './support/logs.ts';
 import { AuditOutage } from './support/memory-audit-log.ts';
 import { MemoryUsers } from './support/memory-users.ts';
 import { operationsSuite } from './support/operations-suite.ts';
@@ -36,8 +37,14 @@ usersSuite('in-memory accounts', MemoryUsers);
 
 operationsSuite('in-memory accounts', MemoryUsers);
 
-const setup = Effect.gen(function* () {
-  const { services, send } = yield* makeHost(MemoryUsers);
+const setupWith = Effect.fnUntraced(function* (
+  environment: Layer.Layer<never> = Layer.empty,
+) {
+  const { services, send } = yield* makeHost(
+    MemoryUsers,
+    undefined,
+    environment,
+  );
   const accounts = Context.get(services, Accounts);
   const ada = yield* accounts.create({
     email: 'ada@example.com',
@@ -57,6 +64,8 @@ const setup = Effect.gen(function* () {
     ),
   };
 });
+
+const setup = setupWith();
 
 describe('an id the database finds by another spelling', () => {
   it.effect('is no way to change or delete oneself', () =>
@@ -193,7 +202,8 @@ describe('an impersonation that started as something changed', () => {
 describe('A missing audit entry is never silent', () => {
   it.effect('an impersonation without an entry signs nobody in', () =>
     Effect.gen(function* () {
-      const { asAda, customer, services } = yield* setup;
+      const logs = yield* captureLogs;
+      const { asAda, customer, services } = yield* setupWith(logs.layer);
       yield* Ref.set(Context.get(services, AuditOutage), true);
       const response = yield* asAda(
         `/users/${customer.id}/impersonate`,
@@ -201,6 +211,13 @@ describe('A missing audit entry is never silent', () => {
       );
       assert.strictEqual(response.status, 500);
       assert.deepStrictEqual(response.headers.getSetCookie(), []);
+      const lines = yield* logs.lines;
+      const said = Arr.filter(
+        lines,
+        Str.includes('An admin action happened without an audit entry'),
+      );
+      assert.lengthOf(said, 1);
+      assert.include(said[0] ?? '', customer.id);
     }),
   );
 });

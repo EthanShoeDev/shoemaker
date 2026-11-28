@@ -428,7 +428,11 @@ export const operationsSuite = <E>(
 
       it.effect('an account whose link was not sent is recorded and said', () =>
         Effect.gen(function* () {
-          const { accounts, asAda, entries } = yield* setup();
+          const logs = yield* captureLogs;
+          const { accounts, asAda, entries } = yield* setup(
+            undefined,
+            logs.layer,
+          );
           yield* accounts.breakMail;
           const response = yield* asAda('/users', post(invitation));
           assert.strictEqual(response.status, 200);
@@ -439,6 +443,12 @@ export const operationsSuite = <E>(
             Arr.map(recorded, (entry) => [entry.action, entry.targetUserId]),
             [['user.invite', user.id]],
           );
+          const lines = yield* logs.lines;
+          const said = Arr.filter(
+            lines,
+            Str.includes('An invited user was sent no link'),
+          );
+          assert.lengthOf(said, 1);
         }),
       );
     });

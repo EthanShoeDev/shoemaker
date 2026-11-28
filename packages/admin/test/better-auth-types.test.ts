@@ -45,6 +45,8 @@ const twice = BetterAuth({
   baseURL: 'http://localhost:3000',
   secret: 'test-secret-test-secret-test-secret-test',
   telemetry: { enabled: false },
+  // It logs the conflict it is refused for.
+  logger: { disabled: true },
   plugins: [adminPlugin(access), admin({ adminUserIds: ['eve'] })],
 }).pipe(Effect.provide(Memory()));
 

@@ -2,6 +2,7 @@ import { NodeServices } from '@effect/platform-node';
 import { PgClient } from '@effect/sql-pg';
 import {
   Array as Arr,
+  Clock,
   Config,
   Context,
   Effect,
@@ -113,8 +114,13 @@ const connectionTo = (source: PostgresSource) =>
     }),
   );
 
+// On the real clock even in a test: a test clock never lets the client's own
+// timers fire, so a connection that hangs would wait for the test's timeout
+// instead of the client's.
 const connect = (connection: Connection, database: string) =>
-  PgClient.layer({ ...connection, database });
+  PgClient.layer({ ...connection, database }).pipe(
+    Layer.provide(Layer.succeed(Clock.Clock, Clock.Clock.defaultValue())),
+  );
 
 export class Postgres extends Context.Service<
   Postgres,

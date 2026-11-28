@@ -107,9 +107,11 @@ describe('PasswordLinks', () => {
   it.effect('an invite whose link could never work makes no account', () =>
     Effect.gen(function* () {
       const { adaCookie, auth, db } = yield* world();
+      const logs = yield* captureLogs;
       const { send, services } = yield* makeHost(
         backend(auth),
         usersLive({ invite: linkTo('https://elsewhere.test/x') }),
+        logs.layer,
       );
       const response = yield* send(
         '/admin/users',
@@ -119,6 +121,10 @@ describe('PasswordLinks', () => {
       assert.lengthOf(db.user, 2);
       const page = yield* Context.get(services, AuditLog).list({ limit: 9 });
       assert.deepStrictEqual(page.items, []);
+      const lines = yield* logs.lines;
+      const said = Arr.filter(lines, Str.includes('outcome is unknown'));
+      assert.lengthOf(said, 1);
+      assert.include(said[0] ?? '', 'UnsafeAuthOptions');
     }),
   );
 });
@@ -476,7 +482,12 @@ describe('setting roles', () => {
         },
       });
       refuse = true;
-      const { send, services } = yield* makeHost(backend(auth));
+      const logs = yield* captureLogs;
+      const { send, services } = yield* makeHost(
+        backend(auth),
+        undefined,
+        logs.layer,
+      );
       const response = yield* send(
         `/admin/users/${bob.id}/roles`,
         as(adaCookie, post({ roles: ['admin'] }, 'PUT')),
@@ -484,6 +495,10 @@ describe('setting roles', () => {
       assert.strictEqual(response.status, 500);
       const page = yield* Context.get(services, AuditLog).list({ limit: 9 });
       assert.deepStrictEqual(page.items, []);
+      const lines = yield* logs.lines;
+      const said = Arr.filter(lines, Str.includes('outcome is unknown'));
+      assert.lengthOf(said, 1);
+      assert.include(said[0] ?? '', bob.id);
     }),
   );
 });
@@ -519,6 +534,8 @@ describe('an impersonation', () => {
         },
       });
       const cookie = yield* it_.impersonate;
+      // Better Auth's router prints what it answers 500 for.
+      const printed = yield* printing;
       const exit = yield* Effect.exit(
         it_.send({ path: '/api/auth/admin/stop-impersonating', cookie }),
       );
@@ -527,6 +544,7 @@ describe('an impersonation', () => {
         onSuccess: ({ status }) => status >= 500,
       });
       assert.isTrue(failed);
+      assert.include(Arr.join(printed, '\n'), 'broken hook');
       assert.deepStrictEqual(
         Arr.map(it_.entries, (entry) => [entry.action, entry.target?.id]),
         [['user.stop-impersonating', it_.bob.id]],

@@ -152,6 +152,8 @@ export const options = {
   },
   rateLimit: { enabled: false },
   telemetry: { enabled: false },
+  // Tests provoke what it logs; they check what the package does instead.
+  logger: { disabled: true },
   // Better Auth turns its origin check off under vitest.
   advanced: { disableOriginCheck: false },
 };
