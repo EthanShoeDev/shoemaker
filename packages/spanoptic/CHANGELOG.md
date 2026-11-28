@@ -1,5 +1,16 @@
 # shoemaker-spanoptic
 
+## 0.0.4
+
+### Patch Changes
+
+- [`0d0c717`](https://github.com/EthanShoeDev/shoemaker/commit/0d0c7179578fc965546c8d3a41f4397aa4e4b174) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Spans come from an Effect `Tracer` instead of the OpenTelemetry SDK, which
+  drops `@effect/opentelemetry` and the three `@opentelemetry/*` packages.
+  Attributes set after a span starts now show in the details panel.
+  Spans Effect does not sample (`sampled: false`, below
+  `Tracer.MinimumTraceLevel`, or under such a span) are left out, and logs are no
+  longer also recorded as span events, which nothing read.
+
 ## 0.0.3
 
 ### Patch Changes
