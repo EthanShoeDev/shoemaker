@@ -1,5 +1,48 @@
 # shoemaker
 
+## 0.2.11
+
+### Patch Changes
+
+- [`0cdc36c`](https://github.com/EthanShoeDev/shoemaker/commit/0cdc36cf6ce021d3c8538ec75b83410aa8d27357) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - CI runs in the flake's dev shell. The setup action installs Nix and enters the
+  default dev shell instead of installing bun alone, so CI gets the same bun,
+  node, `nixPackages` (ffmpeg, say) and shellHook environment as `nix develop`.
+  Before, anything listed in `nixPackages` was missing in CI, and code that
+  needed it could pass there without running. The bun pin is now in two places
+  (`packageManager` and the flake), and the Android release job uses the Nix
+  from the setup action. The setup action caches the Nix store for each job,
+  keyed on the repo's nix files. Only runs on the default branch save the cache,
+  and pull requests restore it, so a warm run downloads nothing.
+  
+  `sync` rewrites the setup action, so a repo picks this up with no steps of its
+  own. Before you sync, check the hand-written part of `flake.nix`'s shellHook,
+  because it now runs in CI too. A command that needs a terminal, local files or
+  credentials has to skip CI, for example with `if [ -z "$CI" ]; then … fi`.
+
+- [`f11b19f`](https://github.com/EthanShoeDev/shoemaker/commit/f11b19f5b005afcbe6b5659b7da2005202996237) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - The credential that opens the secrets store (`INFISICAL_CLIENT_ID` and
+  `INFISICAL_CLIENT_SECRET`) comes from the environment only. `doctor`
+  (`secrets-backend`) now fails when a dotenv file holds it, even encrypted with
+  `varlock encrypt`, and AGENTS.md no longer offers that route.
+  
+  Public repos use the self-hosted Infisical too, not just private ones: its URL
+  comes from `INFISICAL_DOMAIN`, which every machine sets, so no repo contains it.
+  AGENTS.md, the `.env.schema` and `secretspec.toml` headers and doctor's fixes
+  say so.
+  
+  `sync` rewrites the AGENTS.md rule and the file headers. A repo that followed the earlier advice
+  and keeps the credential in a file needs these steps:
+  
+  1. Run `bunx shoemaker doctor` and find the `secrets-backend` finding that
+     names the file holding the store's credential.
+  2. Ask the user to set each variable it names in their environment (their
+     shell profile or a password manager's shell integration, outside the repo).
+     Do not print or copy the values yourself.
+  3. Check that `varlock load` resolves every variable from a new shell.
+  4. Have the user delete those lines from the file, and delete the file if
+     nothing is left in it.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.11
+
 ## 0.2.10
 
 ### Patch Changes
