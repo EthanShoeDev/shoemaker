@@ -372,6 +372,23 @@ export const usersSuite = <E>(
         }),
       );
 
+      it.effect('impersonating an admin with the permissions split', () =>
+        Effect.gen(function* () {
+          const { accounts, ada, send } = yield* setup;
+          // `admin` grants `impersonate`, another role `impersonate-admins`.
+          const split = yield* accounts.create({
+            email: 'split@example.com',
+            roles: 'admin, adminImpersonator',
+          });
+          const cookie = yield* accounts.signIn(split.id);
+          const response = yield* send(
+            `/admin/users/${ada.id}/impersonate`,
+            as(cookie, post()),
+          );
+          assert.strictEqual(response.status, 403);
+        }),
+      );
+
       it.effect('yourself, or a banned user', () =>
         Effect.gen(function* () {
           const { accounts, asAda, customer, send } = yield* setup;

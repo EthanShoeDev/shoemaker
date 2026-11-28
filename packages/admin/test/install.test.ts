@@ -5,7 +5,7 @@ import { INSTALL_TIMEOUT, installed } from 'shoemaker-utils/testing/install';
 
 const MANIFEST = `${import.meta.dirname}/../package.json`;
 
-const install = (beside: Readonly<Record<string, string>>) =>
+const install = (beside: ReadonlyArray<string>) =>
   installed({ manifests: [MANIFEST], beside });
 
 const UNWANTED =
@@ -16,7 +16,7 @@ it.layer(NodeServices.layer)('installing the package', (it) => {
     'beside effect pulls only effect',
     () =>
       Effect.gen(function* () {
-        const names = yield* install({ effect: '4.1.5' });
+        const names = yield* install(['effect']);
         assert.include(names, 'shoemaker-admin');
         assert.include(names, 'effect');
         for (const optional of ['alchemy', 'better-auth']) {
@@ -34,12 +34,12 @@ it.layer(NodeServices.layer)('installing the package', (it) => {
     'on Bun and Postgres needs neither React nor Cloudflare',
     () =>
       Effect.gen(function* () {
-        const names = yield* install({
-          effect: '4.1.5',
-          '@effect/platform-bun': '4.1.5',
-          '@effect/sql-pg': '4.1.5',
-          'better-auth': '1.7.15',
-        });
+        const names = yield* install([
+          'effect',
+          '@effect/platform-bun',
+          '@effect/sql-pg',
+          'better-auth',
+        ]);
         assert.include(names, 'better-auth');
         assert.deepStrictEqual(
           Arr.filter(names, (name) => UNWANTED.test(name)),
@@ -53,13 +53,12 @@ it.layer(NodeServices.layer)('installing the package', (it) => {
     'with Alchemy adds nothing of its own',
     () =>
       Effect.gen(function* () {
-        const chosen = {
-          effect: '4.1.5',
-          alchemy: '2.0.0-beta.87',
-          '@alchemy.run/better-auth': '2.0.0-beta.87',
-          'better-auth': '1.7.15',
-        };
-        const names = yield* install(chosen);
+        const names = yield* install([
+          'effect',
+          'alchemy',
+          '@alchemy.run/better-auth',
+          'better-auth',
+        ]);
         assert.include(names, '@alchemy.run/better-auth');
         assert.deepStrictEqual(
           Arr.filter(names, (name) => UNWANTED.test(name)),

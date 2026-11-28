@@ -21,7 +21,7 @@ import {
 } from '../core/audit.ts';
 import { type AdminCaller, CurrentAdmin } from '../core/caller.ts';
 import { Forbidden, Unauthorized } from '../core/errors.ts';
-import { AdminSessions, type Ban } from '../core/ports.ts';
+import { AdminSessions, isBanActive } from '../core/ports.ts';
 import { AdminSetupError } from './setup-error.ts';
 
 // One call, whatever transport it came by.
@@ -39,10 +39,6 @@ export interface AdminRequest {
 }
 
 const refuse = (message: string) => Effect.fail(Forbidden.make({ message }));
-
-const isActive = (ban: Ban | null, now: DateTime.Utc) =>
-  ban !== null &&
-  (ban.expiresAt === null || DateTime.isGreaterThan(ban.expiresAt, now));
 
 // What a browser would send as `Origin` for a listed address.
 const originOf = (listed: string) => {
@@ -77,7 +73,7 @@ const make = Effect.fnUntraced(function* (options: {
     // Better Auth checks a ban only when a session is created, so a session
     // that outlived one is caught here.
     const now = yield* DateTime.now;
-    if (isActive(user.ban, now)) {
+    if (isBanActive(user.ban, now)) {
       return yield* Unauthorized.make({ message: 'This account is banned.' });
     }
     if (impersonatedBy !== null) {

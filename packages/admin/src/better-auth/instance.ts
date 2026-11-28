@@ -58,7 +58,7 @@ export interface AnyAuth {
           forceAllowId: true;
         }) => Promise<unknown>;
         readonly findMany: (
-          query: SessionQuery & { limit: number },
+          query: SessionQuery & { limit: number; offset?: number },
         ) => Promise<unknown>;
       };
     }

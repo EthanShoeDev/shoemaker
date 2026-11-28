@@ -9,6 +9,7 @@ import {
   Fiber,
   Layer,
   Option,
+  Predicate,
   Schema,
   Scope,
   String as Str,
@@ -286,6 +287,33 @@ describe('a ban', () => {
   );
 });
 
+describe('a change of roles', () => {
+  it.live('ends impersonations behind many ordinary sessions', () =>
+    Effect.gen(function* () {
+      const it_ = yield* world();
+      yield* Effect.forEach(
+        Arr.range(1, 60),
+        () => it_.accounts.signIn(it_.bob.id),
+        {
+          concurrency: 1,
+          discard: true,
+        },
+      );
+      // Sessions without the field, which the memory adapter's
+      // `impersonatedBy ne null` matches.
+      assert.isTrue(
+        Arr.every(sessionsOf(it_.db, it_.bob.id), (row) =>
+          Predicate.isUndefined(row.impersonatedBy),
+        ),
+      );
+      yield* it_.impersonate;
+      yield* it_.directory.setRoles(it_.bob.id, ['user', 'host']);
+      const live = yield* liveOf(it_, 'impersonatedBy', it_.ada.id);
+      assert.lengthOf(live, 0);
+    }),
+  );
+});
+
 describe('stopping an impersonation', () => {
   const stop = { path: '/api/auth/admin/stop-impersonating' };
 
@@ -551,4 +579,23 @@ describe('the ports', () => {
       assert.isTrue(Option.isSome(found));
     }),
   );
+});
+
+describe('the admin plugin', () => {
+  it('drops options that would bypass a check, even through a cast', () => {
+    const plugin = adminPlugin(access, {
+      bannedUserMessage: 'Gone.',
+      adminUserIds: ['eve'],
+      allowImpersonatingAdmins: true,
+      defaultRole: 'admin',
+    } as never);
+    assert.strictEqual(plugin.options?.bannedUserMessage, 'Gone.');
+    for (const key of [
+      'adminUserIds',
+      'allowImpersonatingAdmins',
+      'defaultRole',
+    ]) {
+      assert.notProperty(plugin.options ?? {}, key);
+    }
+  });
 });

@@ -288,6 +288,42 @@ layer(services)('defineShoemakerConfig under oxlint', (it) => {
       expect(bans('probe.test.ts')).toBe(1);
     }),
   );
+  it.effect('keeps the shared bans in an override that sets the rule', () =>
+    Effect.gen(function* () {
+      const { output } = yield* lint(
+        'banned-imports-override',
+        Effect.map(
+          entry,
+          (from) =>
+            `import { defineShoemakerConfig, effectReplacements, restrictedImports } from ${from};\n` +
+            'export default defineShoemakerConfig({\n' +
+            "  scope: 'probe',\n" +
+            "  overrides: [{ files: ['client/**'], rules: restrictedImports([\n" +
+            '    ...effectReplacements,\n' +
+            "    { packages: ['node:fs'], importNames: ['readFileSync'], message: 'Async only.' },\n" +
+            '  ]) }],\n' +
+            '});\n',
+        ),
+        {
+          'client/c.ts': [
+            "import 'zod';",
+            "import { readFileSync } from 'node:fs';",
+            "import { readFile } from 'node:fs';",
+            'export const read = [readFileSync, readFile];',
+            '',
+          ].join('\n'),
+        },
+      );
+      const lines = output
+        .split('\n')
+        .filter(
+          (line) =>
+            line.startsWith('client/c.ts:') &&
+            line.includes('no-restricted-imports'),
+        );
+      expect(lines.map((line) => line.split(':')[1])).toEqual(['1', '2']);
+    }),
+  );
 });
 
 layer(services)('shoemakerPreset with the composer', (it) => {

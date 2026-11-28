@@ -53,7 +53,9 @@ they're the setup I use for my own repos.
   local file, gitignored or not. Private repos use a self-hosted Infisical.
   `.env.schema` and `secretspec.toml` start with its setup, AGENTS.md tells
   coding agents the rule, and `doctor` (`secrets-backend`) fails on a manager
-  with no remote backend, a local provider, or a secret left in a `.env*` file.
+  with no remote backend, a local provider, or a secret left in
+  `.env`, `.env.local` or a stage's dotenv file (`.env.production.local`; not
+  `.env.test`).
   Only the credential that opens the store may be on a machine. Infisical's URL
   comes from `INFISICAL_DOMAIN`, so a public repo never contains it.
 - **Infra**: alchemy, deploying to Cloudflare or AWS, plus GitHub for repos

@@ -1,5 +1,6 @@
 // Renders the agent skills of the OpenSpec that versions.ts pins into
-// packages/cli/src/generators/openspec/skills.gen.ts, and into this repo.
+// packages/cli/src/generators/openspec/skills.gen.ts, and into this repo,
+// whose root catalog it pins to the same CLI.
 //
 //   bun scripts/update-openspec-skills.ts
 //

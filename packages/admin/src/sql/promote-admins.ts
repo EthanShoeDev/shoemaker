@@ -1,4 +1,4 @@
-import { Array as Arr, Effect, Schema, String as Str } from 'effect';
+import { Array as Arr, Effect, Result, Schema, String as Str } from 'effect';
 import { SqlClient } from 'effect/sql';
 
 import { parseRoles } from '../core/roles.ts';
@@ -86,13 +86,18 @@ export const promoteAdmins = Effect.fn('promoteAdmins')(function* (
 
   const attempt = Effect.fnUntraced(function* (email: string) {
     const accounts = yield* find([email]);
+    // Deleted since it was first read.
+    if (!Arr.isReadonlyArrayNonEmpty(accounts)) return 'gone' as const;
     const granted = yield* Effect.forEach(accounts, grant, { concurrency: 1 });
-    return Arr.every(granted, (done) => done);
+    return Arr.every(granted, (done) => done)
+      ? ('granted' as const)
+      : ('contended' as const);
   });
 
   const retry = Effect.fnUntraced(function* (email: string) {
     for (let tries = 1; tries < MAX_ATTEMPTS; tries++) {
-      if (yield* attempt(email)) return;
+      const outcome = yield* attempt(email);
+      if (outcome !== 'contended') return outcome;
     }
     return yield* AdminRoleContended.make({ email });
   });
@@ -108,14 +113,21 @@ export const promoteAdmins = Effect.fn('promoteAdmins')(function* (
     (account) => Effect.map(grant(account), (done) => !done),
     { concurrency: 1 },
   );
-  yield* Effect.forEach(
+  const retried = yield* Effect.forEach(
     contended,
-    (account) => retry(Str.toLowerCase(account.email)),
-    { concurrency: 1, discard: true },
+    (account) => {
+      const email = Str.toLowerCase(account.email);
+      return Effect.map(retry(email), (outcome) => ({ email, outcome }));
+    },
+    { concurrency: 1 },
+  );
+  const gone = Arr.filterMap(retried, ({ email, outcome }) =>
+    outcome === 'gone' ? Result.succeed(email) : Result.failVoid,
   );
 
-  const found = Arr.dedupe(
-    Arr.map(accounts, (account) => Str.toLowerCase(account.email)),
+  const found = Arr.difference(
+    Arr.dedupe(Arr.map(accounts, (account) => Str.toLowerCase(account.email))),
+    gone,
   );
   const missing = Arr.difference(wanted, found);
   if (Arr.isReadonlyArrayNonEmpty(missing)) {

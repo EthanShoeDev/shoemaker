@@ -76,8 +76,10 @@ export const adminPlugin = <
   access: PluginAccess<Ac, Roles>,
   options: Pick<AdminOptions, 'bannedUserMessage' | 'schema'> = {},
 ): AdminPluginBrand & ReturnType<typeof admin<GuardedOptions<Ac, Roles>>> => {
+  // Named, not spread: only the type would keep out the rest.
   const plugin = admin<GuardedOptions<Ac, Roles>>({
-    ...options,
+    bannedUserMessage: options.bannedUserMessage,
+    schema: options.schema,
     ac: access.ac,
     roles: access.roles,
     adminRoles: [...access.adminRoles],

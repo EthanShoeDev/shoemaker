@@ -541,7 +541,7 @@ export const databaseSuite = <E, R = never>(
         yield* sameMembers(roles, [
           ['ada@example.com', 'host,admin'],
           ['Bob@example.com', 'user,host,admin'],
-          ['cyd@example.com', 'admin'],
+          ['cyd@example.com', 'user,admin'],
           ['dan@example.com', 'user, admin'],
           ['eve@example.com', 'user'],
         ]);

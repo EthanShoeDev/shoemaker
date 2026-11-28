@@ -20,6 +20,16 @@ describe('defineAccess', () => {
     }
   });
 
+  it('reads an empty role list as the default role, as Better Auth does', () => {
+    const granted = defineAccess({
+      products: [usersProduct],
+      roles: { user: { user: ['list'] } },
+    });
+    for (const none of ['', ' , ', null, undefined]) {
+      assert.isTrue(granted.can(none, { user: ['list'] }), String(none));
+    }
+  });
+
   it('needs one role to grant every permission', () => {
     const both = { user: ['list'], billing: ['grant'] } as const;
     assert.isFalse(access.can('lister, support', both));
@@ -83,6 +93,7 @@ describe('defineAccess', () => {
       'promoter',
       'recruiter',
       'owner',
+      'adminImpersonator',
     ]);
     assert.isFalse(access.rules.isAdmin(['user', 'host', 'unknown']));
     assert.isTrue(access.rules.isAdmin(['host', 'support']));

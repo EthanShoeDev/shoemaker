@@ -11,7 +11,7 @@ import {
 import { Cookies } from 'effect/http';
 
 import { EmailTaken, Forbidden, UserNotFound } from '../core/errors.ts';
-import { UserDirectory } from '../core/ports.ts';
+import { isBanActive, UserDirectory } from '../core/ports.ts';
 import { parseRoles } from '../core/roles.ts';
 import {
   type AnyAuth,
@@ -41,16 +41,14 @@ const newestFirst = { field: 'createdAt', direction: 'desc' } as const;
 const toAdminUser = Effect.fnUntraced(function* (user: StoredUser) {
   const ban = toBan(user);
   const now = yield* DateTime.now;
-  const banned =
-    ban !== null &&
-    (ban.expiresAt === null || DateTime.isGreaterThan(ban.expiresAt, now));
+  const banned = isBanActive(ban, now);
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     roles: parseRoles(user.role),
     banned,
-    banReason: banned ? ban.reason : null,
+    banReason: banned ? (ban?.reason ?? null) : null,
     createdAt: DateTime.fromDateUnsafe(user.createdAt),
   };
 });
@@ -211,24 +209,33 @@ const liveSessions = Effect.fnUntraced(function* (
   owned: Owned,
 ) {
   const now = yield* DateTime.now;
-  const rows = yield* Effect.promise(() =>
-    context.adapter.findMany({
-      model: 'session',
-      where: [
-        ...whereOwned(owned),
-        { field: 'expiresAt', operator: 'gt', value: DateTime.toDateUtc(now) },
-      ],
-      limit: SESSION_BATCH,
-    }),
-  ).pipe(Effect.flatMap(decodeTokens), Effect.orDie);
-  return Arr.map(
-    // Not every adapter tells a missing impersonator from none.
-    Arr.filter(
-      rows,
-      (row) => !('as' in owned) || Predicate.isString(row.impersonatedBy),
-    ),
-    (row) => row.token,
-  );
+  // Not every adapter tells a missing impersonator from none, so a page of
+  // ordinary sessions may come before the impersonations.
+  for (let offset = 0; ; offset += SESSION_BATCH) {
+    const rows = yield* Effect.promise(() =>
+      context.adapter.findMany({
+        model: 'session',
+        where: [
+          ...whereOwned(owned),
+          {
+            field: 'expiresAt',
+            operator: 'gt',
+            value: DateTime.toDateUtc(now),
+          },
+        ],
+        limit: SESSION_BATCH,
+        offset,
+      }),
+    ).pipe(Effect.flatMap(decodeTokens), Effect.orDie);
+    const tokens = Arr.map(
+      Arr.filter(
+        rows,
+        (row) => !('as' in owned) || Predicate.isString(row.impersonatedBy),
+      ),
+      (row) => row.token,
+    );
+    if (tokens.length > 0 || rows.length < SESSION_BATCH) return tokens;
+  }
 });
 
 // Every batch must end something, so this ends too, also where a hook of the

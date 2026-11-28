@@ -5,6 +5,7 @@ import {
   FileSystem,
   Order,
   Path,
+  RegExp as Regex,
   Schema,
   String as Str,
 } from 'effect';
@@ -15,10 +16,12 @@ import { repoRoot } from './packages.ts';
 import { run } from './run.ts';
 
 const MODULE = 'packages/cli/src/generators/openspec/skills.gen.ts';
+const PACKAGE = '@fission-ai/openspec';
+// The root catalog's pin: this repo runs the CLI whose skills it holds.
+const CATALOG_PIN = new RegExp(`("${Regex.escape(PACKAGE)}": ")\\d[^"]*"`, 'u');
 
 const Line = Schema.fromJsonString(Schema.String);
-const encodeLine = Schema.encodeEffect(Line);
-const literal = (text: string) => encodeLine(text);
+const literal = Schema.encodeEffect(Line);
 
 // OpenSpec 2 puts skills in the home directory unless told otherwise, and
 // reads which workflows to install from there. Every home it could resolve
@@ -48,7 +51,7 @@ const renderSkills = Effect.fnUntraced(function* (version: string) {
   yield* fs.makeDirectory(at('cli'));
   yield* writeJson(path.join(at('cli'), 'package.json'), {
     private: true,
-    dependencies: { '@fission-ai/openspec': version },
+    dependencies: { [PACKAGE]: version },
   });
   yield* run('bun', ['install'], { cwd: at('cli') });
   yield* run(
@@ -84,9 +87,11 @@ const renderModule = Effect.fnUntraced(function* (
     skills,
     Effect.fnUntraced(function* ([file, text]) {
       const key = yield* literal(file);
-      const lines = yield* Effect.forEach(Str.split(text, '\n'), literal, {
-        concurrency: 1,
-      });
+      const lines = yield* Effect.forEach(
+        Str.split(text, '\n'),
+        (line) => literal(line),
+        { concurrency: 1 },
+      );
       const body = Arr.join(
         Arr.map(lines, (line) => `    ${line},`),
         '\n',
@@ -124,5 +129,12 @@ export const vendorOpenspecSkills = Effect.fnUntraced(function* (
       yield* fs.writeFileString(target, text);
     }
   }
+  const manifest = path.join(root, 'package.json');
+  const text = yield* fs.readFileString(manifest);
+  yield* fs.writeFileString(
+    manifest,
+    Str.replace(CATALOG_PIN, `$1${version}"`)(text),
+  );
+  yield* run('bun', ['install', '--lockfile-only'], { cwd: root });
   yield* Console.log(`OpenSpec ${version}: ${skills.length} skill files`);
 });

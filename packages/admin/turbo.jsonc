@@ -2,14 +2,15 @@
   "$schema": "../../node_modules/turbo/schema.json",
   "extends": ["//"],
   "tasks": {
-    // TEST_POSTGRES_URL: the server the tests use instead of starting one. CI
-    // makes them fail without any. Both are hashed, so a run that skipped
-    // Postgres is never replayed as one that used it. Shallow extend: the root
-    // definition is copied.
+    // TEST_POSTGRES_URL: the server the tests use instead of starting one;
+    // IN_NIX_SHELL: the dev shell, whose PATH has Postgres to start. CI makes
+    // them fail without any. All are hashed, so a run that skipped Postgres is
+    // never replayed as one that used it. Shallow extend: the root definition
+    // is copied.
     "test": {
       "command": ["bun", "run", "vitest", "run"],
       "dependsOn": ["^transit"],
-      "env": ["CI", "TEST_POSTGRES_URL"],
+      "env": ["CI", "IN_NIX_SHELL", "TEST_POSTGRES_URL"],
       "outputLogs": "new-only"
     }
   }

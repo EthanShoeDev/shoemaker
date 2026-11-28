@@ -16,5 +16,9 @@ In an existing repo, for each new error:
    `// oxlint-disable-next-line no-restricted-imports -- <reason>` above it.
 3. Once nothing imports the package, remove it from `package.json` and the
    catalog.
-4. If `oxlint.config.ts` sets `no-restricted-imports` in `rules`, move its
-   entries to `bannedImports`: the rule replaces the shared list.
+4. If `oxlint.config.ts` sets `no-restricted-imports`, in `rules` or in an
+   override, that block's options replace the shared bans for its files. Move
+   each `rules` entry to `bannedImports` (`{ packages, importNames?, message }`;
+   a `group` glob becomes its package names). In an override, set the rule to
+   `restrictedImports([...effectReplacements, ...yours])`; both are exported
+   from `shoemaker-oxlint-config`.

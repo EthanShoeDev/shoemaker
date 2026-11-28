@@ -25,30 +25,29 @@ export const FlagType = Schema.Literals([
 ]);
 
 const Scalar = Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]);
-const Property = Schema.NonEmptyString;
-
-// One property of the evaluation context. A property that is absent, or of
-// another type than the operator reads, matches nothing but `missing`: also not
-// `not_in`, so an anonymous visitor is never caught by what a rule excludes.
+// One property of the evaluation context. A property that is absent or null
+// matches only `missing`: not even `not_in`, so an anonymous visitor is never
+// caught by what a rule excludes. One of another type than the operator reads
+// matches nothing.
 // No operator takes a pattern, which could be made to run for minutes.
 export const FlagCondition = Schema.Union([
   Schema.Struct({
-    property: Property,
+    property: Schema.NonEmptyString,
     operator: Schema.Literals(['in', 'not_in']),
     values: Schema.NonEmptyArray(Scalar).check(Schema.isMaxLength(MAX_VALUES)),
   }),
   Schema.Struct({
-    property: Property,
+    property: Schema.NonEmptyString,
     operator: Schema.Literals(['contains', 'starts_with', 'ends_with']),
     value: Schema.NonEmptyString,
   }),
   Schema.Struct({
-    property: Property,
+    property: Schema.NonEmptyString,
     operator: Schema.Literals(['gt', 'gte', 'lt', 'lte']),
     value: Schema.Finite,
   }),
   Schema.Struct({
-    property: Property,
+    property: Schema.NonEmptyString,
     operator: Schema.Literals(['exists', 'missing']),
   }),
 ]);

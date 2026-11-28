@@ -92,6 +92,48 @@ describe('secrets-backend with varlock', () => {
     }),
   );
 
+  it.effect('takes nothing from the example for the store credential', () =>
+    expectFailures(
+      {
+        '.env.schema': envSchema('demo', [
+          {
+            key: 'PORT',
+            description: 'A port',
+            required: false,
+            sensitive: false,
+          },
+        ]),
+        '.env.local': 'INFISICAL_DOMAIN=https://example.com\nPORT=4000\n',
+      },
+      [],
+    ),
+  );
+
+  it.effect('reads decorators where varlock does', () =>
+    Effect.gen(function* () {
+      const none = '# @defaultSensitive=false\n# ---\n\n';
+      // A post-value comment carries decorators.
+      yield* expectFailures({ '.env.schema': `${none}TOKEN= # @sensitive\n` }, [
+        'varlock has no remote plugin for TOKEN',
+      ]);
+      // A regular comment line, or one cut off by a divider, does not.
+      yield* expectFailures(
+        {
+          '.env.schema': `${none}# not @sensitive at all\nPORT=\n\n# @sensitive\n# ---\nHOST=\n`,
+        },
+        [],
+      );
+      // A plugin after another decorator on the same line.
+      yield* expectFailures(
+        {
+          '.env.schema':
+            '# @defaultSensitive=false @plugin(@varlock/infisical-plugin)\n# ---\n\n# @sensitive\nTOKEN=\n',
+        },
+        [],
+      );
+    }),
+  );
+
   it.effect('finds secrets in gitignored dotenv files, by name only', () =>
     Effect.gen(function* () {
       const found = yield* messages({

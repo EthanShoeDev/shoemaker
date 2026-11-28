@@ -186,7 +186,7 @@ type LogEntry = {
 
 ## Requirements
 
-- Effect 4 (`effect` 4.1.5)
+- Effect 4, at the exact `effect` version it is published with
 - Bun (`@opentui/core` loads its native renderer through `bun:ffi`)
 
 ## License

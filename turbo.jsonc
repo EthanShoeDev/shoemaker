@@ -14,7 +14,7 @@
   // Leaf commands every package shares are task `command`s (argv, no shell),
   // defined here once instead of copied into each package.json. Turbo spawns
   // them without node_modules/.bin on PATH, so binaries go through `bun run`.
-  // A package script of the same name overrides one (cli's `test`);
+  // A package script of the same name overrides one;
   // `"command": null` in a package's turbo.jsonc opts the package out. Other
   // leaf commands are package scripts. Aggregates (`lint`, `lint:check`) have
   // neither: they only fan out, so turbo is never called from a script.

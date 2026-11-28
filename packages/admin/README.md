@@ -47,7 +47,9 @@ export const access = defineAccess({
 
 - `admin` grants everything defined except `user:impersonate-admins`. An
   `admin` entry in `roles` replaces that for the resources it names.
-- One role must grant every permission an endpoint needs.
+- One role must grant every permission an endpoint needs, impersonating an
+  admin included.
+- An account with no stored role holds `user`, as in Better Auth.
 - `publicStatements` are the permissions the public app checks too. A role that
   grants anything else is an admin role, and impersonating its holders needs
   `user:impersonate-admins`. An admin endpoint may not need only public
@@ -138,7 +140,7 @@ A contract carries no prefix, so its client's base URL does:
 ```ts
 import { AuditApi, UsersApi } from 'shoemaker-admin/contract';
 
-const users = yield* HttpApiClient.make(UsersApi, { baseUrl: '/api/admin' });
+const users = yield* HttpApiClient.make(UsersApi, { baseUrl: '/admin' });
 const page = yield* users.users.list({ query: { search: 'ada' } });
 ```
 
@@ -325,12 +327,16 @@ granted.
 - `user:set-role` is full trust: it can give any role, more than the holder's
   own. Changing roles, banning and deleting end the impersonations as that user
   and by them.
+- `user:ban` and `user:delete` are full trust too: they act on admins as on
+  anyone. A banned admin cannot sign in to the admin to be unbanned, and
+  `promoteAdmins` does not lift a ban.
 - `LinkNotSent` does not mean that nothing was sent: a mailer that timed out may
   have delivered. No entry is written, and the log names who asked.
 - A delete that a project hook or a foreign key refuses answers 500. The account
   keeps its sign-in and loses its sessions. Better Auth's `user.deleteUser`
   callbacks do not run; use database hooks.
-- An email stored with capitals cannot be sent a link.
+- An email stored with capitals cannot be sent a link. On SQLite and D1,
+  `promoteAdmins` matches capitals in ASCII only, so `Élodie@…` is not found.
 - Startup refuses an admin endpoint that is not behind `AdminAuth`, has a
   middleware outside it, needs an undefined or only public permission, or audits
   a target with no `id` in its path.

@@ -164,8 +164,8 @@ Both were run in local workerd over D1, not on Cloudflare.
 - Rules are tried in order; the first whose conditions all match, and whose
   share holds the targeting key, answers. Otherwise the default does.
 - Operators: `in`, `not_in`, `contains`, `starts_with`, `ends_with`, `gt`,
-  `gte`, `lt`, `lte`, `exists`, `missing`. A property the context lacks matches
-  only `missing`.
+  `gte`, `lt`, `lte`, `exists`, `missing`. A property the context lacks, or holds
+  as null, matches only `missing`.
 - A targeting key has one position in a flag, the same for every rule, so write
   shares cumulatively: 20 for `a`, then 40 for `b`, gives each a fifth. Two
   rules of 20 give `b` nobody. Widening a share keeps whoever had it, and

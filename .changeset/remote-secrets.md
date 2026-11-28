@@ -7,7 +7,8 @@ not. The generated AGENTS.md, `.env.schema` and `secretspec.toml` say so and
 carry the Infisical setup for private repos, whose URL comes from
 `INFISICAL_DOMAIN`. The new `secrets-backend` doctor check fails on a secrets
 manager with no remote backend, a local secretspec provider, or a secret left
-in a `.env*` file.
+in `.env`, `.env.local` or a stage's dotenv file (`.env.production.local`; not
+`.env.test`).
 
 In an existing repo, after `shoemaker sync`:
 

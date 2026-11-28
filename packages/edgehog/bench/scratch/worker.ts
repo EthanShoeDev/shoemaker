@@ -124,8 +124,7 @@ export class BenchCollector extends Cloudflare.DurableObject<BenchCollector>()(
   }).pipe(Effect.provide(Cloudflare.D1.QueryDatabaseBinding)),
 ) {}
 
-const Index = Schema.FiniteFromString;
-const decodeIndex = Schema.decodeUnknownOption(Index);
+const decodeIndex = Schema.decodeUnknownOption(Schema.FiniteFromString);
 
 export default class BenchWorker extends Cloudflare.Worker<BenchWorker>()(
   'BenchWorker',

@@ -20,8 +20,9 @@ import type {
 import type { FlagDefinition, FlagDefinitionMap } from '../core/flag-store.ts';
 import { assignment, isWithin, needsAssignment } from './assignment.ts';
 
-// What is known about who is asking. Only its own strings, numbers and booleans
-// are read.
+// What is known about who is asking. Only its own properties are read:
+// `exists` and `missing` take any value but null, the other operators a string,
+// number or boolean.
 export type FlagContext = Readonly<Record<string, unknown>>;
 
 const failed = (
@@ -33,8 +34,6 @@ const TARGETING_KEY = 'targetingKey';
 
 const own = (context: FlagContext, property: string) =>
   Rec.has(context, property) ? context[property] : undefined;
-
-const isKnown = Predicate.isNotNullish;
 
 const isScalar = (value: unknown) =>
   Predicate.isString(value) ||
@@ -96,10 +95,10 @@ const matches = (condition: FlagCondition, context: FlagContext): boolean => {
       );
     }
     case 'exists': {
-      return isKnown(actual);
+      return Predicate.isNotNullish(actual);
     }
     case 'missing': {
-      return !isKnown(actual);
+      return Predicate.isNullish(actual);
     }
   }
 };

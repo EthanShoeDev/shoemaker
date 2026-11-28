@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect } from 'effect';
+import { Array as Arr, Effect, Exit } from 'effect';
 import { TestClock } from 'effect/testing';
 
 import { liveTracer } from '../src/live-tracer.ts';
@@ -57,6 +57,37 @@ describe('live tracer', () => {
         Effect.interrupt.pipe(Effect.withSpan('stopped')),
       );
       assert.strictEqual(stopped[0]?.status, 'ok');
+    }),
+  );
+
+  it.effect('leaves out unsampled spans and their children', () =>
+    Effect.gen(function* () {
+      const spans = yield* record(
+        Effect.void.pipe(
+          Effect.withSpan('child'),
+          Effect.withSpan('hidden', { sampled: false }),
+        ),
+      );
+      assert.deepStrictEqual(spans, []);
+    }),
+  );
+
+  it.effect('keeps the first end of a span ended twice', () =>
+    Effect.gen(function* () {
+      const spans = new Map<string, SpanInfo>();
+      const tracer = liveTracer((event) => {
+        applySpanEvent(spans, event);
+      });
+      yield* Effect.gen(function* () {
+        const span = yield* Effect.makeSpan('twice');
+        span.end(0n, Exit.void);
+        span.attribute('late', true);
+        span.end(1_000_000n, Exit.die(new Error('late')));
+      }).pipe(Effect.withTracer(tracer));
+      const [only] = Arr.fromIterable(spans.values());
+      assert.strictEqual(only?.status, 'ok');
+      assert.strictEqual(only?.endTime, 0);
+      assert.notProperty(only?.attributes ?? {}, 'late');
     }),
   );
 });

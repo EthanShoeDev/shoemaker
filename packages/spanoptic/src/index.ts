@@ -231,7 +231,9 @@ class SpanopticTUI {
     if (event.type === 'end') this.#now = event.endTime;
     applySpanEvent(this.#spans, event);
     this.#updateFlatSpans();
-    this.render();
+    // An attribute changes only the details: Effect sets a span's attributes
+    // one by one as it starts, and the tree costs more to draw.
+    if (event.type !== 'attribute') this.render();
     this.renderDetails();
   }
 
@@ -512,8 +514,7 @@ class SpanopticTUI {
   }
 }
 
-// Replaces the console loggers so nothing is printed over the TUI; the tracer
-// logger stays so logs are still recorded as span events.
+// Replaces the console loggers so nothing is printed over the TUI.
 const tuiLoggerLayer = (tui: SpanopticTUI) =>
   Logger.layer([
     Logger.make(({ logLevel, message, fiber, date }) => {
@@ -526,7 +527,6 @@ const tuiLoggerLayer = (tui: SpanopticTUI) =>
         spanName: span.name,
       });
     }),
-    Logger.tracerLogger,
   ]);
 
 const acquireTui = (serviceName: string) =>

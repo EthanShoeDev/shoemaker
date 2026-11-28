@@ -45,30 +45,78 @@ const SECRETSPEC_FIX =
   'point every profile at a remote provider; for a private repo that is Infisical, set up as the comment at the top of secretspec.toml shows';
 
 const ASSIGNMENT = /^(?:export\s+)?([A-Za-z_]\w*)\s*=(.*)$/u;
+// Where a comment starts inside a decorator line: `#` then a space or nothing.
+const EXTRA_COMMENT = /(?:^|\s)#(?=\s|$)/u;
 
 interface Item {
   readonly key: string;
   readonly value: string;
-  // Text of the comment lines directly above it.
-  readonly comment: string;
+  // The decorators attached to it, as varlock attaches them.
+  readonly decorators: string;
 }
 
-const dotenvItems = (text: string) => {
+const beforeComment = (text: string) => {
+  const found = EXTRA_COMMENT.exec(text);
+  return found === null ? text : Str.slice(0, found.index)(text);
+};
+
+const count = (text: string, pattern: RegExp) =>
+  Arr.fromIterable(Str.matchAll(pattern)(text)).length;
+
+const depth = (text: string) =>
+  count(text, /[([{]/gu) - count(text, /[)\]}]/gu);
+
+const commentContent = (line: string) => Str.trimStart(Str.slice(1)(line));
+
+// The env-spec reading of a dotenv file. A comment line counts for its
+// decorators only when it starts with one, and a blank line or a `# ---`
+// divider ends what attaches to the next item. `header` holds the decorators
+// above the first item.
+const envSpec = (text: string) => {
+  const lines = Arr.map(Str.split(text, '\n'), Str.trim);
   const items: Array<Item> = [];
-  let comment = '';
-  for (const raw of Str.split(text, '\n')) {
-    const line = Str.trim(raw);
+  const header: Array<string> = [];
+  let attached: Array<string> = [];
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index] ?? '';
     const match = ASSIGNMENT.exec(line);
     if (match?.[1] !== undefined) {
+      const rest = match[2] ?? '';
+      const after = /(?:^|\s)#\s*(@.*)$/u.exec(rest)?.[1];
       items.push({
         key: match[1],
-        value: Str.trim(match[2] ?? ''),
-        comment,
+        value: Str.trim(rest),
+        decorators: Arr.join(
+          after === undefined ? attached : [...attached, beforeComment(after)],
+          ' ',
+        ),
       });
-      comment = '';
-    } else comment = Str.startsWith('#')(line) ? `${comment}\n${line}` : '';
+      attached = [];
+      continue;
+    }
+    if (!Str.startsWith('#')(line)) {
+      attached = [];
+      continue;
+    }
+    const content = commentContent(line);
+    if (/^(?:---|===)/u.test(content)) {
+      attached = [];
+      continue;
+    }
+    if (!Str.startsWith('@')(content)) continue;
+    // A call or literal left open goes on over the `#` lines below it.
+    let decorator = beforeComment(content);
+    let open = depth(decorator);
+    while (open > 0 && Str.startsWith('#')(lines[index + 1] ?? '')) {
+      index++;
+      const next = beforeComment(commentContent(lines[index] ?? ''));
+      decorator = `${decorator} ${next}`;
+      open += depth(next);
+    }
+    attached.push(decorator);
+    if (items.length === 0) header.push(decorator);
   }
-  return items;
+  return { items, header: Arr.join(header, ' ') };
 };
 
 const captures = (text: string, pattern: RegExp) =>
@@ -77,28 +125,24 @@ const captures = (text: string, pattern: RegExp) =>
     Arr.map((match) => match[1] ?? ''),
   );
 
-export const varlockSchema = (text: string) => {
-  const lines = Str.split(text, '\n');
-  const first = Option.getOrElse(
-    Arr.findFirstIndex(lines, (line) => ASSIGNMENT.test(Str.trim(line))),
-    () => lines.length,
-  );
-  const header = Arr.join(lines.slice(0, first), '\n');
+const varlockSchema = (text: string) => {
+  const { items, header } = envSpec(text);
   // varlock treats every item as sensitive unless the schema says otherwise.
-  const byDefault = !/^#\s*(?:@.*\s)?@defaultSensitive=false\b/mu.test(header);
+  const byDefault = !/(?:^|\s)@defaultSensitive=false\b/u.test(header);
   const sensitive = pipe(
-    dotenvItems(text),
-    Arr.filter(({ comment }) => {
-      if (/@public\b|@sensitive=false\b/u.test(comment)) return false;
-      return byDefault || /@sensitive\b/u.test(comment);
+    items,
+    Arr.filter(({ decorators }) => {
+      if (/@public\b|@sensitive=false\b/u.test(decorators)) return false;
+      return byDefault || /@sensitive\b/u.test(decorators);
     }),
     Arr.map((item) => item.key),
   );
   return {
+    declared: Arr.map(items, (item) => item.key),
     sensitive,
-    plugins: captures(header, /^#\s*@plugin\(\s*["']?([^\s"')]+)/gmu),
-    // What the plugin is initialised with: the credential that opens the store.
-    bootstrap: captures(
+    plugins: captures(header, /@plugin\(\s*["']?([^\s"')]+)/gu),
+    // What the plugins are initialised with.
+    initialisedWith: captures(
       Arr.join(
         captures(header, /@init\w+\(([^()]*(?:\([^()]*\)[^()]*)*)\)/gu),
         ' ',
@@ -115,7 +159,7 @@ const table = (value: unknown): Readonly<Record<string, unknown>> =>
   Predicate.isObject(value) ? value : {};
 
 // `undefined` when the file is not valid TOML.
-export const secretspecManifest = (text: string) => {
+const secretspecManifest = (text: string) => {
   const parsed = Toml.parse(text);
   if (Result.isFailure(parsed)) return undefined;
   const manifest = parsed.success;
@@ -173,8 +217,10 @@ export const secretspecManifest = (text: string) => {
 
 const named = (keys: ReadonlyArray<string>) => listSome(Arr.dedupe(keys), 5);
 
-const secretspecFindings = (path: string, text: string) => {
-  const manifest = secretspecManifest(text);
+const secretspecFindings = (
+  path: string,
+  manifest: ReturnType<typeof secretspecManifest>,
+) => {
   if (manifest === undefined)
     return [fail(`${path} is not valid TOML`, { path })];
   const local = Arr.filter(manifest.secrets, (secret) =>
@@ -239,7 +285,7 @@ const dotenvFindings = Effect.fnUntraced(function* (
       const text = yield* repo.read(path);
       if (text === undefined) continue;
       const held = pipe(
-        dotenvItems(text),
+        envSpec(text).items,
         Arr.filter(({ key, value }) => {
           if (/^(?:#.*|""|'')?$/u.test(value)) return false;
           const resolver = /^(\w+)\(/u.exec(value)?.[1];
@@ -288,21 +334,28 @@ export const secretsBackend: DoctorCheck = {
     const [schemas, manifests] = Arr.partition(files, ({ path, text }) =>
       Str.endsWith('.env.schema')(path)
         ? Result.succeed({ path, ...varlockSchema(text) })
-        : Result.fail({ path, text }),
+        : Result.fail({ path, manifest: secretspecManifest(text) }),
     );
-    const bootstrap = new Set(Arr.flatMap(schemas, (s) => s.bootstrap));
-    bootstrap.delete('APP_ENV');
-    const sensitive = pipe(
-      Arr.flatMap(schemas, (s) => s.sensitive),
-      Arr.filter((key) => !bootstrap.has(key)),
-      Arr.dedupe,
+    const items = new Set(Arr.flatMap(schemas, (s) => s.declared));
+    const sensitiveKeys = new Set(Arr.flatMap(schemas, (s) => s.sensitive));
+    // The credential that opens the store: what a plugin is initialised with,
+    // unless the schema declares it not sensitive (`APP_ENV`).
+    const bootstrap = new Set(
+      Arr.filter(
+        Arr.flatMap(schemas, (s) => s.initialisedWith),
+        (key) => sensitiveKeys.has(key) || !items.has(key),
+      ),
+    );
+    const sensitive = Arr.filter(
+      [...sensitiveKeys],
+      (key) => !bootstrap.has(key),
     );
     // A nested schema imports the root's, plugins included.
     const remote = Arr.some(schemas, (schema) =>
       Arr.some(schema.plugins, (plugin) => !LOCAL_PLUGINS.test(plugin)),
     );
-    const declared = Arr.flatMap(manifests, ({ text }) =>
-      Arr.map(secretspecManifest(text)?.secrets ?? [], (s) => s.key),
+    const declared = Arr.flatMap(manifests, ({ manifest }) =>
+      Arr.map(manifest?.secrets ?? [], (s) => s.key),
     );
     const findings: Array<Finding> = [
       ...(sensitive.length > 0 && !remote
@@ -313,8 +366,8 @@ export const secretsBackend: DoctorCheck = {
             ),
           ]
         : []),
-      ...Arr.flatMap(manifests, ({ path, text }) =>
-        secretspecFindings(path, text),
+      ...Arr.flatMap(manifests, ({ path, manifest }) =>
+        secretspecFindings(path, manifest),
       ),
       ...(yield* dotenvFindings(
         repo,

@@ -18,12 +18,12 @@ it.layer(NodeServices.layer)('installing the package', (it) => {
       Effect.gen(function* () {
         const names = yield* installed({
           manifests: MANIFESTS,
-          beside: {
-            effect: '4.1.5',
-            '@effect/platform-bun': '4.1.5',
-            '@effect/sql-pg': '4.1.5',
-            '@openfeature/server-sdk': '1.23.0',
-          },
+          beside: [
+            'effect',
+            '@effect/platform-bun',
+            '@effect/sql-pg',
+            '@openfeature/server-sdk',
+          ],
         });
         assert.includeMembers(names, [
           'shoemaker-edgehog',
@@ -44,7 +44,7 @@ it.layer(NodeServices.layer)('installing the package', (it) => {
       Effect.gen(function* () {
         const names = yield* installed({
           manifests: MANIFESTS,
-          beside: { effect: '4.1.5' },
+          beside: ['effect'],
         });
         assert.include(names, 'shoemaker-edgehog');
         assert.deepStrictEqual(

@@ -122,13 +122,14 @@ const usersHandlers = (supported: Supported) =>
       });
 
       // Not whether the two may be impersonated or banned at all: only who the
-      // extra permission is needed for.
+      // extra permission is needed for. One role grants both, as for any
+      // endpoint.
       const mayBecome = (
         actor: { readonly roles: ReadonlyArray<string> },
         target: { readonly roles: ReadonlyArray<string> },
       ) =>
         !rules.isAdmin(target.roles) ||
-        rules.can(actor.roles, { user: ['impersonate-admins'] });
+        rules.can(actor.roles, { user: ['impersonate', 'impersonate-admins'] });
 
       const stillAllowed = (actorId: string, targetId: string) =>
         Effect.all([directory.get(actorId), directory.get(targetId)], {

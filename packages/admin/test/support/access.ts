@@ -28,6 +28,7 @@ export const access = defineAccess({
     promoter: { user: ['set-role'] },
     recruiter: { user: ['create', 'set-role'] },
     owner: { user: ['impersonate', 'impersonate-admins'] },
+    adminImpersonator: { user: ['impersonate-admins'] },
   },
   publicStatements: { outing: ['host'] },
 });

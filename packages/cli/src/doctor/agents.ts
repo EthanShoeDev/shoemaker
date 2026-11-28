@@ -10,12 +10,18 @@ import {
 } from 'effect';
 import { Yaml } from 'effect/encoding';
 
-import { hasDep } from '../checks/workspace.ts';
+import {
+  allDeps,
+  hasDep,
+  isNewerVersion,
+  readWorkspace,
+} from '../checks/workspace.ts';
 import { parseJsonc } from '../engine/json.ts';
 import {
   OPENSPEC_PACKAGE,
   openspecSkillFiles,
 } from '../generators/openspec/index.ts';
+import { OPENSPEC_SKILLS_VERSION } from '../generators/openspec/skills.gen.ts';
 import { CLOUDFLARE_OBSERVABILITY_MCP } from '../generators/root/mcp.ts';
 import { fail, listSome, manifestsOf, pass } from './shared.ts';
 import type { DoctorCheck, Finding } from './types.ts';
@@ -115,13 +121,32 @@ export const openspec: DoctorCheck = {
         }),
       );
     }
-    const manifests = yield* manifestsOf(repo);
-    if (!Arr.some(manifests, (m) => hasDep(m.pkg, OPENSPEC_PACKAGE))) {
+    // The dev shell runs the root's CLI. The skills sync writes may call what
+    // their version added, so the CLI is at least that; one raised past it
+    // stays, as any dependency does.
+    const workspace = yield* readWorkspace(repo);
+    const spec =
+      workspace === undefined
+        ? undefined
+        : allDeps(workspace.root.pkg)[OPENSPEC_PACKAGE];
+    const pinned =
+      spec === 'catalog:' ? workspace?.catalog[OPENSPEC_PACKAGE] : spec;
+    if (spec === undefined) {
       findings.push(
-        fail(`${OPENSPEC_PACKAGE} is not a dependency`, {
+        fail(`${OPENSPEC_PACKAGE} is not a root dependency`, {
           path: 'package.json',
           fix: 'set features.openspec in shoemaker.config.ts and run shoemaker sync, or add it as a root devDependency',
         }),
+      );
+    } else if (isNewerVersion(OPENSPEC_SKILLS_VERSION, pinned ?? spec)) {
+      findings.push(
+        fail(
+          `${OPENSPEC_PACKAGE} is ${pinned ?? spec}, older than the skills sync writes (${OPENSPEC_SKILLS_VERSION})`,
+          {
+            path: 'package.json',
+            fix: `raise it to ${OPENSPEC_SKILLS_VERSION}; shoemaker sync does`,
+          },
+        ),
       );
     }
     const stale = yield* Effect.filter(

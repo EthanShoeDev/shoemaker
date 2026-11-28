@@ -21,6 +21,7 @@ import {
   PasswordLinks,
   UserDirectory,
   UserNotFound,
+  isBanActive,
   parseRoles,
 } from '../../src/index.ts';
 import { Accounts, type Mail } from './accounts.ts';
@@ -41,15 +42,19 @@ interface StoredSession {
   readonly impersonatedBy: string | null;
 }
 
-const toAdminUser = (user: StoredUser) => ({
-  id: user.id,
-  email: user.email,
-  name: user.name,
-  roles: parseRoles(user.roles),
-  banned: user.ban !== null,
-  banReason: user.ban?.reason ?? null,
-  createdAt: user.createdAt,
-});
+const toAdminUser = (user: StoredUser) =>
+  Effect.map(DateTime.now, (now) => {
+    const banned = isBanActive(user.ban, now);
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roles: parseRoles(user.roles),
+      banned,
+      banReason: banned ? (user.ban?.reason ?? null) : null,
+      createdAt: user.createdAt,
+    };
+  });
 
 const tokenIn = (headers: Headers.Headers) =>
   Option.flatMapNullishOr(
@@ -154,14 +159,15 @@ export const MemoryUsers = Layer.effectContext(
           ),
         );
         return {
-          items: Arr.map(
+          items: yield* Effect.forEach(
             Arr.take(Arr.drop(newestFirst, offset), limit),
             toAdminUser,
+            { concurrency: 1 },
           ),
           total: matching.length,
         };
       }),
-      get: (id) => Effect.map(get(id), toAdminUser),
+      get: (id) => Effect.flatMap(get(id), toAdminUser),
       ban: Effect.fnUntraced(function* (asked, reason) {
         const { id } = yield* get(asked);
         yield* update(id, { ban: { reason, expiresAt: null } });
@@ -185,7 +191,7 @@ export const MemoryUsers = Layer.effectContext(
           return yield* EmailTaken.make({ email });
         }
         const user = yield* add({ email, name, roles: Arr.join(roles, ',') });
-        return toAdminUser(user);
+        return yield* toAdminUser(user);
       }),
       delete: Effect.fnUntraced(function* (asked) {
         const { id } = yield* get(asked);

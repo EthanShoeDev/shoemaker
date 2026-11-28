@@ -85,6 +85,8 @@ jobs:
           draft: ${{ steps.verify.outcome != 'success' }}
           add-paths: |
             packages/cli/src/versions.ts
+            package.json
+            bun.lock
             packages/cli/src/generators/openspec/skills.gen.ts
             .agents/skills
             .claude/skills

@@ -3,6 +3,7 @@ import {
   Duration,
   Exit,
   Formatter,
+  Function as Fn,
   Option,
   Predicate,
   Tracer,
@@ -36,8 +37,9 @@ class LiveSpan extends Tracer.NativeSpan {
     emit: Emit,
   ) {
     super(options);
-    this.#emit = emit;
-    emit({
+    // Unsampled, or below the minimum trace level: Effect's exporters skip it.
+    this.#emit = this.sampled ? emit : Fn.constVoid;
+    this.#emit({
       type: 'start',
       span: {
         spanId: this.spanId,
@@ -55,7 +57,12 @@ class LiveSpan extends Tracer.NativeSpan {
     });
   }
 
+  get #ended() {
+    return Predicate.isTagged(this.status, 'Ended');
+  }
+
   override attribute(key: string, value: unknown) {
+    if (this.#ended) return;
     super.attribute(key, value);
     this.#emit({
       type: 'attribute',
@@ -65,7 +72,9 @@ class LiveSpan extends Tracer.NativeSpan {
     });
   }
 
+  // A span ends once; a second `end` would overwrite what the TUI shows.
   override end(endTime: bigint, exit: Exit.Exit<unknown, unknown>) {
+    if (this.#ended) return;
     super.end(endTime, exit);
     const error = errorOf(exit);
     this.#emit({

@@ -15,9 +15,10 @@ export const sameMembers = <A, E, R>(
     assert.sameDeepMembers([...actual], [...expected]);
   });
 
+// Ends in an error of its own; a defect or an interruption does not count.
 export const fails = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.map(Effect.exit(effect), (exit) => {
-    assert.isTrue(Exit.isFailure(exit));
+    assert.isTrue(Exit.hasFails(exit));
   });
 
 // Ends in a defect: a mistake in the host's code, not something to handle.

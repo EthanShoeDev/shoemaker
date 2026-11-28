@@ -3,6 +3,8 @@ import type { OxlintRules } from '../helpers.ts';
 export type BannedImport = {
   /** Package names; their subpaths (`zod/mini`) are banned too. */
   packages: Array<string>;
+  /** Only these named imports; without it, the whole package. */
+  importNames?: Array<string>;
   /** What to use instead; oxlint prints it as the error's help. */
   message: string;
 };
@@ -38,7 +40,11 @@ export const effectReplacements: Array<BannedImport> = [
 const escaped = (name: string) =>
   name.replaceAll(/[.*+?^${}()|[\]\\/]/gu, '\\$&');
 
-/** One no-restricted-imports entry per ban. */
+/**
+ * The no-restricted-imports rule for these bans, one entry each. oxlint gives
+ * a rule the options of the last block that sets it, overrides included, so a
+ * block that sets it passes `effectReplacements` too.
+ */
 export const restrictedImports = (
   banned: Array<BannedImport>,
 ): OxlintRules => ({
@@ -47,8 +53,9 @@ export const restrictedImports = (
   'no-restricted-imports': [
     'error',
     {
-      patterns: banned.map(({ packages, message }) => ({
+      patterns: banned.map(({ packages, importNames, message }) => ({
         regex: `^(?:${packages.map(escaped).join('|')})(?:/|$)`,
+        ...(importNames === undefined ? {} : { importNames }),
         message,
         // A type import runs nothing: it names another library's types.
         allowTypeImports: true,

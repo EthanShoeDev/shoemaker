@@ -1,4 +1,4 @@
-import { Context, type DateTime, type Effect, type Option } from 'effect';
+import { Context, DateTime, type Effect, type Option } from 'effect';
 import type { Cookies, Headers } from 'effect/http';
 
 import type {
@@ -14,6 +14,11 @@ export interface Ban {
   // Null is a ban without an end.
   readonly expiresAt: DateTime.Utc | null;
 }
+
+// A ban that has ended is no ban.
+export const isBanActive = (ban: Ban | null, now: DateTime.Utc) =>
+  ban !== null &&
+  (ban.expiresAt === null || DateTime.isGreaterThan(ban.expiresAt, now));
 
 export interface AdminSession {
   readonly user: {

@@ -21,14 +21,16 @@ const Manifest = Schema.Struct({
   type: Schema.String,
   dependencies: Schema.optional(Specs),
   optionalDependencies: Schema.optional(Specs),
-  peerDependencies: Specs,
-  peerDependenciesMeta: Schema.Record(
-    Schema.String,
-    Schema.Struct({ optional: Schema.Boolean }),
+  peerDependencies: Schema.optional(Specs),
+  peerDependenciesMeta: Schema.optional(
+    Schema.Record(Schema.String, Schema.Struct({ optional: Schema.Boolean })),
   ),
 });
 
 const ManifestJson = Schema.fromJsonString(Manifest);
+const RootJson = Schema.fromJsonString(
+  Schema.Struct({ workspaces: Schema.Struct({ catalog: Specs }) }),
+);
 const Json = Schema.fromJsonString(Schema.Unknown);
 const decode = Schema.decodeEffect(ManifestJson);
 const encode = Schema.encodeEffect(Json);
@@ -40,20 +42,33 @@ const published = (specs: typeof Specs.Type | undefined) =>
     isWorkspace(spec) ? `file:../${name}` : spec,
   );
 
-// What `bun install` puts in a new project that depends on the packages. The
-// published manifests alone decide it, so the packages are those manifests:
-// packing swaps package.json in place, which other tests read at the same time.
-// A workspace package they need is one of them.
+// What `bun install` puts in a new project that depends on the packages, and
+// on `beside` at the versions this repo's catalog pins. The published manifests
+// alone decide it, so the packages are those manifests: packing swaps
+// package.json in place, which other tests read at the same time. A workspace
+// package they need is one of them.
 export const installed = Effect.fnUntraced(function* (options: {
   readonly manifests: Arr.NonEmptyReadonlyArray<string>;
-  readonly beside: Readonly<Record<string, string>>;
+  readonly beside: ReadonlyArray<string>;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const root = yield* fs.makeTempDirectoryScoped();
+  // Each manifest is packages/<name>/package.json.
+  const { catalog } = (yield* Effect.flatMap(
+    fs.readFileString(
+      path.resolve(path.dirname(options.manifests[0]), '../../package.json'),
+    ),
+    Schema.decodeEffect(RootJson),
+  )).workspaces;
+  const beside = Rec.fromIterableWith(options.beside, (name) => {
+    const version = catalog[name];
+    assert.isDefined(version, `${name} is not in the catalog`);
+    return [name, version];
+  });
   const write = Effect.fnUntraced(function* (dir: string, content: unknown) {
     const text = yield* encode(content);
-    yield* fs.makeDirectory(path.join(root, dir));
+    yield* fs.makeDirectory(path.join(root, dir), { recursive: true });
     yield* fs.writeFileString(path.join(root, dir, 'package.json'), text);
   });
   const names = yield* Effect.forEach(
@@ -87,7 +102,7 @@ export const installed = Effect.fnUntraced(function* (options: {
     private: true,
     dependencies: {
       ...Rec.fromIterableWith(names, (name) => [name, `file:../${name}`]),
-      ...options.beside,
+      ...beside,
     },
   });
   const project = path.join(root, 'project');

@@ -32,12 +32,8 @@ export type PostgresSource =
     }
   | { readonly kind: 'none' };
 
-type Connection = Pick<
-  PgClient.PgClientConfig,
-  'host' | 'password' | 'path' | 'port' | 'username'
->;
+type Connection = Pick<PgClient.PgClientConfig, 'host' | 'url' | 'username'>;
 
-const DEFAULT_PORT = 5432;
 const START_ATTEMPTS = 200;
 
 // The real path, since Postgres finds its files beside its binary and a Nix
@@ -64,16 +60,6 @@ export const findPostgres = Effect.gen(function* () {
       : { kind: 'none' };
   return source;
 });
-
-const fromUrl = (text: string): Connection => {
-  const url = new URL(text);
-  return {
-    host: url.hostname,
-    port: url.port === '' ? DEFAULT_PORT : Number(url.port),
-    username: decodeURIComponent(url.username),
-    password: Redacted.make(decodeURIComponent(url.password)),
-  };
-};
 
 // Listens only on a socket in its own directory, and goes when the scope does.
 const startCluster = Effect.fnUntraced(function* (
@@ -104,19 +90,24 @@ const startCluster = Effect.fnUntraced(function* (
     ChildProcess.make(
       source.postgres,
       ['-D', data, '-k', dir, '-c', 'listen_addresses=', '-c', 'fsync=off'],
-      { stdout: 'ignore', stderr: 'ignore' },
+      {
+        stdout: 'ignore',
+        stderr: 'ignore',
+        // A fast shutdown: SIGTERM waits for every client to leave.
+        killSignal: 'SIGINT',
+        forceKillAfter: '5 seconds',
+      },
     ),
   );
-  return {
-    path: path.join(dir, `.s.PGSQL.${DEFAULT_PORT}`),
-    username: 'postgres',
-  } satisfies Connection;
+  // A host that is a directory is where the socket is.
+  return { host: dir, username: 'postgres' } satisfies Connection;
 });
 
 const connectionTo = (source: PostgresSource) =>
   Match.value(source).pipe(
     Match.discriminatorsExhaustive('kind')({
-      url: ({ url }) => Effect.succeed(fromUrl(url)),
+      url: ({ url }) =>
+        Effect.succeed({ url: Redacted.make(url) } satisfies Connection),
       binaries: startCluster,
       none: () => Effect.die(new Error('There is no Postgres.')),
     }),
@@ -152,7 +143,7 @@ export const postgresLayer = (source: PostgresSource) =>
       );
       const create = Effect.gen(function* () {
         const id = yield* random.uuidV4();
-        const name = `admin_test_${Arr.join(Str.split(id, '-'), '')}`;
+        const name = `test_${Arr.join(Str.split(id, '-'), '')}`;
         yield* sql`CREATE DATABASE ${sql(name)}`;
         return name;
       });
