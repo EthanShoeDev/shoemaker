@@ -166,25 +166,29 @@ describe('secrets-backend with varlock', () => {
     }),
   );
 
-  it.effect("allows the store's own credential only encrypted", () =>
-    Effect.gen(function* () {
-      yield* expectFailures(
-        {
-          '.env.schema': REMOTE,
-          '.env.local': 'INFISICAL_CLIENT_SECRET=varlock("local:abc")\n',
-        },
-        [],
-      );
-      yield* expectFailures(
-        {
-          '.env.schema': REMOTE,
-          '.env.local': `INFISICAL_CLIENT_SECRET=${VALUE}\n`,
-        },
-        [
-          ".env.local holds the store's own credential in plaintext: INFISICAL_CLIENT_SECRET",
-        ],
-      );
-    }),
+  it.effect(
+    "keeps the store's own credential out of files, even encrypted",
+    () =>
+      Effect.gen(function* () {
+        for (const value of [VALUE, 'varlock("local:abc")']) {
+          yield* expectFailures(
+            {
+              '.env.schema': REMOTE,
+              '.env.local': `INFISICAL_CLIENT_SECRET=${value}\n`,
+            },
+            [
+              ".env.local holds the store's own credential: INFISICAL_CLIENT_SECRET",
+            ],
+          );
+        }
+        yield* expectFailures(
+          {
+            '.env.schema': REMOTE,
+            '.env.local': 'INFISICAL_CLIENT_SECRET=\n',
+          },
+          [],
+        );
+      }),
   );
 });
 

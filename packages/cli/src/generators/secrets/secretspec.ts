@@ -56,8 +56,7 @@ export const secretspecToml = (name: string, vars: ReadonlyArray<EnvVar>) => {
 # Docs: https://secretspec.dev/concepts/declarative/
 #
 # Values live in a remote provider, never in dotenv, keyring or another local
-# one. A private repo uses the self-hosted Infisical; add to the end of this
-# file:
+# one. Every repo uses the self-hosted Infisical; add to the end of this file:
 #   [providers]
 #   infisical = "infisical:///<project uuid>"
 #   [defaults]
@@ -65,7 +64,7 @@ export const secretspecToml = (name: string, vars: ReadonlyArray<EnvVar>) => {
 # A profile reads the Infisical environment of the same name; append \`?env=\` to
 # pin another. The host comes from INFISICAL_DOMAIN, which each machine and CI
 # sets beside INFISICAL_CLIENT_ID and INFISICAL_CLIENT_SECRET. Unset, it falls
-# back to Infisical's cloud, so check it first. A public repo never contains the
+# back to Infisical's cloud, so check it first. The repo never contains the
 # server's URL.
 [project]
 name = ${tomlString(name)}

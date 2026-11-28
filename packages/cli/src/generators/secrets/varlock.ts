@@ -49,8 +49,8 @@ export const envSchema = (name: string, vars: ReadonlyArray<EnvVar>) => {
 # process.env. Docs: https://varlock.dev/env-spec/overview/
 #
 # Secret values live in a remote store that a varlock plugin reads, never here
-# and never in .env.local or another local file, gitignored or not. A private
-# repo uses the self-hosted Infisical: add @varlock/infisical-plugin to the root
+# and never in .env.local or another local file, gitignored or not. Every repo
+# uses the self-hosted Infisical: add @varlock/infisical-plugin to the root
 # devDependencies, and these to the slot below, without the backticks:
 #   \`@plugin(@varlock/infisical-plugin)\`
 #   \`@initInfisical(projectId=<uuid>, siteUrl=$INFISICAL_DOMAIN,\`
@@ -60,7 +60,7 @@ export const envSchema = (name: string, vars: ReadonlyArray<EnvVar>) => {
 #   \`  enabled=not(isEmpty($INFISICAL_DOMAIN)))\`
 # then declare the three INFISICAL_ variables at the end of this file as
 # \`@optional @sensitive @internal\`. Each machine and CI sets them in its
-# environment. A public repo never contains the server's URL.
+# environment, so the repo never contains the server's URL.
 #
 # @defaultSensitive=false @defaultRequired=infer @currentEnv=$APP_ENV`,
     '#',

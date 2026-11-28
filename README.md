@@ -50,14 +50,16 @@ they're the setup I use for my own repos.
   plugins (`@plugin`, `@initInfisical`, ...) go there and `sync` leaves them
   alone.
 - **Remote secrets only**: secret values come from a remote store, never from a
-  local file, gitignored or not. Private repos use a self-hosted Infisical.
+  local file, gitignored or not. Every repo, public or private, uses a
+  self-hosted Infisical.
   `.env.schema` and `secretspec.toml` start with its setup, AGENTS.md tells
   coding agents the rule, and `doctor` (`secrets-backend`) fails on a manager
   with no remote backend, a local provider, or a secret left in
   `.env`, `.env.local` or a stage's dotenv file (`.env.production.local`; not
   `.env.test`).
-  Only the credential that opens the store may be on a machine. Infisical's URL
-  comes from `INFISICAL_DOMAIN`, so a public repo never contains it.
+  The credential that opens the store comes from the environment, never a
+  file, even an encrypted one. Infisical's URL comes from `INFISICAL_DOMAIN`,
+  set on every machine, so no repo contains it.
 - **Infra**: alchemy, deploying to Cloudflare or AWS, plus GitHub for repos
   and Actions secrets
 - **Environment**: a Nix dev shell, GitHub Actions CI that runs in that same

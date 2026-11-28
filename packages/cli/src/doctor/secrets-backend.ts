@@ -18,7 +18,8 @@ import type { DoctorCheck, Finding } from './types.ts';
 
 // Secret values live in a remote store. A file on one machine is lost with it,
 // shared by copy-paste and readable by anything that runs there, gitignored or
-// not. The one exception is the credential that opens the store.
+// not. The credential that opens the store can't come from the store, so it
+// comes from the environment: never a file, encrypted or not.
 
 // varlock plugins that read this machine, or store nothing. Any other plugin
 // counts as remote.
@@ -40,9 +41,9 @@ const LOCAL_PROVIDERS = new Set([
 const NEUTRAL_PROVIDERS = new Set(['env', 'null']);
 
 const VARLOCK_FIX =
-  'load them through a remote varlock plugin; for a private repo that is Infisical, set up as the comment at the top of .env.schema shows';
+  'load them through a remote varlock plugin: the self-hosted Infisical, set up as the comment at the top of .env.schema shows';
 const SECRETSPEC_FIX =
-  'point every profile at a remote provider; for a private repo that is Infisical, set up as the comment at the top of secretspec.toml shows';
+  'point every profile at a remote provider: the self-hosted Infisical, set up as the comment at the top of secretspec.toml shows';
 
 const ASSIGNMENT = /^(?:export\s+)?([A-Za-z_]\w*)\s*=(.*)$/u;
 // Where a comment starts inside a decorator line: `#` then a space or nothing.
@@ -288,9 +289,9 @@ const dotenvFindings = Effect.fnUntraced(function* (
         envSpec(text).items,
         Arr.filter(({ key, value }) => {
           if (/^(?:#.*|""|'')?$/u.test(value)) return false;
+          if (bootstrap.has(key)) return true;
           const resolver = /^(\w+)\(/u.exec(value)?.[1];
           const onDevice = resolver === 'varlock' || resolver === 'keychain';
-          if (bootstrap.has(key)) return resolver === undefined;
           return secrets.has(key) && (resolver === undefined || onDevice);
         }),
         Arr.map((item) => item.key),
@@ -306,13 +307,10 @@ const dotenvFindings = Effect.fnUntraced(function* (
         );
       if (opening.length > 0)
         findings.push(
-          fail(
-            `${path} holds the store's own credential in plaintext: ${named(opening)}`,
-            {
-              path,
-              fix: `set it in the environment, or run \`bunx varlock encrypt --file ${path}\` to bind it to this device`,
-            },
-          ),
+          fail(`${path} holds the store's own credential: ${named(opening)}`, {
+            path,
+            fix: 'set it in the environment instead and delete it from the file; encrypted is not enough',
+          }),
         );
     }
   }
