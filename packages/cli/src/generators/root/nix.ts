@@ -31,8 +31,8 @@ const nixString = (text: string) =>
   )}"`;
 
 // Prebuilt bun release archives for the version in `packageManager`
-// (package-json.ts) and the CI setup action. nixpkgs lags bun releases, so
-// the flake swaps the source; bump all three together.
+// (package-json.ts). nixpkgs lags bun releases, so the flake swaps the
+// source; bump both together. CI runs in this dev shell, so it follows.
 const BUN_VERSION = '1.4.5';
 const BUN_SOURCES = [
   [
@@ -76,9 +76,9 @@ const bunOverlay = () => {
     Arr.join('\n'),
   );
   return `    # nixpkgs lags bun releases, so repoint the prebuilt release archives at
-    # the version in package.json \`packageManager\` and the CI setup action.
+    # the version in package.json \`packageManager\`; CI runs in this shell.
     # bun ships binaries only, so this is a src swap and nothing is compiled.
-    # Keep the three in lockstep.
+    # Keep the two in lockstep.
     bunOverlay = _final: prev: {
       bun = prev.bun.overrideAttrs (finalAttrs: oldAttrs: {
         version = "${BUN_VERSION}";

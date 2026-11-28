@@ -196,6 +196,19 @@ describe.each(presetNames)('root files (%s preset)', (name) => {
     assert.include(ci, 'actions/cache@');
   });
 
+  it('runs CI in the flake dev shell, not a bun of its own', () => {
+    if (!byPath.has('.github/actions/setup/action.yml')) return;
+    const setup = text('.github/actions/setup/action.yml');
+    assert.include(setup, 'uses: nixbuild/nix-quick-install-action@');
+    assert.include(setup, 'uses: nix-community/cache-nix-action@');
+    // Every later step, the install included, is in the dev shell.
+    assert.match(
+      setup,
+      /uses: nicknovitski\/nix-develop@[\s\S]*bun install --frozen-lockfile/u,
+    );
+    assert.notInclude(setup, 'setup-bun');
+  });
+
   it('puts every contributed nix package in the dev shell', () => {
     const flake = text('flake.nix');
     for (const pkg of ['bun', 'nodejs_24', ...aggregate.nixPackages]) {

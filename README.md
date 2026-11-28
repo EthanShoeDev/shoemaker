@@ -60,8 +60,9 @@ they're the setup I use for my own repos.
   comes from `INFISICAL_DOMAIN`, so a public repo never contains it.
 - **Infra**: alchemy, deploying to Cloudflare or AWS, plus GitHub for repos
   and Actions secrets
-- **Environment**: a Nix dev shell, GitHub Actions CI, and an AGENTS.md for
-  coding agents
+- **Environment**: a Nix dev shell, GitHub Actions CI that runs in that same
+  shell (its bun, `nixPackages` and shellHook), and an AGENTS.md for coding
+  agents
 - **MCP servers**: `.mcp.json` gives coding agents the project's MCP servers:
   Cloudflare's observability server (Workers logs and traces) when the Stack
   registers Cloudflare. Sync merges its servers in, so ones you add stay.

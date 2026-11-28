@@ -64,15 +64,27 @@ export const vscode: Generator = (ctx) =>
       }
     : {};
 
+// CI runs in the flake's default dev shell, so it gets what a local
+// \`nix develop\` does: the pinned bun and node, \`nixPackages\`, and the
+// shellHook's environment. nix-develop exports that shell to every later step
+// of the job, \`uses:\` steps included.
 const SETUP_ACTION = `name: Setup
-description: Install the pinned bun and the frozen lockfile.
+description: Enter the flake's dev shell, cached, and install the frozen lockfile.
 runs:
   using: composite
   steps:
-    - uses: oven-sh/setup-bun@v2
+    # Single-user Nix, which cache-nix-action can restore a store into. Flakes
+    # and the flake's nixConfig (android-nixpkgs' cache) are on by default.
+    - uses: nixbuild/nix-quick-install-action@v35
+    # The whole store, so a run downloads nothing the last one on the default
+    # branch had. One cache per job and nix-file hash: a new key starts from
+    # empty rather than growing on top of the old store. Pull requests read the
+    # default branch's cache and save none of their own.
+    - uses: nix-community/cache-nix-action@v7
       with:
-        # Keep in lockstep with package.json packageManager and flake.nix.
-        bun-version: 1.4.5
+        primary-key: nix-\${{ runner.os }}-\${{ github.job }}-\${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        save: \${{ github.ref_name == github.event.repository.default_branch }}
+    - uses: nicknovitski/nix-develop@v1
     # --frozen-lockfile: CI must never mutate the lockfile. Retried because it
     # reaches the npm registry, which fails independently of the diff.
     - name: Install

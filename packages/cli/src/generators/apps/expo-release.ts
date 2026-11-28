@@ -273,15 +273,8 @@ const androidJob = (app: App) => {
           ref: ${expr(tag)}
       - uses: ./.github/actions/setup
       # The same \`android\` dev shell (nix/android.nix) a local
-      # \`bun run apk:${app.name}\` builds in.
-      - uses: DeterminateSystems/nix-installer-action@v22
-        with:
-          # Upstream Nix: Determinate's default also logs in to FlakeHub,
-          # which nothing here uses.
-          determinate: false
-          # Takes the flake's android-nixpkgs binary cache.
-          extra-conf: |
-            accept-flake-config = true
+      # \`bun run apk:${app.name}\` builds in; the setup action installed Nix
+      # and caches this job's store.
       - name: Build the signed APK
         run: nix develop .#android --command bun run --cwd ${dir} build:apk
         env:
