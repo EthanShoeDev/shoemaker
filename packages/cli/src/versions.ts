@@ -8,11 +8,11 @@ import { cliVersion } from './engine/meta.ts';
 // as one edit. `bun run update:generated-versions` moves every pin here to
 // npm's latest.
 
-const effect = '4.1.5';
-const oxlint = '1.94.0';
+const effect = '4.1.7';
+const oxlint = '1.95.0';
 const alchemy = '2.0.0-beta.87';
 const tanstackRouter = '^1.170.46';
-const expoSdk = '~58.0.26';
+const expoSdk = '~58.1.0';
 // Changesets releases the shoemaker packages as one fixed group, so the CLI's
 // own version is theirs. On 0.x a caret only admits patches, so a literal here
 // fell behind the first minor release.
@@ -83,16 +83,16 @@ export const versions = {
   '@effect/opentelemetry': effect,
   '@effect/atom-react': effect,
   '@effect/sql-pg': effect,
-  // @effect/tsgo 0.73 supports oxlint 1.91-1.94, tsgolint 7.0.2005, 2006 and 2008, TS 7.0.2.
-  '@effect/tsgo': '0.73.4',
+  // @effect/tsgo 0.74 supports oxlint 1.93-1.95, tsgolint 7.0.2006 and 2009, TS 7.0.2.
+  '@effect/tsgo': '0.74.1',
   '@effect/language-service': '^0.87.5',
 
   // Lint / format family: oxlint, its plugin API and tsgolint move together.
   oxlint,
   '@oxlint/plugins': oxlint,
-  'oxlint-tsgolint': '7.0.2008',
+  'oxlint-tsgolint': '7.0.2009',
   oxfmt: '0.80.0',
-  knip: '^6.48.0',
+  knip: '^6.49.0',
   jscpd: '^5.4.3',
   '@tanstack/eslint-plugin-query': '^5.108.4',
   'eslint-plugin-playwright': '^2.12.2',
@@ -101,14 +101,14 @@ export const versions = {
   // Toolchain
   typescript: '^7.0.2',
   turbo: '^2.11.13',
-  nx: '^24.0.6',
+  nx: '^24.1.0',
   tsdown: '^0.23.7',
-  vitest: '^5.1.1',
+  vitest: '^5.1.2',
   'happy-dom': '^21.0.4',
-  '@types/node': '^26.6.6',
+  '@types/node': '^26.6.11',
   'bun-types': '^1.4.5',
-  '@changesets/cli': '^3.0.3',
-  '@changesets/changelog-github': '^1.0.1',
+  '@changesets/cli': '^3.1.0',
+  '@changesets/changelog-github': '^2.0.0',
 
   // Spec-driven changes (openspec/)
   // Exact: generators/openspec/skills.gen.ts is this version's skills.
@@ -131,11 +131,11 @@ export const versions = {
   // React / web
   react: '^19.3.1',
   'react-dom': '^19.3.1',
-  '@types/react': '^19.3.0',
+  '@types/react': '^19.3.3',
   '@types/react-dom': '^19.3.0',
-  vite: '^8.3.8',
+  vite: '^8.4.0',
   '@vitejs/plugin-react': '^6.3.0',
-  '@rolldown/plugin-babel': '^0.3.1',
+  '@rolldown/plugin-babel': '^0.3.2',
   'babel-plugin-react-compiler': '^1.0.0',
   // Babel 7 while the repo can hold an Expo app: bun's hoisted linker puts
   // the web app's @babel/core at the root, where Metro loads it and Expo's
@@ -158,7 +158,7 @@ export const versions = {
 
   // Expo family: let `expo install --fix` own the exact RN-side versions.
   expo: expoSdk,
-  'expo-router': '~58.0.32',
+  'expo-router': '~58.0.33',
   'expo-status-bar': '~58.0.5',
   'expo-system-ui': '~58.0.7',
   'expo-constants': '~58.0.16',

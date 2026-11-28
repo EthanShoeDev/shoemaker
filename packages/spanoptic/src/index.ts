@@ -11,7 +11,7 @@ import {
   TextRenderable,
   createCliRenderer,
 } from '@opentui/core';
-import type { CliRenderer, KeyEvent } from '@opentui/core';
+import type { CliRenderer, KeyEvent, RenderContext } from '@opentui/core';
 import {
   Array as Arr,
   Clock,
@@ -99,6 +99,7 @@ const SPANS_TOP = 3;
 
 class SpanopticTUI {
   readonly #renderer: CliRenderer;
+  readonly #context: RenderContext;
   readonly #serviceName: string;
   readonly #container: BoxRenderable;
   readonly #logsBox: BoxRenderable;
@@ -120,19 +121,24 @@ class SpanopticTUI {
 
   constructor(renderer: CliRenderer, serviceName: string, now: number) {
     this.#renderer = renderer;
+    // The renderer is the context renderables take. Since @opentui/core 0.9.8
+    // its `selectionBg` getter returns `RGBA | undefined`, which the context's
+    // `selectionBg?: RGBA` refuses under exactOptionalPropertyTypes; a context
+    // without one reads as undefined all the same.
+    this.#context = renderer as RenderContext;
     this.#serviceName = serviceName;
     this.#now = now;
 
     renderer.setBackgroundColor(colors.background);
 
-    this.#container = new BoxRenderable(renderer, {
+    this.#container = new BoxRenderable(this.#context, {
       id: 'spanoptic-container',
       zIndex: 10,
     });
     renderer.root.add(this.#container);
 
     this.#container.add(
-      new TextRenderable(renderer, {
+      new TextRenderable(this.#context, {
         id: 'header',
         content: `● Trace (${serviceName})`,
         position: 'absolute',
@@ -144,7 +150,7 @@ class SpanopticTUI {
     );
 
     const logsHeight = MAX_LOGS_IN_PANEL + 2;
-    this.#logsBox = new BoxRenderable(renderer, {
+    this.#logsBox = new BoxRenderable(this.#context, {
       id: 'logs-box',
       position: 'absolute',
       left: 2,
@@ -166,7 +172,7 @@ class SpanopticTUI {
   }
 
   #addText(id: string, top: number) {
-    const text = new TextRenderable(this.#renderer, {
+    const text = new TextRenderable(this.#context, {
       id,
       content: '',
       position: 'absolute',
@@ -212,7 +218,7 @@ class SpanopticTUI {
           }));
 
     for (const [i, line] of lines.entries()) {
-      const text = new TextRenderable(this.#renderer, {
+      const text = new TextRenderable(this.#context, {
         id: `log-line-${i}`,
         content: line.content,
         position: 'absolute',
@@ -303,7 +309,7 @@ class SpanopticTUI {
 
     const line = this.#spanLines.get(span.spanId);
     if (line === undefined) {
-      const created = new TextRenderable(this.#renderer, {
+      const created = new TextRenderable(this.#context, {
         id: `span-${span.spanId}`,
         content,
         position: 'absolute',
@@ -324,7 +330,7 @@ class SpanopticTUI {
     if (!isSelected) {
       if (indicator !== undefined) indicator.visible = false;
     } else if (indicator === undefined) {
-      const created = new TextRenderable(this.#renderer, {
+      const created = new TextRenderable(this.#context, {
         id: `indicator-${span.spanId}`,
         content: '▶',
         position: 'absolute',
@@ -375,7 +381,7 @@ class SpanopticTUI {
       this.#detailsBox.height = height;
       return this.#detailsBox;
     }
-    const box = new BoxRenderable(this.#renderer, {
+    const box = new BoxRenderable(this.#context, {
       id: 'details-box',
       position: 'absolute',
       left: x,
@@ -458,7 +464,7 @@ class SpanopticTUI {
     }
 
     for (const [i, line] of lines.slice(0, height - 2).entries()) {
-      const text = new TextRenderable(this.#renderer, {
+      const text = new TextRenderable(this.#context, {
         id: `detail-line-${i}`,
         content: Str.slice(0, DETAILS_WIDTH - 4)(line.content),
         position: 'absolute',

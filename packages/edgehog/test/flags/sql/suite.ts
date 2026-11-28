@@ -7,7 +7,7 @@ import {
   type Scope,
   String as Str,
 } from 'effect';
-import { SqlClient } from 'effect/sql';
+import { SqlClient, SqlSchema } from 'effect/sql';
 import { TestClock } from 'effect/testing';
 import { runMigrations } from 'shoemaker-admin/sql';
 import { equals } from 'shoemaker-utils/testing/assertions';
@@ -293,13 +293,17 @@ export const flagSuite = <E, R>(
         const sql = yield* SqlClient.SqlClient;
         const key = Str.repeat(100)('k');
         yield* store.create(1, { key, config: text('é') });
-        const [row] = yield* sql<{
-          readonly size: number;
-          readonly definition: string;
-        }>`SELECT size, definition FROM edgehog_flag`;
+        const row = yield* SqlSchema.findOne({
+          Request: Schema.Void,
+          Result: Schema.Struct({
+            size: Schema.Finite,
+            definition: Schema.String,
+          }),
+          execute: () => sql`SELECT size, definition FROM edgehog_flag`,
+        })(undefined);
         assert.strictEqual(
-          row?.size,
-          100 + new TextEncoder().encode(row?.definition).length,
+          row.size,
+          100 + new TextEncoder().encode(row.definition).length,
         );
       }),
     );

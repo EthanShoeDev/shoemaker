@@ -52,7 +52,7 @@ const withMailer = Effect.map(
   BetterAuth({
     emailAndPassword: {
       enabled: true,
-      sendResetPassword: ({ url }) => Promise.resolve(void url),
+      sendResetPassword: () => Promise.resolve(),
     },
     plugins: [link, adminPlugin(access)],
   }),
@@ -82,11 +82,11 @@ const withoutPasswords = Effect.map(
 
 describe('a project’s instance', () => {
   it('typechecks for password links only with a mailer', () => {
-    void [withMailer, withoutMailer, withoutPasswords];
+    assert.lengthOf([withMailer, withoutMailer, withoutPasswords], 3);
   });
 
   it('typechecks only with the guarded admin plugin', () => {
-    void [project, stock, bare];
+    assert.lengthOf([project, stock, bare], 3);
   });
 
   it.effect('is refused with a second admin plugin', () =>

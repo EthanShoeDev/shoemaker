@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       # The pinned npm (12) needs Node ^22.22.2 or >= 24.15; trusted publishing needs npm 11.5+.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       # Opens a "Version packages" PR from pending changesets; once that PR is
