@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-spanoptic",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "TUI trace visualizer for Effect programs",
   "repository": {
     "type": "git",

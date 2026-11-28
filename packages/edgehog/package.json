@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-edgehog",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Feature flags and error tracking inside an Effect project, on its own database",
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-admin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Admin core for Effect projects: access, audit log and user operations, without UI",
   "repository": {
     "type": "git",

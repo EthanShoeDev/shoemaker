@@ -1,5 +1,103 @@
 # shoemaker
 
+## 0.2.10
+
+### Patch Changes
+
+- [`0d0c717`](https://github.com/EthanShoeDev/shoemaker/commit/0d0c7179578fc965546c8d3a41f4397aa4e4b174) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - `jsonc-parser` is gone: Effect's `Json5` parses JSONC, and `check --fix`
+  edits package.json through the merge `sync` uses. A fixed package.json keeps
+  its key order, indent and line endings, but comes out in `JSON.stringify`
+  layout, without any comments it had.
+  
+  `--force` globs use Effect's `Glob`, so `{a,b}` and `[...]` now work; a path
+  with literal brackets needs them escaped (`app/\[id].tsx`). Version comparisons
+  use `SemVer`, which orders prereleases.
+
+- [`97d8bef`](https://github.com/EthanShoeDev/shoemaker/commit/97d8bef965aaf85c7e42cfd3e3ffcb9281f33218) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Generated env vars and `shoemaker.lock.jsonc` sort by code unit instead of the
+  machine's locale. The next `shoemaker sync` reorders the lock once, and
+  `.env.schema` or `secretspec.toml` where the two orders differ
+  (`MOBILE_ANDROID_KEYSTORE` now comes before `MOBILE_ANDROID_KEY_ALIAS`); until
+  then `sync --check` can report those files as drift.
+
+- [`036f6d2`](https://github.com/EthanShoeDev/shoemaker/commit/036f6d2065e3e02909904035de4b5c645058fad5) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - `features.openspec` sets up [OpenSpec](https://github.com/Fission-AI/OpenSpec):
+  `openspec/`, the pinned CLI (a root devDependency, and `openspec` in the dev
+  shell), and its agent skills in `.agents/skills` and `.claude/skills`. Sync
+  writes the skills, so none go in the home directory, where agents in projects
+  that don't use OpenSpec would load them. New repos get it unless `openspec` is
+  left out of `--extras`; a config without the key leaves it off. `doctor` checks
+  repos that have an `openspec/config.yaml`.
+  
+  AGENTS.md's tooling region says skills, commands, plugins and MCP servers are
+  project-local.
+  
+  To turn it on in an existing repo:
+  
+  1. Set `openspec: true` under `features` in `shoemaker.config.ts`, and commit.
+  2. Run `bun run shoemaker:sync`. If the repo already had OpenSpec skills, they
+     are reported as untracked: compare them with `--dry-run`, then run
+     `bun run shoemaker:sync --force '.agents/skills/openspec*/**' --force '.claude/skills/openspec*/**'`.
+     Symlinks `openspec init` made in `.claude/skills` can stay: sync reads
+     through them.
+  3. If `openspec/config.yaml` already existed, make sure it says
+     `skillsScope: project`.
+  4. If `flake.nix` installs OpenSpec another way (a flake input or package),
+     remove that and run `nix flake lock`. The dev shell's `openspec` now runs
+     the one in `node_modules`.
+  5. Remove ignore entries for `openspec/**` that repeat the generated ones, then
+     `bun install` and run `lint:check`.
+  6. If `~/.agents/skills` or `~/.claude/skills` has `openspec*` folders, remove
+     them once every repo using OpenSpec has its own skills.
+
+- [`2485944`](https://github.com/EthanShoeDev/shoemaker/commit/24859442a6d3a873cb78fd860f75d5bacd08128f) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Secret values come from a remote store, never from a local file, gitignored or
+  not. The generated AGENTS.md, `.env.schema` and `secretspec.toml` say so and
+  carry the Infisical setup for private repos, whose URL comes from
+  `INFISICAL_DOMAIN`. The new `secrets-backend` doctor check fails on a secrets
+  manager with no remote backend, a local secretspec provider, or a secret left
+  in `.env`, `.env.local` or a stage's dotenv file (`.env.production.local`; not
+  `.env.test`).
+  
+  In an existing repo, after `shoemaker sync`:
+  
+  1. Run `bunx shoemaker doctor` and read the `secrets-backend` findings. They
+     name variables, never values.
+  2. Pick the store: the user's self-hosted Infisical for a private repo, any
+     remote store for a public one. If `INFISICAL_DOMAIN` is unset, ask the user
+     for it and have them set it in their environment. Never write the URL into a
+     public repo.
+  3. Add the plugin or provider the way the comment at the top of `.env.schema`
+     or `secretspec.toml` shows. With varlock, install the plugin first
+     (`bun add -d @varlock/infisical-plugin`, then `bun run catalog:fix`).
+  4. Ask the user to put each named value in the store. Do not print or copy
+     values yourself.
+  5. Check that `varlock load` or `secretspec check` resolves every variable,
+     then have the user delete the values from the local files.
+  6. Keep only the credential that opens the store on the machine, in its
+     environment or encrypted with `bunx varlock encrypt --file .env.local`.
+
+- [`e8b9b09`](https://github.com/EthanShoeDev/shoemaker/commit/e8b9b09d1c40e5b6ce487d02096b00907451772e) Thanks [@EthanShoeDev](https://github.com/EthanShoeDev)! - Generated repos get newer dependency versions:
+  
+  - `effect`: 4.1.5 → 4.1.7
+  - `expoSdk`: ~58.0.26 → ~58.1.0
+  - `@effect/tsgo`: 0.73.4 → 0.74.1
+  - `oxlint` and `@oxlint/plugins`: 1.94.0 → 1.95.0, which `@effect/tsgo` 0.74
+    supports
+  - `oxlint-tsgolint`: 7.0.2008 → 7.0.2009
+  - `knip`: ^6.48.0 → ^6.49.0
+  - `nx`: ^24.0.6 → ^24.1.0
+  - `vitest`: ^5.1.1 → ^5.1.2
+  - `@types/node`: ^26.6.6 → ^26.6.11
+  - `@changesets/cli`: ^3.0.3 → ^3.1.0
+  - `@changesets/changelog-github`: ^1.0.1 → ^2.0.0
+  - `@types/react`: ^19.3.0 → ^19.3.3
+  - `vite`: ^8.3.8 → ^8.4.0
+  - `@rolldown/plugin-babel`: ^0.3.1 → ^0.3.2
+  - `expo-router`: ~58.0.32 → ~58.0.33
+  
+  Existing repos: `bun run shoemaker:sync`, then `bun install`. A version the
+  repo already raised past these stays as it is.
+- Updated dependencies []:
+  - shoemaker-oxfmt-config@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes
