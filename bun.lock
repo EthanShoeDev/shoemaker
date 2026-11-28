@@ -63,7 +63,7 @@
     },
     "packages/cli": {
       "name": "shoemaker",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "bin": {
         "shoemaker": "./src/bin.ts",
       },
@@ -122,7 +122,7 @@
     },
     "packages/knip-config": {
       "name": "shoemaker-knip-config",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "devDependencies": {
         "@types/node": "catalog:",
         "knip": "catalog:",
@@ -136,7 +136,7 @@
     },
     "packages/oxfmt-config": {
       "name": "shoemaker-oxfmt-config",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "devDependencies": {
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
@@ -154,7 +154,7 @@
     },
     "packages/oxlint-config": {
       "name": "shoemaker-oxlint-config",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "@oxlint-flat-config/composer": "catalog:",
         "@tanstack/eslint-plugin-query": "catalog:",
@@ -183,7 +183,7 @@
     },
     "packages/oxlint-plugins": {
       "name": "shoemaker-oxlint-plugins",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "@oxlint/plugins": "catalog:",
       },
@@ -223,7 +223,7 @@
     },
     "packages/typescript-config": {
       "name": "shoemaker-typescript-config",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "@effect/language-service": "catalog:",
       },

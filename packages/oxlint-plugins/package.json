@@ -1,6 +1,6 @@
 {
   "name": "shoemaker-oxlint-plugins",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Generic oxlint JS plugin rules plus vendored anti-slop, used by shoemaker-oxlint-config",
   "license": "MIT",
   "repository": {
